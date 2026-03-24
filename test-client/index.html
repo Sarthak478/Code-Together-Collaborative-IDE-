@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+
+<body>
+    <h2>Hocuspocus Test</h2>
+
+    <script type="module">
+        import * as Y from "https://esm.sh/yjs"
+        import { HocuspocusProvider } from "https://esm.sh/@hocuspocus/provider"
+
+        const doc = new Y.Doc()
+
+        const provider = new HocuspocusProvider({
+            url: "ws://localhost:1235",
+            name: "test-room",
+            document: doc,
+        })
+
+        provider.on("connect", () => {
+            console.log("Connected to room")
+        })
+
+        provider.on("disconnect", () => {
+            console.log("Disconnected")
+        })
+    </script>
+</body>
+
+</html>

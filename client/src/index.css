@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&family=Source+Code+Pro:wght@400;500;700&family=Ubuntu+Mono:wght@400;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Reset button defaults so our inline styles take over fully */
+button {
+  font-family: inherit;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+
+button:hover {
+  opacity: 0.85;
+}
+
+/* CodeMirror full-height fix */
+.cm-editor {
+  height: 100% !important;
+}
+
+.cm-scroller {
+  overflow: auto !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0.5; }
+  to { transform: translateX(0); opacity: 1; }
+}
