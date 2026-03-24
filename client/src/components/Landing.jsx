@@ -1,102 +1,3 @@
-// import { useEffect, useState, useCallback } from "react"
-// import { generateRoomId } from "../utils/helpers"
-
-// /* ─── Landing Page ──────────────────────────────────────────────── */
-// export default function Landing({ username, onUsernameChange, onJoin, initialError }) {
-//   const [joinId, setJoinId] = useState("")
-//   const [createType, setCreateType] = useState("collaborative")
-//   const [isJoining, setIsJoining] = useState(false)
-//   const [toasts, setToasts] = useState([])
-
-//   const addToast = useCallback((text) => {
-//     const id = Date.now() + Math.random().toString()
-//     setToasts(prev => [...prev, { id, text }])
-//     setTimeout(() => {
-//       setToasts(prev => prev.filter(t => t.id !== id))
-//     }, 3000)
-//   }, [])
-
-//   useEffect(() => {
-//     if (initialError) addToast(initialError)
-//   }, [initialError, addToast])
-
-//   const handleJoin = async () => {
-//     const id = joinId.trim().replace(/^#/, '')
-//     if (!id) return
-//     setIsJoining(true)
-//     try {
-//       const res = await fetch("http://127.0.0.1:1235/rooms")
-//       const activeRooms = await res.json()
-//       if (!activeRooms.includes(id)) {
-//         addToast("❌ Please enter a correct room ID. This room does not exist.")
-//         setIsJoining(false)
-//         return
-//       }
-//       onJoin(id, "collaborative", false)
-//     } catch(e) {
-//       console.error(e)
-//       addToast("⚠️ Failed to connect to server to verify room.")
-//       setIsJoining(false)
-//     }
-//   }
-
-//   return (
-//     <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#1e1e2e", color: "#cdd6f4", fontFamily: "system-ui", position: "relative", overflow: "hidden" }}>
-//       {/* Landing Toasts */}
-//       <div style={{ position: "absolute", top: 24, left: "50%", transform: "translateX(-50%)", zIndex: 9999, display: "flex", flexDirection: "column", gap: 10, pointerEvents: "none", width: "100%", alignItems: "center" }}>
-//         {toasts.map(t => (
-//           <div key={t.id} style={{ background: "#313244", color: "#cdd6f4", padding: "12px 20px", borderRadius: 8, border: "1px solid #45475a", boxShadow: "0 4px 12px rgba(0,0,0,0.3)", animation: "toastIn 0.3s ease-out forwards", fontSize: 13, fontWeight: 500, maxWidth: 380, textAlign: "center" }}>
-//             {t.text}
-//             <style>{`
-//               @keyframes toastIn {
-//                 from { opacity: 0; transform: translateY(-20px); }
-//                 to { opacity: 1; transform: translateY(0); }
-//               }
-//             `}</style>
-//           </div>
-//         ))}
-//       </div>
-
-//       <div style={{ width: 440, background: "#181825", padding: 32, borderRadius: 12, border: "1px solid #313244", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
-//         <h1 style={{ marginTop: 0, textAlign: "center", fontSize: 26, color: "#89b4fa" }}>⚡ LiveShare IDE</h1>
-
-//         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24, padding: "8px 12px", background: "#11111b", borderRadius: 8, border: "1px solid #313244" }}>
-//           <span style={{ opacity: 0.7, fontSize: 13 }}>Username:</span>
-//           <input value={username} onChange={e => onUsernameChange(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", color: "#a6e3a1", fontWeight: 700, outline: "none", fontSize: 13 }} />
-//         </div>
-
-//         <div style={{ marginBottom: 24, padding: 16, background: "#11111b", borderRadius: 8, border: "1px solid #313244" }}>
-//           <div style={{ fontWeight: 700, marginBottom: 12, display: "flex", justifyContent: "space-between" }}>
-//             <span>Create a New Room</span>
-//             <span style={{ fontSize: 12, background: "#cba6f7", color: "#11111b", padding: "2px 8px", borderRadius: 12 }}>Host</span>
-//           </div>
-//           <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 8 }}>Select Room Type:</div>
-//           <select value={createType} onChange={e => setCreateType(e.target.value)} style={{ width: "100%", padding: 10, marginBottom: 12, background: "#1e1e2e", color: "#cdd6f4", border: "1px solid #313244", borderRadius: 6, cursor: "pointer" }}>
-//             <option value="collaborative">🤝 Collaborative (Friends) - All edit & run</option>
-//             <option value="interview">🎤 Interview - Participants can only run/change language</option>
-//             <option value="broadcast">📺 Broadcast (Teacher) - Participants are Read-Only</option>
-//           </select>
-//           <button onClick={() => onJoin(generateRoomId(), createType, true)} style={{ width: "100%", padding: 12, background: "#89b4fa", color: "#1e1e2e", border: "none", borderRadius: 6, fontWeight: 700, cursor: "pointer", transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity=0.9} onMouseLeave={e => e.currentTarget.style.opacity=1}>
-//             Create & Join Automatically
-//           </button>
-//         </div>
-
-//         <div style={{ padding: 16, background: "#11111b", borderRadius: 8, border: "1px solid #313244" }}>
-//           <div style={{ fontWeight: 700, marginBottom: 12 }}>Join Existing Room</div>
-//           <div style={{ display: "flex", gap: 8 }}>
-//             <input disabled={isJoining} value={joinId} onChange={e => setJoinId(e.target.value)} onKeyDown={e => {
-//               if (e.key === "Enter" && joinId.trim() && !isJoining) handleJoin()
-//             }} placeholder="e.g. fast-tiger-42" style={{ flex: 1, padding: 10, background: "#1e1e2e", color: "#cdd6f4", border: "1px solid #313244", borderRadius: 6, outline: "none", opacity: isJoining ? 0.5 : 1 }} />
-
-//             <button disabled={!joinId.trim() || isJoining} onClick={handleJoin} style={{ padding: "0 24px", background: joinId.trim() ? "#a6e3a1" : "#45475a", color: "#1e1e2e", border: "none", borderRadius: 6, fontWeight: 700, cursor: (joinId.trim() && !isJoining) ? "pointer" : "not-allowed", opacity: isJoining ? 0.5 : 1 }}>
-//               {isJoining ? "..." : "Join"}
-//             </button>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   )
-// }
 import { useEffect, useState, useCallback, useRef } from "react"
 import { generateRoomId } from "../utils/helpers"
 import { motion, AnimatePresence } from "framer-motion"
@@ -112,16 +13,17 @@ const themes = {
     textPrimary: "#cdd6f4",
     textSecondary: "#a6adc8",
     accent: "#89b4fa",
-    success: "#a6e3a1",
+    success: "#22c55e",
     error: "#f38ba8",
-    warning: "#f9e2af",
-    info: "#cba6f7",
+    warning: "#f59e0b",
+    info: "#8b5cf6",
     tabBg: "#11111b",
     tabActive: "#89b4fa",
     tabInactive: "transparent",
     placeholder: "#6c7086",
     gradient: "linear-gradient(135deg, #89b4fa, #cba6f7)",
-    buttonText: "#1e1e2e"
+    buttonText: "#1e1e2e" 
+    
   },
   light: {
     background: "linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)",
@@ -142,6 +44,7 @@ const themes = {
     placeholder: "#adb5bd",
     gradient: "linear-gradient(135deg, #0d6efd, #6f42c1)",
     buttonText: "#ffffff"
+
   }
 }
 
@@ -219,14 +122,14 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
       setRoomExists(null)
       return
     }
-
+    
     setIsValidating(true)
     try {
       const res = await fetch("http://127.0.0.1:1235/rooms")
       const activeRooms = await res.json()
       const exists = activeRooms.includes(roomId.trim().replace(/^#/, ''))
       setRoomExists(exists)
-    } catch (e) {
+    } catch(e) {
       console.error(e)
       setRoomExists(null)
     } finally {
@@ -244,20 +147,20 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
   const handleJoin = async () => {
     const id = joinId.trim().replace(/^#/, '')
     if (!id) return
-
+    
     setIsJoining(true)
     try {
       const res = await fetch("http://127.0.0.1:1235/rooms")
       const activeRooms = await res.json()
-
+      
       if (!activeRooms.includes(id)) {
         addToast("❌ Room not found. Please check the room ID and try again.", "error")
         setIsJoining(false)
         return
       }
-
+      
       onJoin(id, "collaborative", false)
-    } catch (e) {
+    } catch(e) {
       console.error(e)
       addToast("⚠️ Unable to connect to server. Please check your connection.", "error")
       setIsJoining(false)
@@ -272,7 +175,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
   }
 
   const getToastStyles = (type) => {
-    switch (type) {
+    switch(type) {
       case "error":
         return { background: currentTheme.error, color: "#ffffff", border: currentTheme.error }
       case "success":
@@ -283,13 +186,13 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
   }
 
   return (
-    <div style={{
-      height: "100vh",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      background: currentTheme.background,
-      color: currentTheme.textPrimary,
+    <div style={{ 
+      height: "100vh", 
+      display: "flex", 
+      alignItems: "center", 
+      justifyContent: "center", 
+      background: currentTheme.background, 
+      color: currentTheme.textPrimary, 
       fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif",
       position: "relative",
       overflow: "hidden",
@@ -307,7 +210,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
           <motion.div
             key={i}
             initial={{ opacity: 0, scale: 0 }}
-            animate={{
+            animate={{ 
               opacity: [0, 0.3, 0],
               scale: [0, 1, 0],
               x: Math.random() * window.innerWidth,
@@ -360,15 +263,15 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
       </motion.button>
 
       {/* Toast Notifications */}
-      <div style={{
-        position: "absolute",
-        top: 24,
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 9999,
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
+      <div style={{ 
+        position: "absolute", 
+        top: 24, 
+        left: "50%", 
+        transform: "translateX(-50%)", 
+        zIndex: 9999, 
+        display: "flex", 
+        flexDirection: "column", 
+        gap: 10, 
         pointerEvents: "none",
         width: "100%",
         maxWidth: 400,
@@ -381,13 +284,13 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
               initial={{ opacity: 0, y: -50, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-              style={{
+              style={{ 
                 ...getToastStyles(t.type),
-                padding: "12px 20px",
-                borderRadius: 12,
+                padding: "12px 20px", 
+                borderRadius: 12, 
                 boxShadow: theme === 'dark' ? "0 8px 24px rgba(0,0,0,0.3)" : "0 4px 12px rgba(0,0,0,0.15)",
-                fontSize: 13,
-                fontWeight: 500,
+                fontSize: 13, 
+                fontWeight: 500, 
                 textAlign: "center",
                 backdropFilter: "blur(10px)",
                 border: `1px solid ${getToastStyles(t.type).border}`,
@@ -404,13 +307,13 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
         initial={{ opacity: 0, y: 20, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        style={{
-          width: 480,
-          background: currentTheme.cardBg,
-          padding: 32,
-          borderRadius: 24,
+        style={{ 
+          width: 480, 
+          background: currentTheme.cardBg, 
+          padding: 32, 
+          borderRadius: 24, 
           border: `1px solid ${currentTheme.cardBorder}`,
-          boxShadow: theme === 'dark'
+          boxShadow: theme === 'dark' 
             ? "0 20px 60px rgba(0,0,0,0.5)"
             : "0 20px 40px rgba(0,0,0,0.1)",
           position: "relative",
@@ -420,12 +323,12 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
       >
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <motion.h1
+          <motion.h1 
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
-            style={{
-              margin: 0,
-              fontSize: 32,
+            style={{ 
+              margin: 0, 
+              fontSize: 32, 
               // background: currentTheme.gradient,
               WebkitBackgroundClip: "text",
               // WebkitTextFillColor: "transparent",
@@ -436,58 +339,66 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
           >
             ⚡ LiveShare IDE
           </motion.h1>
-          <p style={{
-            fontSize: 13,
-            marginTop: 0,
+          <p style={{ 
+            fontSize: 13, 
+            marginTop: 0, 
             color: currentTheme.textSecondary,
             fontWeight: 500
           }}>
             Real-time collaborative coding environment
           </p>
         </div>
-
+        
         {/* Username Input */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 }}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            marginBottom: 24,
-            padding: "12px 16px",
-            background: currentTheme.inputBg,
-            borderRadius: 12,
-            border: `1px solid ${currentTheme.inputBorder}`,
-            transition: "all 0.2s"
-          }}
-        >
-          <span style={{ fontSize: 18, color: currentTheme.textSecondary }}>👤</span>
-          <input
-            value={username}
-            onChange={e => onUsernameChange(e.target.value)}
-            placeholder="Enter your username"
-            style={{
-              flex: 1,
-              background: "transparent",
-              border: "none",
-              color: currentTheme.textPrimary,
-              fontWeight: 500,
-              outline: "none",
-              fontSize: 14,
-              padding: "4px 0"
-            }}
-          />
-        </motion.div>
+<motion.div
+  initial={{ opacity: 0, x: -20 }}
+  animate={{ opacity: 1, x: 0 }}
+  transition={{ delay: 0.1 }}
+  style={{ 
+    display: "flex", 
+    alignItems: "center", 
+    gap: 12, 
+    marginBottom: 24, 
+    padding: "12px 16px", 
+    background: currentTheme.inputBg,
+    borderRadius: 12, 
+    border: `1px solid ${currentTheme.inputBorder}`,
+    transition: "all 0.2s"
+  }}
+>
+  <span style={{ 
+    fontSize: 18, 
+    color: currentTheme.textSecondary 
+  }}>
+    👤
+  </span>
+
+  <input 
+    value={username} 
+    onChange={e => onUsernameChange(e.target.value)} 
+    placeholder="Enter your username"
+    style={{ 
+      flex: 1, 
+      background: "transparent", 
+      border: "none", 
+      color: currentTheme.textPrimary, 
+      fontWeight: 600,                // bold & clean
+      outline: "none", 
+      fontSize: 15,                   // slightly bigger
+      padding: "4px 0",
+      fontFamily: "'Inter', 'Poppins', sans-serif", // modern font
+      letterSpacing: "0.3px"          // premium spacing
+    }} 
+  />
+</motion.div>
 
         {/* Tab Navigation */}
-        <div style={{
-          display: "flex",
-          gap: 8,
-          marginBottom: 24,
-          background: currentTheme.tabBg,
-          padding: 4,
+        <div style={{ 
+          display: "flex", 
+          gap: 8, 
+          marginBottom: 24, 
+          background: currentTheme.tabBg, 
+          padding: 4, 
           borderRadius: 12,
           border: theme === 'light' ? `1px solid ${currentTheme.cardBorder}` : 'none'
         }}>
@@ -531,26 +442,26 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
               transition={{ duration: 0.3 }}
             >
               <div style={{ marginBottom: 20 }}>
-                <div style={{
-                  fontWeight: 700,
-                  marginBottom: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
+                <div style={{ 
+                  fontWeight: 700, 
+                  marginBottom: 12, 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8, 
                   color: currentTheme.textPrimary,
                   fontSize: 15
                 }}>
                   <span>🚀 Room Configuration</span>
-                  <span style={{
-                    fontSize: 11,
-                    background: currentTheme.info,
-                    color: "#ffffff",
-                    padding: "2px 10px",
+                  <span style={{ 
+                    fontSize: 11, 
+                    background: currentTheme.info, 
+                    color: "#ffffff", 
+                    padding: "2px 10px", 
                     borderRadius: 20,
                     fontWeight: 600
                   }}>Host</span>
                 </div>
-
+                
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {Object.entries(roomTypes).map(([key, type]) => (
                     <motion.div
@@ -575,11 +486,11 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
                             <div style={{ fontSize: 12, color: currentTheme.textSecondary }}>{type.description}</div>
                           </div>
                         </div>
-                        <span style={{
-                          fontSize: 11,
-                          background: type.color,
-                          color: "#ffffff",
-                          padding: "4px 10px",
+                        <span style={{ 
+                          fontSize: 11, 
+                          background: type.color, 
+                          color: "#ffffff", 
+                          padding: "4px 10px", 
                           borderRadius: 20,
                           fontWeight: 600
                         }}>
@@ -629,9 +540,9 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
               transition={{ duration: 0.3 }}
             >
               <div style={{ marginBottom: 20 }}>
-                <div style={{
-                  fontWeight: 700,
-                  marginBottom: 12,
+                <div style={{ 
+                  fontWeight: 700, 
+                  marginBottom: 12, 
                   color: currentTheme.textPrimary,
                   fontSize: 15
                 }}>
@@ -718,10 +629,10 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
                 )}
               </motion.button>
 
-              <div style={{
-                marginTop: 16,
-                fontSize: 12,
-                textAlign: "center",
+              <div style={{ 
+                marginTop: 16, 
+                fontSize: 12, 
+                textAlign: "center", 
                 color: currentTheme.textSecondary,
                 fontWeight: 500
               }}>
