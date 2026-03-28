@@ -1,7 +1,7 @@
 /* ─── Navbar Component ──────────────────────────────────────────── */
 export default function Navbar({
   roomId, actualRoomType, isHost, username,
-  chatOpen, onToggleChat, onToggleSettings, onLeave,
+  onToggleSettings, onLeave,
   headerBg, borderCol, textColor, accent
 }) {
   return (
@@ -14,10 +14,6 @@ export default function Navbar({
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <span style={{ fontSize: 12, opacity: 0.5 }}>@{username}</span>
-
-        <button onClick={onToggleChat} title="Toggle Chat" style={{ background: chatOpen ? accent : "transparent", color: chatOpen ? "#1e1e2e" : textColor, border: "none", cursor: "pointer", fontSize: 13, fontWeight: "bold", padding: "4px 10px", borderRadius: 6, transition: "all 0.2s" }}>
-          💬 Chat
-        </button>
 
         <button onClick={onToggleSettings} title="Settings" style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 20, color: textColor }}>⚙️</button>
 

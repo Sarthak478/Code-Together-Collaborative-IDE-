@@ -52,6 +52,7 @@ const themes = {
 export default function Landing({ username, onUsernameChange, onJoin, initialError }) {
   const [joinId, setJoinId] = useState("")
   const [createType, setCreateType] = useState("collaborative")
+  const [roomMode, setRoomMode] = useState("ide")
   const [isJoining, setIsJoining] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [toasts, setToasts] = useState([])
@@ -80,6 +81,23 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
   }, [])
 
   const currentTheme = themes[theme]
+
+  const roomModes = {
+    compiler: {
+      icon: "⚡",
+      title: "Compiler",
+      description: "Single file editor with code execution",
+      color: currentTheme.warning,
+      badge: "Quick Run"
+    },
+    ide: {
+      icon: "🛠️",
+      title: "Full IDE",
+      description: "Multi-file workspace with terminal & tools",
+      color: currentTheme.accent,
+      badge: "VS Code-like"
+    }
+  }
 
   const roomTypes = {
     collaborative: {
@@ -159,7 +177,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
         return
       }
       
-      onJoin(id, "collaborative", false)
+      onJoin(id, "collaborative", false, null)
     } catch(e) {
       console.error(e)
       addToast("⚠️ Unable to connect to server. Please check your connection.", "error")
@@ -170,7 +188,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
   const handleCreate = async (type) => {
     setIsCreating(true)
     await new Promise(resolve => setTimeout(resolve, 300))
-    onJoin(generateRoomId(), type, true)
+    onJoin(generateRoomId(), type, true, roomMode)
     setIsCreating(false)
   }
 
@@ -441,6 +459,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.3 }}
             >
+              {/* Mode Selection */}
               <div style={{ marginBottom: 20 }}>
                 <div style={{ 
                   fontWeight: 700, 
@@ -451,7 +470,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
                   color: currentTheme.textPrimary,
                   fontSize: 15
                 }}>
-                  <span>🚀 Room Configuration</span>
+                  <span>🖥️ Environment</span>
                   <span style={{ 
                     fontSize: 11, 
                     background: currentTheme.info, 
@@ -462,7 +481,60 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
                   }}>Host</span>
                 </div>
                 
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "flex", gap: 10 }}>
+                  {Object.entries(roomModes).map(([key, mode]) => (
+                    <motion.div
+                      key={key}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => setRoomMode(key)}
+                      style={{
+                        flex: 1,
+                        padding: 14,
+                        background: roomMode === key ? (theme === 'dark' ? `rgba(137, 180, 250, 0.12)` : `rgba(13, 110, 253, 0.06)`) : currentTheme.inputBg,
+                        border: `2px solid ${roomMode === key ? mode.color : currentTheme.inputBorder}`,
+                        borderRadius: 12,
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                        textAlign: "center"
+                      }}
+                    >
+                      <div style={{ fontSize: 28, marginBottom: 6 }}>{mode.icon}</div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: currentTheme.textPrimary }}>{mode.title}</div>
+                      <div style={{ fontSize: 11, color: currentTheme.textSecondary, marginTop: 2 }}>{mode.description}</div>
+                      <span style={{ 
+                        display: "inline-block",
+                        marginTop: 8,
+                        fontSize: 10, 
+                        background: roomMode === key ? mode.color : 'transparent',
+                        color: roomMode === key ? "#ffffff" : currentTheme.textSecondary,
+                        padding: "3px 10px", 
+                        borderRadius: 20,
+                        fontWeight: 600,
+                        border: roomMode === key ? 'none' : `1px solid ${currentTheme.inputBorder}`
+                      }}>
+                        {mode.badge}
+                      </span>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Room Type Selection */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ 
+                  fontWeight: 700, 
+                  marginBottom: 12, 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8, 
+                  color: currentTheme.textPrimary,
+                  fontSize: 14
+                }}>
+                  <span>🚀 Room Type</span>
+                </div>
+                
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {Object.entries(roomTypes).map(([key, type]) => (
                     <motion.div
                       key={key}
@@ -470,7 +542,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
                       whileTap={{ scale: 0.98 }}
                       onClick={() => setCreateType(key)}
                       style={{
-                        padding: 16,
+                        padding: 14,
                         background: createType === key ? (theme === 'dark' ? `rgba(137, 180, 250, 0.1)` : `rgba(13, 110, 253, 0.05)`) : currentTheme.inputBg,
                         border: `2px solid ${createType === key ? type.color : currentTheme.inputBorder}`,
                         borderRadius: 12,
@@ -478,19 +550,19 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
                         transition: "all 0.2s"
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span style={{ fontSize: 24 }}>{type.icon}</span>
+                          <span style={{ fontSize: 22 }}>{type.icon}</span>
                           <div>
-                            <div style={{ fontWeight: 700, fontSize: 16, color: currentTheme.textPrimary }}>{type.title}</div>
-                            <div style={{ fontSize: 12, color: currentTheme.textSecondary }}>{type.description}</div>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: currentTheme.textPrimary }}>{type.title}</div>
+                            <div style={{ fontSize: 11, color: currentTheme.textSecondary }}>{type.description}</div>
                           </div>
                         </div>
                         <span style={{ 
-                          fontSize: 11, 
+                          fontSize: 10, 
                           background: type.color, 
                           color: "#ffffff", 
-                          padding: "4px 10px", 
+                          padding: "3px 10px", 
                           borderRadius: 20,
                           fontWeight: 600
                         }}>

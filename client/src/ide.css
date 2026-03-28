@@ -1,0 +1,273 @@
+/* ═══════════════════════════════════════════════════════════════
+   IDE-specific styles — LiveShare Collaborative IDE
+   ═══════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+/* ── File Explorer ───────────────────────────────────── */
+.ide-file-tree {
+  user-select: none;
+}
+
+.ide-file-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 0;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ide-file-item:hover {
+  opacity: 1 !important;
+}
+
+.ide-file-item.active {
+  font-weight: 600;
+}
+
+/* ── Tab Bar ─────────────────────────────────────────── */
+.ide-tab-bar {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ide-tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.ide-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  border-right: 1px solid var(--ide-border, #313244);
+  transition: background 0.15s ease;
+  position: relative;
+  min-width: 0;
+}
+
+.ide-tab:hover {
+  opacity: 1 !important;
+}
+
+.ide-tab .tab-close {
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 11px;
+  transition: opacity 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.ide-tab:hover .tab-close {
+  opacity: 0.6;
+}
+
+.ide-tab .tab-close:hover {
+  opacity: 1;
+}
+
+/* ── Terminal ────────────────────────────────────────── */
+.ide-terminal-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.ide-terminal-container .xterm {
+  padding: 8px;
+}
+
+.ide-terminal-container .xterm-viewport::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ide-terminal-container .xterm-viewport::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+/* ── Resize Handle ───────────────────────────────────── */
+.ide-resize-handle {
+  height: 4px;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 5;
+}
+
+.ide-resize-handle:hover,
+.ide-resize-handle.dragging {
+  background: rgba(137, 180, 250, 0.3) !important;
+}
+
+.ide-resize-handle::after {
+  content: '';
+  width: 40px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  transition: background 0.15s;
+}
+
+.ide-resize-handle:hover::after {
+  background: rgba(137, 180, 250, 0.6);
+}
+
+/* ── Status Bar ──────────────────────────────────────── */
+.ide-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.ide-status-bar .status-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  cursor: default;
+  transition: background 0.15s;
+  height: 100%;
+}
+
+.ide-status-bar .status-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Extensions Panel ────────────────────────────────── */
+.ide-ext-card {
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s;
+}
+
+.ide-ext-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.ide-tool-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.15s, border-color 0.15s;
+  border: 1px solid transparent;
+}
+
+.ide-tool-btn:hover {
+  transform: translateX(3px);
+}
+
+.ide-tool-btn:active {
+  transform: translateX(1px) scale(0.99);
+}
+
+/* ── Context Menu ────────────────────────────────────── */
+.ide-context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 180px;
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: contextMenuIn 0.12s ease;
+}
+
+.ide-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.1s;
+}
+
+.ide-context-menu-item:hover {
+  background: rgba(137, 180, 250, 0.15);
+}
+
+.ide-context-menu-sep {
+  height: 1px;
+  margin: 4px 8px;
+  opacity: 0.3;
+}
+
+@keyframes contextMenuIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ── Scrollbar (for panels) ──────────────────────────── */
+.ide-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ide-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ide-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.ide-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Animations ──────────────────────────────────────── */
+@keyframes slideUp {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes panelIn {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Input inline rename ─────────────────────────────── */
+.ide-rename-input {
+  background: transparent;
+  border: 1px solid rgba(137, 180, 250, 0.5);
+  border-radius: 3px;
+  color: inherit;
+  font-size: 13px;
+  padding: 1px 4px;
+  outline: none;
+  width: 100%;
+  font-family: inherit;
+}
+
+.ide-rename-input:focus {
+  border-color: rgba(137, 180, 250, 0.8);
+  box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.15);
+}

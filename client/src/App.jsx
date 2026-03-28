@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Landing from "./components/Landing"
 import EditorRoom from "./components/EditorRoom"
+import IDERoom from "./components/IDERoom"
 
 const SESSION_KEY = "ls_session"
 
@@ -11,8 +12,8 @@ function getSession() {
   } catch { return null }
 }
 
-function saveSession(roomId, roomType) {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ roomId, roomType }))
+function saveSession(roomId, roomType, roomMode) {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ roomId, roomType, roomMode }))
 }
 
 function clearSession() {
@@ -23,7 +24,8 @@ export default function App() {
   const saved = getSession()
   const [roomId, setRoomId] = useState(saved?.roomId ?? null)
   const [roomType, setRoomType] = useState(saved?.roomType ?? "collaborative")
-  const [isCreating, setIsCreating] = useState(saved ? false : false)
+  const [roomMode, setRoomMode] = useState(saved?.roomMode ?? "compiler")
+  const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState(null)
   const [username, setUsername] = useState(() => {
     let un = localStorage.getItem("ls_un")
@@ -31,12 +33,15 @@ export default function App() {
     return un
   })
 
-  const onJoin = (id, type, creating = false) => {
+  const onJoin = (id, type, creating = false, mode = null) => {
     setError(null)
     setRoomId(id)
     setRoomType(type)
     setIsCreating(creating)
-    saveSession(id, type)
+    // When joining (not creating), mode will be null — detect from room
+    // When creating, mode is explicitly set
+    if (mode) setRoomMode(mode)
+    saveSession(id, type, mode || roomMode)
   }
 
   const onLeave = (msg) => {
@@ -53,6 +58,19 @@ export default function App() {
         onUsernameChange={u => { setUsername(u); localStorage.setItem("ls_un", u) }}
         onJoin={onJoin}
         initialError={error}
+      />
+    )
+  }
+
+  // Route to IDE or Compiler based on roomMode
+  if (roomMode === "ide") {
+    return (
+      <IDERoom
+        roomId={roomId}
+        initialRoomType={roomType}
+        isCreating={isCreating}
+        username={username}
+        onLeave={onLeave}
       />
     )
   }

@@ -49,3 +49,72 @@ export const CURSORS = [
   { id: "pointer", label: "👆 Pointer", css: "pointer" },
   { id: "cell", label: "⊞ Cell", css: "cell" },
 ]
+
+/* ─── File extension → language mapping ────────────────────────── */
+export const EXT_TO_LANG = {
+  'py': 'python',
+  'js': 'javascript',
+  'jsx': 'javascript',
+  'ts': 'typescript',
+  'tsx': 'typescript',
+  'cpp': 'cpp',
+  'cc': 'cpp',
+  'c': 'cpp',
+  'h': 'cpp',
+  'hpp': 'cpp',
+  'java': 'java',
+  'rs': 'rust',
+  'go': 'go',
+  'html': 'html',
+  'htm': 'html',
+  'css': 'html',
+  'sql': 'sql',
+  'md': 'markdown',
+  'json': 'javascript',
+  'xml': 'html',
+  'yaml': 'markdown',
+  'yml': 'markdown',
+  'txt': 'markdown',
+  'sh': 'javascript',
+  'bash': 'javascript',
+  'toml': 'markdown',
+  'cfg': 'markdown',
+  'env': 'markdown',
+}
+
+/* ─── File icon mapping ────────────────────────────────────────── */
+export const FILE_ICONS = {
+  'py': '🐍',
+  'js': '📜',
+  'jsx': '⚛️',
+  'ts': '🔷',
+  'tsx': '⚛️',
+  'cpp': '⚙️',
+  'c': '⚙️',
+  'h': '📋',
+  'java': '☕',
+  'rs': '🦀',
+  'go': '🐹',
+  'html': '🌐',
+  'htm': '🌐',
+  'css': '🎨',
+  'sql': '🗄️',
+  'md': '📝',
+  'json': '📦',
+  'xml': '📄',
+  'yaml': '⚙️',
+  'yml': '⚙️',
+  'txt': '📄',
+  'sh': '💻',
+  'bash': '💻',
+  'toml': '⚙️',
+  'env': '🔐',
+  'gitignore': '🚫',
+  'dockerfile': '🐳',
+  'lock': '🔒',
+}
+
+export const FOLDER_ICON = '📁'
+export const FOLDER_OPEN_ICON = '📂'
+export const DEFAULT_FILE_ICON = '📄'
+
