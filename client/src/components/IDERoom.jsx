@@ -8,13 +8,14 @@ import useIDERoom from "../hooks/useIDERoom"
 import Navbar from "./editor/Navbar"
 import ChatPanel from "./editor/ChatPanel"
 import SettingsPanel from "./editor/SettingsPanel"
+import OutputPanel from "./editor/OutputPanel"
 
 import FileExplorer from "./ide/FileExplorer"
 import TabBar from "./ide/TabBar"
 import TerminalPanel from "./ide/TerminalPanel"
 import ExtensionsPanel from "./ide/ExtensionsPanel"
 import StatusBar from "./ide/StatusBar"
-import BrowserPreviewPanel from "./ide/BrowserPreviewPanel"
+
 
 export default function IDERoom(props) {
   const ide = useIDERoom(props)
@@ -151,6 +152,28 @@ export default function IDERoom(props) {
           </button>
         </div>
 
+        {/* User Presence (Center-ish) */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "0 16px", overflowX: "auto", maxWidth: 400 }}>
+          {ide.visibleActiveUsersList.map(u => (
+            <div
+              key={u.id}
+              onClick={() => { if (u.activeFile && u.id !== ide.editor.provider.awareness.clientID) ide.openFile(u.activeFile) }}
+              title={u.id === ide.editor.provider.awareness.clientID ? `@${u.name} (You)` : `Click to follow @${u.name}`}
+              style={{
+                width: 28, height: 28, borderRadius: "50%", background: u.color,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#1e1e2e", fontWeight: "bold", fontSize: 11, cursor: "pointer",
+                border: u.activeFile === ide.activeFile ? `2px solid ${ide.accent}` : "2px solid transparent",
+                flexShrink: 0, transition: "transform 0.2s"
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = "scale(1.1)"}
+              onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+            >
+              {u.name.slice(0, 1).toUpperCase()}
+            </div>
+          ))}
+        </div>
+
         {/* Right Toggle Panel Controls */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, height: "100%" }}>
           {ide.actualRoomType !== "broadcast" && (
@@ -200,18 +223,27 @@ export default function IDERoom(props) {
             &gt;_ Terminal
           </button>
 
+          {ide.actualRoomType === "interview" && (
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginLeft: 16 }}>
+              <div style={{ background: "#a6e3a1", color: "#1e1e2e", padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px" }}>
+                🎓 Interview Mode
+              </div>
+              <div style={{ color: ide.textColor, fontSize: 13, fontWeight: "bold", fontFamily: "monospace", opacity: 0.8 }}>
+                ⏱️ {new Date(ide.interviewTime * 1000).toISOString().substr(11, 8)}
+              </div>
+            </div>
+          )}
+
           <button
-            onClick={() => {
-              if (ide.activeFile !== "__PREVIEW__") ide.openFile("__PREVIEW__")
-            }}
+            onClick={() => ide.setPreviewOpen(!ide.previewOpen)}
             style={{
-              background: ide.activeFile === "__PREVIEW__" ? (ide.isDark ? "rgba(137, 180, 250, 0.2)" : "rgba(13, 110, 253, 0.1)") : "transparent",
-              color: ide.activeFile === "__PREVIEW__" ? ide.accent : ide.textColor,
-              border: "none", cursor: "pointer", fontSize: 13, fontWeight: "bold",
+              background: ide.previewOpen ? "transparent" : (ide.isDark ? "rgba(137, 180, 250, 0.2)" : "rgba(13, 110, 253, 0.1)"),
+              color: ide.previewOpen ? ide.textColor : ide.accent,
+              border: `1px solid ${ide.previewOpen ? "transparent" : ide.borderCol}`, cursor: "pointer", fontSize: 13, fontWeight: "bold",
               padding: "4px 10px", borderRadius: 6, transition: "all 0.2s"
             }}
           >
-            🌐 Preview
+            {ide.previewOpen ? "❌ Close Preview" : "🚀 Open Preview"}
           </button>
         </div>
       </div>
@@ -254,36 +286,52 @@ export default function IDERoom(props) {
           />
 
           {/* Editor Container */}
-          <div style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-            {ide.activeFile === "__PREVIEW__" ? (
-              <BrowserPreviewPanel
-                bg={ide.bg}
-                panelBg={ide.panelBg}
+          <div style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", flexDirection: "row" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+              {ide.activeFile && !ide.isSyncingFile && ide.isPersistenceSynced ? (
+                <CodeMirror
+                  key={ide.activeFile}
+                  extensions={[
+                    ...ide.extensions,
+                    keymap.of([indentWithTab])
+                  ]}
+                  theme={ide.cmBaseTheme}
+                  style={{ flex: 1, fontSize: `${ide.activeFontSize}px`, fontFamily: ide.activeFontFamily, height: "100%" }}
+                  readOnly={!ide.canEdit}
+                />
+              ) : (
+                <div style={{
+                  flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
+                  justifyContent: "center", opacity: 0.4, gap: 16, background: ide.panelBg
+                }}>
+                  {(ide.isSyncingFile || !ide.isPersistenceSynced) ? (
+                    <>
+                      <div style={{ width: 40, height: 40, border: `3px solid ${ide.accent}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>
+                        {!ide.isPersistenceSynced ? "Initializing Offline Storage..." : "Synchronizing Workspace..."}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 64 }}>🛠️</div>
+                      <div style={{ fontSize: 18, fontWeight: 600 }}>LiveShare Collaborative IDE</div>
+                      <div style={{ fontSize: 13, marginTop: 8 }}>Select or create a file to start coding</div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {ide.previewOpen && (
+              <OutputPanel
+                output={{ isRender: true, lang: ide.activeLanguage, renderedCode: ide.activeYText?.toString() || "" }}
+                onClear={() => ide.setPreviewOpen(false)}
+                fontFamily={ide.activeFontFamily}
+                fontSize={ide.activeFontSize}
+                isDark={ide.isDark}
                 textColor={ide.textColor}
                 borderCol={ide.borderCol}
-                accent={ide.accent}
-                isDark={ide.isDark}
               />
-            ) : ide.activeFile ? (
-              <CodeMirror
-                value={ide.activeYText ? ide.activeYText.toString() : ""}
-                extensions={[
-                  ...ide.extensions,
-                  keymap.of([indentWithTab])
-                ]}
-                theme={ide.cmBaseTheme}
-                style={{ flex: 1, fontSize: `${ide.activeFontSize}px`, fontFamily: ide.activeFontFamily, height: "100%" }}
-                readOnly={!ide.canEdit}
-              />
-            ) : (
-              <div style={{
-                flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
-                justifyContent: "center", opacity: 0.4, gap: 16
-              }}>
-                <div style={{ fontSize: 64 }}>🛠️</div>
-                <div style={{ fontSize: 18, fontWeight: 600 }}>LiveShare Collaborative IDE</div>
-                <div style={{ fontSize: 13, marginTop: 8 }}>Select or create a file to start coding</div>
-              </div>
             )}
           </div>
 
@@ -325,14 +373,17 @@ export default function IDERoom(props) {
                 {ide.rightPanel === "chat" ? (
                   <ChatPanel
                     messages={ide.visibleChatMsgs}
-                    onSendMessage={ide.sendChat}
                     chatInput={ide.chatInput}
                     setChatInput={ide.setChatInput}
                     chatTarget={ide.chatTarget}
                     setChatTarget={ide.setChatTarget}
+                    onSendMessage={ide.sendChat}
                     activeUsers={ide.visibleActiveUsersList}
-                    themeData={{ bg: ide.bg, textColor: ide.textColor, borderCol: ide.borderCol, accent: ide.accent, inputBg: ide.inputBg }}
+                    themeData={{ bg: ide.bg, textColor: ide.textColor, borderCol: ide.borderCol, accent: ide.accent, inputBg: ide.inputBg, panelBg: ide.panelBg, headerBg: ide.headerBg }}
                     chatEnabled={ide.chatEnabled}
+                    username={ide.editor.username}
+                    actualRoomType={ide.actualRoomType}
+                    isHost={ide.isHost}
                   />
                 ) : (
                   <ExtensionsPanel
@@ -360,6 +411,7 @@ export default function IDERoom(props) {
         bg={ide.bg}
         textColor={ide.textColor}
         accent={ide.accent}
+        actualRoomType={ide.actualRoomType}
       />
 
       {/* ── Modals / Overlays ── */}
@@ -381,7 +433,8 @@ export default function IDERoom(props) {
           activeUsers={ide.visibleActiveUsersList}
           hostName={ide.hostName}
           kickUser={ide.kickUser}
-          themeData={{ bg: ide.bg, headerBg: ide.headerBg, textColor: ide.textColor, borderCol: ide.borderCol, accent: ide.accent, inputBg: ide.inputBg, isDark: ide.isDark }}
+          themeData={{ bg: ide.bg, headerBg: ide.headerBg, textColor: ide.textColor, borderCol: ide.borderCol, accent: ide.accent, inputBg: ide.inputBg, isDark: ide.isDark, panelBg: ide.panelBg }}
+          username={ide.editor.username}
         />
       )}
 

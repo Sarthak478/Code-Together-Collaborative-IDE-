@@ -3,7 +3,7 @@ import { EXT_TO_LANG } from "../constants/editorConfigs"
 
 const API_URL = "http://localhost:1236"
 
-export default function useFileSystem(ydoc, provider, isCreating, roomId) {
+export default function useFileSystem(ydoc, provider, isCreating, roomId, isHost) {
   const [tree, setTree] = useState({}) // Maps parentPath -> Array of children
   const [version, setVersion] = useState(0)
 
@@ -61,17 +61,19 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId) {
   /* Fetch specific file content to Yjs */
   const fetchFileContentToYjs = useCallback(async (filePath) => {
     const ytext = getFileText(filePath)
-    if (ytext.length > 0) return // already loaded in memory
+    // If Y.Text already has content, skip fetch (collaborative state is source of truth)
+    if (ytext.length > 0) return
     try {
       const resp = await fetch(`${API_URL}/content?roomId=${roomId}&path=${encodeURIComponent(filePath)}`)
       if (resp.ok) {
         const content = await resp.text()
+        // Any user can populate empty Y.Text — CRDT handles conflicts (first writer wins)
         if (content && ytext.length === 0) {
           ydoc.transact(() => { ytext.insert(0, content) })
         }
       }
     } catch (e) { console.error("Content fetch block:", e) }
-  }, [roomId, getFileText, ydoc])
+  }, [roomId, getFileText, ydoc, isHost])
 
   /* Save Yjs text back to Disk via REST */
   const saveFileToDisk = useCallback(async (filePath) => {
@@ -144,6 +146,50 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId) {
     return newPath
   }, [roomId, refreshPath, getFileText, ydoc])
 
+  const importFiles = useCallback(async (files, parentPath = "/") => {
+    for (const file of files) {
+      // webkitRelativePath gives "folder/subfolder/file.txt"
+      const relativePath = file.webkitRelativePath || file.name
+      const parts = relativePath.split("/")
+      let currentPath = parentPath === "/" ? "" : parentPath
+
+      // Create intermediate folders
+      for (let i = 0; i < parts.length - 1; i++) {
+        const folderName = parts[i]
+        const folderPath = (currentPath === "" ? "" : currentPath + "/") + folderName
+        // Check if folder exists or just try creating
+        await createFolder(currentPath || "/", folderName)
+        currentPath = folderPath
+      }
+
+      // Create the file
+      const fileName = parts[parts.length - 1]
+      const finalParent = currentPath || "/"
+      const filePath = (finalParent === "/" ? "/" : finalParent + "/") + fileName
+
+      // Read file content
+      const content = await new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onload = (e) => resolve(e.target.result)
+        reader.readAsText(file)
+      })
+
+      // Create on server
+      await createFile(finalParent, fileName)
+      
+      // Sync content to Yjs
+      const ytext = getFileText(filePath)
+      ydoc.transact(() => {
+        if (ytext.length > 0) ytext.delete(0, ytext.length)
+        ytext.insert(0, content)
+      })
+      
+      // Save to disk
+      await saveFileToDisk(filePath)
+    }
+    refreshPath(parentPath)
+  }, [createFile, createFolder, getFileText, ydoc, saveFileToDisk, refreshPath])
+
   /* ── Tree helpers ── */
   const getChildren = useCallback((parentPath) => {
     const normalizedParent = parentPath === "/" ? "/" : parentPath
@@ -159,7 +205,7 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId) {
     version,
     getChildren,
     getFileText,
-    getFileContent,       // ← fixed: now exported so runCode/syncFilesToTerminal can use it
+    getFileContent,
     fetchFileContentToYjs,
     saveFileToDisk,
     refreshPath,
@@ -170,5 +216,6 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId) {
     renameEntry,
     detectLanguage,
     getExt,
+    importFiles,
   }
 }

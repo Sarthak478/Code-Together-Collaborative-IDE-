@@ -177,7 +177,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
         return
       }
       
-      onJoin(id, "collaborative", false, null)
+      onJoin(id, "collaborative", false, "ide")
     } catch(e) {
       console.error(e)
       addToast("⚠️ Unable to connect to server. Please check your connection.", "error")

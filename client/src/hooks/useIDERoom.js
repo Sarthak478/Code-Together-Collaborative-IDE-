@@ -32,17 +32,34 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     }
 
     const joinTime = Date.now()
+    const userColor = "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0")
     provider.awareness.setLocalStateField("user", {
       name: username,
-      color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0"),
+      color: userColor,
       joinTime,
+      activeFile: null
     })
 
-    return { ydoc, provider, username, joinTime, roomMap, chatArray }
+    return { ydoc, provider, username, joinTime, roomMap, chatArray, userColor, persistence }
   })
 
+  /* ── Host state & Active Users ── */
+  const [activeUsers, setActiveUsers] = useState([])
+  const [hostClientId, setHostClientId] = useState(null)
+  const [hostName, setHostName] = useState("")
+  const isHost = hostClientId === editor.provider.awareness.clientID
+
+  /* ── Room state ── */
+  const [actualRoomType, setRoomType] = useState(initialRoomType)
+  const [output, setOutput] = useState("")
+  const [runner, setRunner] = useState(null)
+
+  const canEdit = isHost || actualRoomType === "collaborative" || actualRoomType === "interview"
+  const canRun = isHost || actualRoomType === "collaborative" || actualRoomType === "interview"
+  const canChangeRoom = isHost
+
   /* ── File System ── */
-  const fs = useFileSystem(editor.ydoc, editor.provider, isCreating, roomId)
+  const fs = useFileSystem(editor.ydoc, editor.provider, isCreating, roomId, isHost)
 
   /* ── Open Files & Tabs ── */
   const [openFiles, setOpenFiles] = useState([])
@@ -55,10 +72,8 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   /* ── Right Panel: 'chat' | 'extensions' | null ── */
   const [rightPanel, setRightPanel] = useState(null)
 
-  /* ── Room state ── */
-  const [actualRoomType, setRoomType] = useState(initialRoomType)
-  const [output, setOutput] = useState("")
-  const [runner, setRunner] = useState(null)
+  /* ── Preview Panel ── */
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   /* ── Chat & Moderation ── */
   const [showUsersList, setShowUsersList] = useState(true)
@@ -68,6 +83,9 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   const [chatEnabled, setChatEnabled] = useState(true)
   const [kickedUsers, setKickedUsers] = useState([])
   const [toasts, setToasts] = useState([])
+  const [interviewTime, setInterviewTime] = useState(0) // Shared timer
+  const [isSyncingFile, setIsSyncingFile] = useState(false)
+  const [isPersistenceSynced, setIsPersistenceSynced] = useState(false)
   const lastToastId = useRef(null)
 
   const addToast = useCallback((msgText) => {
@@ -75,16 +93,6 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     setToasts(prev => [...prev, { id, text: msgText }])
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
   }, [])
-
-  /* ── Host state & Active Users ── */
-  const [activeUsers, setActiveUsers] = useState([])
-  const [hostClientId, setHostClientId] = useState(null)
-  const [hostName, setHostName] = useState("")
-  const isHost = hostClientId === editor.provider.awareness.clientID
-
-  const canEdit = isHost || actualRoomType !== "broadcast"
-  const canRun = isHost || actualRoomType !== "broadcast"
-  const canChangeRoom = isHost
 
   /* ── Personal UI ── */
   const [personalPrefs, setPersonalPrefs] = useState(() => {
@@ -109,6 +117,11 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       editor.provider.disconnect()
     }
     window.addEventListener("beforeunload", handleUnload)
+    
+    // Check initial persistence sync
+    if (editor.persistence.synced) setIsPersistenceSynced(true)
+    editor.persistence.on("synced", () => setIsPersistenceSynced(true))
+
     return () => {
       window.removeEventListener("beforeunload", handleUnload)
       handleUnload()
@@ -121,7 +134,12 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     const states = Array.from(editor.provider.awareness.getStates().entries())
     if (states.length === 0) return
     const validStates = states.filter(s => s[1].user?.name)
-    setActiveUsers(validStates.map(s => ({ id: s[0], name: s[1].user.name })))
+    setActiveUsers(validStates.map(s => ({
+      id: s[0],
+      name: s[1].user.name,
+      color: s[1].user.color || "#89b4fa",
+      activeFile: s[1].user.activeFile || null
+    })))
     if (validStates.length === 0) return
 
     const earliest = validStates.reduce((best, cur) => {
@@ -136,6 +154,11 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     if (earliest[0] === editor.provider.awareness.clientID) {
       editor.roomMap.set("host", earliest[1].user?.name)
       if (!editor.roomMap.get("roomType")) editor.roomMap.set("roomType", initialRoomType)
+      if (editor.roomMap.get("roomMode") !== "ide") editor.roomMap.set("roomMode", "ide")
+      // Start interview timer if not started
+      if (initialRoomType === "interview" && !editor.roomMap.get("interviewStart")) {
+        editor.roomMap.set("interviewStart", Date.now())
+      }
     }
   }, [editor.provider.awareness, editor.roomMap, initialRoomType])
 
@@ -144,18 +167,19 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     const { provider, roomMap, chatArray } = editor
 
     provider.on("synced", () => {
+      // Check for duplicate username among other connected clients
       const states = Array.from(provider.awareness.getStates().entries())
       const isDuplicate = states.some(([clientId, state]) =>
         clientId !== provider.awareness.clientID && state.user?.name === username
       )
-      if (isDuplicate) {
+      if (isDuplicate && !isHost) {
         onLeave(`⚠️ The username '@${username}' is already taken in this room.`)
         return
       }
 
       // Auto-detect room mode for joiners
       const mode = roomMap.get("roomMode")
-      if (mode && mode !== "ide") {
+      if (mode && mode !== "ide" && !isHost) {
         onLeave("This room is in Compiler mode. Please join through the correct mode.")
         return
       }
@@ -173,7 +197,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       const kicked = roomMap.get("kickedUsers") || []
       setKickedUsers(kicked)
 
-      if (kicked.length > 0 && (kicked.includes(editor.username) || kicked.includes(editor.provider.awareness.clientID))) {
+      if (kicked.length > 0 && !isHost && (kicked.includes(editor.username) || kicked.includes(editor.provider.awareness.clientID))) {
         alert("You have been removed from the room by the host.")
         onLeave()
       }
@@ -207,7 +231,18 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       } catch (_) { }
     }
 
+
+    // 🕒 Shared Interview Timer Update
+    const timerInterval = setInterval(() => {
+      const start = roomMap.get("interviewStart")
+      const currentType = roomMap.get("roomType")
+      if (start && currentType === "interview") {
+        setInterviewTime(Math.floor((Date.now() - start) / 1000))
+      }
+    }, 1000)
+
     return () => {
+      clearInterval(timerInterval)
       roomMap.unobserve(onRoomChange)
       chatArray.unobserve(onChatChange)
       provider.awareness.off("change", recalcHost)
@@ -215,6 +250,18 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     }
   }, [editor, recalcHost, roomId, onLeave, username, fs.refreshPath])
 
+
+  /* ── Broadcast Active File ── */
+  useEffect(() => {
+    const { provider } = editor
+    const state = provider.awareness.getLocalState()
+    if (state && state.user) {
+      provider.awareness.setLocalStateField("user", {
+        ...state.user,
+        activeFile
+      })
+    }
+  }, [activeFile, editor])
 
   /* ── Chat Toast ── */
   useEffect(() => {
@@ -232,13 +279,19 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   /* ── Open file in tab ── */
   const onSelectFile = useCallback((path) => {
     setActiveFile(path)
-    if (path !== "__PREVIEW__" && fs.fetchFileContentToYjs) fs.fetchFileContentToYjs(path)
+    if (fs.fetchFileContentToYjs) fs.fetchFileContentToYjs(path)
   }, [fs])
 
   const openFile = useCallback(async (path) => {
-    if (!openFiles.includes(path)) setOpenFiles(prev => [...prev, path])
-    setActiveFile(path)
-    if (path !== "__PREVIEW__" && fs.fetchFileContentToYjs) await fs.fetchFileContentToYjs(path)
+    if (!path) return
+    setIsSyncingFile(true)
+    try {
+      if (!openFiles.includes(path)) setOpenFiles(prev => [...prev, path])
+      if (fs.fetchFileContentToYjs) await fs.fetchFileContentToYjs(path)
+      setActiveFile(path)
+    } finally {
+      setIsSyncingFile(false)
+    }
   }, [openFiles, fs])
 
   const closeFile = useCallback((filePath) => {
@@ -254,7 +307,18 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   }, [activeFile])
 
   /* ── Get current file's Yjs text and language extension ── */
-  const activeFileEntry = activeFile ? fs.tree[activeFile] : null
+  const activeFileEntry = useMemo(() => {
+    if (!activeFile) return null
+    // fs.tree maps parentPath → children array, so search all entries
+    for (const children of Object.values(fs.tree)) {
+      const found = children.find(c => c.path === activeFile)
+      if (found) return found
+    }
+    // Fallback: construct a minimal entry from the path
+    const name = activeFile.split("/").pop()
+    const ext = name.split(".").pop()
+    return { path: activeFile, name, type: "file", language: EXT_TO_LANG[ext] || "python" }
+  }, [activeFile, fs.tree])
   const activeLanguage = activeFileEntry?.language || "python"
 
   const langExt = useMemo(() => {
@@ -268,7 +332,8 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   }, [activeFile, fs])
 
   const collabExt = useMemo(() => {
-    if (!activeYText) return []
+    if (!activeYText || !editor.provider.awareness) return []
+    // ✅ Re-memoize yCollab only when the Y.Text truly changes
     return yCollab(activeYText, editor.provider.awareness)
   }, [activeYText, editor.provider.awareness])
 
@@ -355,7 +420,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
 
   /* ── Save Active File To Disk ── */
   const saveCode = useCallback(async () => {
-    if (!activeFile || activeFile === "__PREVIEW__" || !fs.saveFileToDisk) return
+    if (!activeFile || !fs.saveFileToDisk) return
     try {
       await fs.saveFileToDisk(activeFile)
       addToast(`✅ Saved ${activeFile.split("/").pop()} to disk`)
@@ -373,7 +438,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
 
     try {
       if (window.showSaveFilePicker) {
-        const ext = fs.getExt(fileName)
+        const ext = fileName.split(".").pop()
         const handle = await window.showSaveFilePicker({
           suggestedName: fileName,
           types: [{ description: "Source Code", accept: { "text/plain": [`.${ext}`] } }]
@@ -455,6 +520,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     terminalOpen, setTerminalOpen, terminalHeight, setTerminalHeight,
     // Right panel
     rightPanel, toggleRightPanel,
+    previewOpen, setPreviewOpen,
     // Room state
     roomId, actualRoomType, output, runner,
     // Permissions
@@ -463,6 +529,11 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     activeTheme, activeFontSize, activeFontFamily, isDark,
     bg, headerBg, toolbarBg, textColor, panelBg, borderCol, inputBg, accent,
     personalPrefs, roomTheme, roomFont,
+    // Interview
+    interviewTime,
+    // Navigation / Sync
+    isSyncingFile,
+    isPersistenceSynced,
     // UI state
     settingsOpen, setSettingsOpen,
     toasts,

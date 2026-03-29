@@ -13,26 +13,6 @@ export default function TabBar({ openFiles, activeFile, onSelectFile, onCloseFil
       {openFiles.map(filePath => {
         const isActive = filePath === activeFile
 
-        if (filePath === "__PREVIEW__") {
-          return (
-            <div
-              key={filePath}
-              className="ide-tab"
-              onClick={() => onSelectFile(filePath)}
-              style={{
-                background: isActive ? (isDark ? 'rgba(137,180,250,0.08)' : '#ffffff') : 'transparent',
-                color: isActive ? accent : textColor,
-                borderBottom: isActive ? `2px solid ${accent}` : '2px solid transparent',
-                opacity: isActive ? 1 : 0.6,
-                fontWeight: isActive ? 600 : 400,
-              }}
-            >
-              <span style={{ fontSize: 12 }}>🌐</span>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120 }}>Browser Preview</span>
-              <span className="tab-close" onClick={(e) => { e.stopPropagation(); onCloseFile(filePath) }} style={{ color: textColor }} title="Close">✕</span>
-            </div>
-          )
-        }
 
         const name = filePath.split("/").pop() || filePath
 

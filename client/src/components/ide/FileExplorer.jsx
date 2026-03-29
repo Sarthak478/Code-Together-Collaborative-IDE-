@@ -35,14 +35,43 @@ function ContextMenu({ x, y, items, onClose, panelBg, borderCol, textColor }) {
   )
 }
 
+/* ── Inline Create Input ── */
+function InlineCreateInput({ creatingType, newItemName, setNewItemName, commitCreate, setCreatingType, newItemRef, depth = 0 }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: `4px 12px 4px ${12 + depth * 16}px` }}>
+      <span style={{ fontSize: 13 }}>{creatingType === "file" ? "📄" : "📁"}</span>
+      <input
+        ref={newItemRef}
+        className="ide-rename-input"
+        value={newItemName}
+        placeholder={creatingType === "file" ? "filename.ext" : "folder-name"}
+        onChange={e => setNewItemName(e.target.value)}
+        onBlur={commitCreate}
+        onKeyDown={e => {
+          if (e.key === "Enter") commitCreate()
+          if (e.key === "Escape") setCreatingType(null)
+        }}
+      />
+    </div>
+  )
+}
+
 /* ── Single Tree Item ── */
-function TreeItem({ entry, depth, fs, activeFile, onFileClick, expandedFolders, toggleFolder, onContextMenu, textColor, borderCol, inputBg, accent, isDark }) {
+function TreeItem({
+  entry, depth, fs, activeFile, onFileClick,
+  expandedFolders, toggleFolder, onContextMenu,
+  textColor, borderCol, inputBg, accent, isDark,
+  creatingType, creatingParent, newItemName, setNewItemName,
+  commitCreate, setCreatingType, newItemRef, onCreateInFolder
+}) {
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState("")
+  const [isHovered, setIsHovered] = useState(false)
   const inputRef = useRef(null)
   const isActive = activeFile === entry.path
   const isFolder = entry.type === "folder"
   const isExpanded = expandedFolders.has(entry.path)
+  const isCreatingHere = creatingType && creatingParent === entry.path
 
   useEffect(() => {
     if (renaming && inputRef.current) {
@@ -79,6 +108,8 @@ function TreeItem({ entry, depth, fs, activeFile, onFileClick, expandedFolders, 
           color: isActive ? accent : textColor,
           borderLeft: isActive ? `2px solid ${accent}` : '2px solid transparent'
         }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         onClick={() => {
           if (isFolder) toggleFolder(entry.path)
           else onFileClick(entry.path)
@@ -110,32 +141,81 @@ function TreeItem({ entry, depth, fs, activeFile, onFileClick, expandedFolders, 
             onClick={e => e.stopPropagation()}
           />
         ) : (
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{entry.name}</span>
+          <>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>{entry.name}</span>
+            {isFolder && isHovered && !renaming && (
+              <div style={{ display: "flex", gap: 6, opacity: 0.7, marginRight: 8 }}>
+                <span 
+                  title="New File"
+                  onClick={(e) => { e.stopPropagation(); onCreateInFolder(entry.path, "file") }}
+                  style={{ fontSize: 13, cursor: "pointer", padding: "0 2px", transition: "transform 0.1s" }}
+                  onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.1)"}
+                  onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                >📄</span>
+                <span 
+                  title="New Folder"
+                  onClick={(e) => { e.stopPropagation(); onCreateInFolder(entry.path, "folder") }}
+                  style={{ fontSize: 13, cursor: "pointer", padding: "0 2px", transition: "transform 0.1s" }}
+                  onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.1)"}
+                  onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                >📁</span>
+              </div>
+            )}
+          </>
         )}
       </div>
-      {/* Render children if folder is expanded */}
+
+      {/* Render children + inline create input if folder is expanded */}
       {isFolder && isExpanded && (
-        <TreeChildren
-          parentPath={entry.path}
-          depth={depth + 1}
-          fs={fs}
-          activeFile={activeFile}
-          onFileClick={onFileClick}
-          expandedFolders={expandedFolders}
-          toggleFolder={toggleFolder}
-          onContextMenu={onContextMenu}
-          textColor={textColor}
-          borderCol={borderCol}
-          inputBg={inputBg}
-          accent={accent}
-          isDark={isDark}
-        />
+        <>
+          <TreeChildren
+            parentPath={entry.path}
+            depth={depth + 1}
+            fs={fs}
+            activeFile={activeFile}
+            onFileClick={onFileClick}
+            expandedFolders={expandedFolders}
+            toggleFolder={toggleFolder}
+            onContextMenu={onContextMenu}
+            textColor={textColor}
+            borderCol={borderCol}
+            inputBg={inputBg}
+            accent={accent}
+            isDark={isDark}
+            creatingType={creatingType}
+            creatingParent={creatingParent}
+            newItemName={newItemName}
+            setNewItemName={setNewItemName}
+            commitCreate={commitCreate}
+            setCreatingType={setCreatingType}
+            newItemRef={newItemRef}
+            onCreateInFolder={onCreateInFolder}
+          />
+          {/* Show create input inside THIS folder if it's the target */}
+          {isCreatingHere && (
+            <InlineCreateInput
+              creatingType={creatingType}
+              newItemName={newItemName}
+              setNewItemName={setNewItemName}
+              commitCreate={commitCreate}
+              setCreatingType={setCreatingType}
+              newItemRef={newItemRef}
+              depth={depth + 1}
+            />
+          )}
+        </>
       )}
     </>
   )
 }
 
-function TreeChildren({ parentPath, depth, fs, activeFile, onFileClick, expandedFolders, toggleFolder, onContextMenu, textColor, borderCol, inputBg, accent, isDark }) {
+function TreeChildren({
+  parentPath, depth, fs, activeFile, onFileClick,
+  expandedFolders, toggleFolder, onContextMenu,
+  textColor, borderCol, inputBg, accent, isDark,
+  creatingType, creatingParent, newItemName, setNewItemName,
+  commitCreate, setCreatingType, newItemRef, onCreateInFolder
+}) {
   const children = fs.getChildren(parentPath)
   return children.map(child => (
     <TreeItem
@@ -153,6 +233,14 @@ function TreeChildren({ parentPath, depth, fs, activeFile, onFileClick, expanded
       inputBg={inputBg}
       accent={accent}
       isDark={isDark}
+      creatingType={creatingType}
+      creatingParent={creatingParent}
+      newItemName={newItemName}
+      setNewItemName={setNewItemName}
+      commitCreate={commitCreate}
+      setCreatingType={setCreatingType}
+      newItemRef={newItemRef}
+      onCreateInFolder={onCreateInFolder}
     />
   ))
 }
@@ -165,10 +253,19 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
   const [creatingParent, setCreatingParent] = useState("/")
   const [newItemName, setNewItemName] = useState("")
   const newItemRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const folderInputRef = useRef(null)
 
   useEffect(() => {
     if (creatingType && newItemRef.current) newItemRef.current.focus()
   }, [creatingType])
+
+  const handleCreateInFolder = useCallback((folderPath, type) => {
+    setCreatingType(type)
+    setCreatingParent(folderPath)
+    setNewItemName("")
+    setExpandedFolders(prev => new Set([...prev, folderPath]))
+  }, [])
 
   const toggleFolder = useCallback((path) => {
     setExpandedFolders(prev => {
@@ -186,8 +283,23 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
   const handleContextMenu = useCallback((e, entry, onRename) => {
     const items = []
     if (entry.type === "folder") {
-      items.push({ icon: "📄", label: "New File", action: () => { setCreatingType("file"); setCreatingParent(entry.path); setNewItemName("") } })
-      items.push({ icon: "📁", label: "New Folder", action: () => { setCreatingType("folder"); setCreatingParent(entry.path); setNewItemName(""); setExpandedFolders(prev => new Set([...prev, entry.path])) } })
+      items.push({
+        icon: "📄", label: "New File", action: () => {
+          setCreatingType("file")
+          setCreatingParent(entry.path)
+          setNewItemName("")
+          // ensure folder is expanded so input is visible
+          setExpandedFolders(prev => new Set([...prev, entry.path]))
+        }
+      })
+      items.push({
+        icon: "📁", label: "New Folder", action: () => {
+          setCreatingType("folder")
+          setCreatingParent(entry.path)
+          setNewItemName("")
+          setExpandedFolders(prev => new Set([...prev, entry.path]))
+        }
+      })
       items.push({ separator: true })
     }
     if (canEdit) {
@@ -197,14 +309,25 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
     setContextMenu({ x: e.clientX, y: e.clientY, items })
   }, [canEdit, fs])
 
-  const commitCreate = () => {
+  const handleImport = async (e, mode) => {
+    const files = Array.from(e.target.files)
+    if (files.length > 0 && fs.importFiles) {
+      await fs.importFiles(files, creatingParent)
+    }
+    if (fileInputRef.current) fileInputRef.current.value = ""
+    if (folderInputRef.current) folderInputRef.current.value = ""
+  }
+
+  const commitCreate = useCallback(() => {
     const name = newItemName.trim()
     if (!name) { setCreatingType(null); return }
     if (creatingType === "file") fs.createFile(creatingParent, name)
     else fs.createFolder(creatingParent, name)
     setCreatingType(null)
     setNewItemName("")
-  }
+  }, [newItemName, creatingType, creatingParent, fs])
+
+  const isCreatingAtRoot = creatingType && creatingParent === "/"
 
   return (
     <div style={{ width: 240, minWidth: 200, display: "flex", flexDirection: "column", background: isDark ? '#181825' : '#f6f8fa', borderRight: `1px solid ${borderCol}`, overflow: "hidden" }}>
@@ -228,6 +351,22 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
               title="New Folder"
               style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 14, color: textColor, padding: "2px 4px", borderRadius: 4, opacity: 0.6 }}
             >📁</button>
+            {isHost && (
+              <>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Import Files"
+                  style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 14, color: textColor, padding: "2px 4px", borderRadius: 4, opacity: 0.6 }}
+                >📥</button>
+                <button
+                  onClick={() => folderInputRef.current?.click()}
+                  title="Import Folder"
+                  style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 14, color: textColor, padding: "2px 4px", borderRadius: 4, opacity: 0.6 }}
+                >📂</button>
+              </>
+            )}
+            <input type="file" multiple ref={fileInputRef} onChange={e => handleImport(e, "file")} style={{ display: "none" }} />
+            <input type="file" multiple webkitdirectory="true" ref={folderInputRef} onChange={e => handleImport(e, "folder")} style={{ display: "none" }} />
           </div>
         )}
       </div>
@@ -248,25 +387,27 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
           inputBg={inputBg}
           accent={accent}
           isDark={isDark}
+          creatingType={creatingType}
+          creatingParent={creatingParent}
+          newItemName={newItemName}
+          setNewItemName={setNewItemName}
+          commitCreate={commitCreate}
+          setCreatingType={setCreatingType}
+          newItemRef={newItemRef}
+          onCreateInFolder={handleCreateInFolder}
         />
 
-        {/* Inline create input */}
-        {creatingType && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 12px" }}>
-            <span style={{ fontSize: 13 }}>{creatingType === "file" ? "📄" : "📁"}</span>
-            <input
-              ref={newItemRef}
-              className="ide-rename-input"
-              value={newItemName}
-              placeholder={creatingType === "file" ? "filename.ext" : "folder-name"}
-              onChange={e => setNewItemName(e.target.value)}
-              onBlur={commitCreate}
-              onKeyDown={e => {
-                if (e.key === "Enter") commitCreate()
-                if (e.key === "Escape") setCreatingType(null)
-              }}
-            />
-          </div>
+        {/* Root-level create input (only when creating at "/") */}
+        {isCreatingAtRoot && (
+          <InlineCreateInput
+            creatingType={creatingType}
+            newItemName={newItemName}
+            setNewItemName={setNewItemName}
+            commitCreate={commitCreate}
+            setCreatingType={setCreatingType}
+            newItemRef={newItemRef}
+            depth={0}
+          />
         )}
 
         {/* Empty state */}

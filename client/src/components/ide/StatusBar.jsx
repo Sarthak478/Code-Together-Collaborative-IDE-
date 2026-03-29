@@ -1,4 +1,4 @@
-export default function StatusBar({ activeLanguage, roomMode, terminalOpen, isHost, username, bg, textColor, accent }) {
+export default function StatusBar({ activeLanguage, roomMode, terminalOpen, isHost, username, bg, textColor, accent, actualRoomType }) {
   return (
     <div
       className="ide-status-bar"
@@ -12,8 +12,8 @@ export default function StatusBar({ activeLanguage, roomMode, terminalOpen, isHo
         <div className="status-item" style={{ background: "rgba(0,0,0,0.15)", fontWeight: 600 }}>
           <span style={{ fontSize: 13 }}>◆</span> LiveShare {roomMode === "ide" ? "IDE" : "Standard"}
         </div>
-        <div className="status-item" title="Room Host">
-          <span style={{ fontSize: 13 }}>👑</span> {isHost ? "(Host)" : ""} {username}
+        <div className="status-item" title={actualRoomType === "interview" ? (isHost ? "Interviewer" : "Candidate") : "Room Host"}>
+          <span style={{ fontSize: 13 }}>{isHost ? "👑" : "👤"}</span> {actualRoomType === "interview" ? (isHost ? "Interviewer" : "Candidate") : (isHost ? "(Host)" : "")} @{username}
         </div>
         <div className="status-item" title="Language selected">
           <span style={{ fontSize: 13 }}>📝</span> {activeLanguage || "No file open"}
