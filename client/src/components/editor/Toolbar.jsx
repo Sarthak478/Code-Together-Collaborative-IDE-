@@ -1,57 +1,224 @@
 import { useState } from "react"
-import { LANGUAGES } from "../../constants/editorConfigs"
+import { 
+  Play, 
+  Download, 
+  Terminal, 
+  Code,
+  Users,
+  UserPlus,
+  Check,
+  Eye,
+  EyeOff
+} from "lucide-react"
 
-/* ─── Toolbar Component ─────────────────────────────────────────── */
 export default function Toolbar({
-  canRun, canEdit, canChangeLanguage, language,
-  onRunCode, onDownloadCode, onLanguageChange,
-  visibleActiveUsersList, isHost, runner, onKickUser,
+  canRun,
+  canEdit,
+  canChangeLanguage,
+  language,
+  onRunCode,
+  onDownloadCode,
+  onLanguageChange,
+  visibleActiveUsersList,
+  isHost,
+  runner,
+  onKickUser,
   editorAwarenessClientID,
-  textColor, borderCol, inputBg, accent
+  textColor,
+  borderCol,
+  inputBg,
+  accent,
+  roomId,
+  actualRoomType,
+  interviewTime,
+  previewOpen,
+  onTogglePreview,
+  isDark
 }) {
-  const [usersDropdownOpen, setUsersDropdownOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const handleInvite = async () => {
+    try {
+      await navigator.clipboard.writeText(roomId)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      const el = document.createElement("textarea")
+      el.value = roomId
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand("copy")
+      document.body.removeChild(el)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
 
   return (
-    <div style={{ height: 44, display: "flex", alignItems: "center", gap: 10, padding: "0 14px", background: "inherit", borderBottom: `1px solid ${borderCol}` }}>
-      <button onClick={onRunCode} disabled={!canRun} title={canRun ? "Run code" : "No permission to run"} style={{ background: canRun ? "#a6e3a1" : "#45475a", color: "#1e1e2e", border: "none", borderRadius: 6, padding: "4px 14px", fontWeight: 700, cursor: canRun ? "pointer" : "not-allowed", fontSize: 13, opacity: canRun ? 1 : 0.5 }}>
-        ▶ Run
-      </button>
-      <a href="#" onClick={onDownloadCode} title="Download Source File" style={{ background: "transparent", color: textColor, border: `1px solid ${borderCol}`, borderRadius: 6, padding: "3px 10px", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, textDecoration: "none" }}>
-        ⬇️ Download
-      </a>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        {!canChangeLanguage && <span style={{ fontSize: 11, opacity: 0.5 }}>🔒</span>}
-        <select value={language} disabled={!canChangeLanguage} onChange={e => onLanguageChange(e.target.value)} title={canChangeLanguage ? "Change language" : "Only hosts / interviewers can change language"} style={{ background: inputBg, color: textColor, border: `1px solid ${borderCol}`, borderRadius: 5, padding: "3px 8px", fontSize: 13, cursor: canChangeLanguage ? "pointer" : "not-allowed", opacity: canChangeLanguage ? 1 : 0.6 }}>
-          {LANGUAGES.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
-        </select>
-      </div>
-
-      {/* Active Users Dropdown */}
-      <div style={{ position: "relative" }}>
-        <button onClick={() => setUsersDropdownOpen(o => !o)} style={{ background: "transparent", color: textColor, border: `1px solid ${borderCol}`, borderRadius: 6, padding: "3px 10px", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-          👥 Users ({visibleActiveUsersList.length}) ▾
+    <div 
+      className="ide-glass-effect"
+      style={{ 
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "8px 16px", margin: "0 10px 10px 10px", borderRadius: 12,
+        height: 48, boxSizing: "border-box", border: `1px solid ${borderCol}`
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        {/* Run Button */}
+        <button
+          onClick={onRunCode}
+          disabled={!canRun}
+          className="ide-btn-premium"
+          style={{
+            background: canRun ? accent : inputBg,
+            color: canRun ? "#fff" : textColor,
+            opacity: !canRun ? 0.4 : 1,
+            border: `1px solid ${canRun ? accent : borderCol}`,
+            cursor: !canRun ? "not-allowed" : "pointer",
+            boxShadow: canRun ? `0 4px 15px ${accent}44` : "none"
+          }}
+        >
+          {runner === editorAwarenessClientID ? (
+            <div className="ide-icon-pulse">⚙️</div>
+          ) : (
+            <Play size={16} fill={canRun ? "#fff" : "transparent"} />
+          )}
+          <span>{runner ? "Running..." : "Run Engine"}</span>
         </button>
-        {usersDropdownOpen && (
-          <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, width: 220, background: inputBg, border: `1px solid ${borderCol}`, borderRadius: 6, boxShadow: "0 4px 12px rgba(0,0,0,0.2)", zIndex: 100, padding: 8, display: "flex", flexDirection: "column", gap: 4, maxHeight: 300, overflowY: "auto" }}>
-            <div style={{ fontSize: 11, fontWeight: "bold", opacity: 0.6, marginBottom: 8, marginTop: 4, textTransform: "uppercase" }}>Active Participants</div>
-            {visibleActiveUsersList.map(u => (
-              <div key={u.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: inputBg, padding: "6px 8px", borderRadius: 4, fontSize: 12 }}>
-                <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginRight: 8 }}>
-                  @{u.name} {u.id === editorAwarenessClientID ? "(You)" : visibleActiveUsersList.filter(x => x.name === u.name).length > 1 ? `(Tab)` : ""}
-                </span>
-                {isHost && u.id !== editorAwarenessClientID && (
-                  <button onClick={() => { onKickUser(u.id, u.name); setUsersDropdownOpen(false); }} style={{ background: "#f38ba8", color: "#1e1e2e", border: "none", borderRadius: 4, padding: "2px 8px", fontWeight: "bold", cursor: "pointer", fontSize: 10 }}>Kick</button>
-                )}
-              </div>
-            ))}
-            {visibleActiveUsersList.length === 1 && <div style={{ fontSize: 11, opacity: 0.5, textAlign: "center", margin: "8px 0" }}>You are the only one here.</div>}
-          </div>
-        )}
+
+        {/* Download Button */}
+        <button
+          onClick={onDownloadCode}
+          className="ide-btn-premium"
+          style={{
+            background: "rgba(255,255,255,0.03)", color: textColor,
+            border: `1px solid ${borderCol}`, cursor: "pointer"
+          }}
+        >
+          <Download size={16} />
+          <span>Sync & Download</span>
+        </button>
+
+        <div style={{ width: 1, height: 20, background: borderCol, margin: "0 4px" }} />
+
+        {/* Language Selector */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.03)", padding: "4px 8px", borderRadius: 10, border: `1px solid ${borderCol}` }}>
+          <Code size={14} opacity={0.6} />
+          <select
+            value={language}
+            onChange={(e) => onLanguageChange(e.target.value)}
+            disabled={!canChangeLanguage}
+            style={{
+              background: "transparent", color: textColor, border: "none",
+              fontSize: 12, fontWeight: 700, outline: "none", cursor: "pointer",
+              fontFamily: "inherit"
+            }}
+          >
+            <option value="python">Python 3</option>
+            <option value="javascript">JavaScript</option>
+            <option value="cpp">C++ 17</option>
+            <option value="java">Java 17</option>
+            <option value="rust">Rust</option>
+            <option value="html">HTML Render</option>
+          </select>
+        </div>
       </div>
 
-      {!canEdit && <span style={{ fontSize: 12, color: "#f38ba8", marginLeft: 8, fontWeight: "bold" }}>👁 Read-Only Mode</span>}
-      {runner && <span style={{ fontSize: 12, color: "#f9e2af", marginLeft: 8 }}>⏳ {runner} is running…</span>}
+      {/* Interview Mode Indicator */}
+      {actualRoomType === "interview" && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ 
+            background: "rgba(166, 227, 161, 0.15)", color: "#a6e3a1", padding: "4px 12px", 
+            borderRadius: 20, fontSize: 11, fontWeight: "bold", textTransform: "uppercase", 
+            letterSpacing: "1px", border: "1px solid rgba(166, 227, 161, 0.2)",
+            display: "flex", alignItems: "center", gap: 6
+          }}>
+            🎓 Interview Mode
+          </div>
+          <div style={{ 
+            color: textColor, fontSize: 13, fontWeight: "bold", fontFamily: "monospace", 
+            opacity: 0.8, background: "rgba(255,255,255,0.03)", padding: "4px 10px",
+            borderRadius: 8, border: `1px solid ${borderCol}`
+          }}>
+            ⏱️ {new Date(interviewTime * 1000).toISOString().substr(11, 8)}
+          </div>
+          <div style={{
+            background: isHost ? "rgba(249, 226, 175, 0.1)" : "rgba(137, 180, 250, 0.1)",
+            color: isHost ? "#f9e2af" : "#89b4fa",
+            fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8,
+            border: `1px solid ${isHost ? "rgba(249, 226, 175, 0.2)" : "rgba(137, 180, 250, 0.2)"}`,
+            textTransform: "uppercase", letterSpacing: "0.5px"
+          }}>
+            {isHost ? "👑 Interviewer" : "👤 Candidate"}
+          </div>
+        </div>
+      )}
+
+      {/* Browser Preview Toggle */}
+      <button
+        onClick={onTogglePreview}
+        className="ide-btn-premium"
+        style={{
+          background: previewOpen ? "rgba(243, 139, 168, 0.1)" : (isDark ? "rgba(137, 180, 250, 0.1)" : "rgba(13, 110, 253, 0.1)"),
+          color: previewOpen ? "#f38ba8" : accent,
+          border: `1px solid ${previewOpen ? "rgba(243, 139, 168, 0.2)" : borderCol}`,
+          cursor: "pointer", fontSize: 12, fontWeight: 700,
+          transition: "all 0.2s"
+        }}
+      >
+        {previewOpen ? <EyeOff size={14} /> : <Eye size={14} />}
+        <span>{previewOpen ? "Close Preview" : "Live Preview"}</span>
+      </button>
+
+      {/* Right Side: Active Users + Invite */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: -8 }}>
+          {visibleActiveUsersList.slice(0, 5).map((u, i) => (
+            <div
+              key={u.id}
+              title={`@${u.name}`}
+              style={{
+                width: 28, height: 28, borderRadius: "50%", background: u.color || accent,
+                border: `2px solid ${inputBg}`, marginLeft: i === 0 ? 0 : -8,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#1e1e2e", fontWeight: "bold", fontSize: 11,
+                boxShadow: "0 4px 10px rgba(0,0,0,0.2)", position: "relative", zIndex: 10 - i
+              }}
+            >
+              {u.name.charAt(0).toUpperCase()}
+            </div>
+          ))}
+          {visibleActiveUsersList.length > 5 && (
+            <div style={{
+              width: 28, height: 28, borderRadius: "50%", background: "#313244",
+              border: `2px solid ${inputBg}`, marginLeft: -8,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#fff", fontSize: 10, fontWeight: 700, zIndex: 1
+            }}>
+              +{visibleActiveUsersList.length - 5}
+            </div>
+          )}
+        </div>
+        
+        <button 
+          onClick={handleInvite}
+          title={copied ? "Room ID Copied!" : "Copy Room ID to invite collaborators"}
+          style={{ 
+            background: copied ? `${accent}22` : "transparent", 
+            border: copied ? `1px solid ${accent}44` : "1px solid transparent", 
+            cursor: "pointer", 
+            color: copied ? "#a6e3a1" : accent, 
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            padding: "6px 12px", borderRadius: 8, transition: "all 0.2s",
+            fontSize: 12, fontWeight: 600
+          }}
+          onMouseEnter={e => { if (!copied) e.currentTarget.style.background = "rgba(255,255,255,0.05)" }}
+          onMouseLeave={e => { if (!copied) e.currentTarget.style.background = "transparent" }}
+        >
+          {copied ? <Check size={16} /> : <UserPlus size={16} />}
+          <span>{copied ? "Copied!" : "Invite"}</span>
+        </button>
+      </div>
     </div>
   )
 }

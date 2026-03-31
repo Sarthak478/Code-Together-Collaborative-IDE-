@@ -8,6 +8,7 @@ import { yCollab } from "y-codemirror.next"
 
 import { LANGUAGES, THEMES, FONT_FAMILIES, CURSORS } from "../constants/editorConfigs"
 import { loadPersonalPrefs, savePersonalPrefs } from "../utils/helpers"
+import { WS_URL, API_URL } from "../config"
 
 /* ─── useEditorRoom Hook ────────────────────────────────────────── */
 export default function useEditorRoom({ roomId, initialRoomType, isCreating, username, onLeave }) {
@@ -15,7 +16,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
   const [editor] = useState(() => {
     const ydoc = new Y.Doc()
     const provider = new HocuspocusProvider({
-      url: "ws://127.0.0.1:1235",
+      url: WS_URL,
       name: roomId,
       document: ydoc,
     })
@@ -29,11 +30,12 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
 
     const joinTime = Date.now()
 
-    provider.awareness.setLocalStateField("user", {
-      name: username,
-      color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0"),
-      joinTime,
-    })
+      provider.awareness.setLocalStateField("user", {
+        name: username,
+        color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0"),
+        joinTime,
+        peerId: null
+      })
 
     return { ydoc, provider, username, joinTime, ytext, roomMap, chatArray }
   })
@@ -58,6 +60,10 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
   const [chatEnabled, setChatEnabled] = useState(true)
   const [kickedUsers, setKickedUsers] = useState([])
   const [toasts, setToasts] = useState([])
+  const [callActive, setCallActive] = useState(false)
+  const [peerId, setPeerId] = useState(null)
+  const [rightPanel, setRightPanel] = useState(null)
+  const [interviewTime, setInterviewTime] = useState(0) // Shared timer
   const lastToastId = useRef(null)
 
   const addToast = useCallback((msgText) => {
@@ -66,6 +72,33 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id))
     }, 4000)
+  }, [])
+
+  /* ── Version Control (Git) State ── */
+  const [gitStatus, setGitStatus] = useState(null)
+  const [isGitLoading, setIsGitLoading] = useState(false)
+
+  const refreshGitStatus = useCallback(async () => {
+    setIsGitLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/git/status?roomId=${roomId}`)
+      const data = await res.json()
+      setGitStatus(data)
+    } catch (err) {
+      console.error("Git Status Error:", err)
+    } finally {
+      setIsGitLoading(false)
+    }
+  }, [roomId])
+
+  useEffect(() => {
+    refreshGitStatus()
+    const interval = setInterval(refreshGitStatus, 15000)
+    return () => clearInterval(interval)
+  }, [refreshGitStatus])
+
+  const toggleRightPanel = useCallback((panel) => {
+    setRightPanel(prev => prev === panel ? null : panel)
   }, [])
 
   /* ── Host state & Active Users ── */
@@ -90,9 +123,22 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
   }, [])
 
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const activeTheme = roomTheme ?? personalPrefs.theme
   const activeFontSize = roomFont?.fontSize ?? personalPrefs.fontSize
   const activeFontFamily = roomFont?.fontFamily ?? personalPrefs.fontFamily
+
+  useEffect(() => {
+    const { provider } = editor
+    const state = provider.awareness.getLocalState()
+    if (state && state.user) {
+      provider.awareness.setLocalStateField("user", {
+        ...state.user,
+        peerId
+      })
+    }
+  }, [peerId, editor])
 
   /* ── Cleanup ── */
   useEffect(() => {
@@ -114,7 +160,11 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     if (states.length === 0) return
 
     const validStates = states.filter(s => s[1].user?.name)
-    setActiveUsers(validStates.map(s => ({ id: s[0], name: s[1].user.name })))
+    setActiveUsers(validStates.map(s => ({ 
+      id: s[0], 
+      name: s[1].user.name,
+      peerId: s[1].user.peerId || null
+    })))
 
     if (validStates.length === 0) return
 
@@ -134,6 +184,10 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     if (hostId === editor.provider.awareness.clientID) {
       editor.roomMap.set("host", hostUser)
       if (!editor.roomMap.get("roomType")) editor.roomMap.set("roomType", initialRoomType)
+      // Start interview timer if not started
+      if (initialRoomType === "interview" && !editor.roomMap.get("interviewStart")) {
+        editor.roomMap.set("interviewStart", Date.now())
+      }
     }
   }, [editor.provider.awareness, editor.roomMap, initialRoomType])
 
@@ -188,7 +242,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     provider.awareness.on("change", recalcHost)
     recalcHost()
 
-    const ws = new WebSocket("ws://127.0.0.1:1236")
+    const ws = new WebSocket(API_URL.replace("http", "ws"))
     ws.onopen = () => ws.send(JSON.stringify({ type: "join", roomId }))
     ws.onmessage = (event) => {
       try {
@@ -203,7 +257,17 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
       } catch (_e) { }
     }
 
+    // 🕒 Shared Interview Timer Update
+    const timerInterval = setInterval(() => {
+      const start = roomMap.get("interviewStart")
+      const currentType = roomMap.get("roomType")
+      if (start && currentType === "interview") {
+        setInterviewTime(Math.floor((Date.now() - start) / 1000))
+      }
+    }, 1000)
+
     return () => {
+      clearInterval(timerInterval)
       roomMap.unobserve(onRoomChange)
       chatArray.unobserve(onChatChange)
       provider.awareness.off("change", recalcHost)
@@ -330,7 +394,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     if (!code.trim()) { setOutput("(empty code)"); return }
 
     try {
-      const res = await fetch("http://127.0.0.1:1236/run", {
+      const res = await fetch(`${API_URL}/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomId, userId: editor.username, language, code, input: "" }),
@@ -405,9 +469,16 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     personalPrefs, roomTheme, roomFont,
     // UI state
     settingsOpen, setSettingsOpen,
+    exitConfirmOpen, setExitConfirmOpen,
+    previewOpen, setPreviewOpen,
     chatOpen, setChatOpen,
+    rightPanel, setRightPanel, toggleRightPanel,
     usersDropdownOpen, setUsersDropdownOpen,
+    callActive, setCallActive,
+    peerId, setPeerId,
     toasts,
+    // Git
+    gitStatus, isGitLoading, refreshGitStatus,
     // Users
     activeUsers, visibleActiveUsersList, hostName,
     // Chat
@@ -420,5 +491,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     updatePersonalPref, pushRoomUI, clearRoomUI,
     onToggleChatEnabled, onToggleShowUsers, onSetRoomTheme,
     setOutput,
+    // Interview
+    interviewTime,
   }
 }

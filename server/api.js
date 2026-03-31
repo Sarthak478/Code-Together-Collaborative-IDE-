@@ -7,14 +7,46 @@ import fs from "fs";
 import { writeFileSync, unlinkSync, mkdirSync, rmSync, existsSync } from "fs";
 import { tmpdir, platform } from "os";
 import { join, dirname, relative } from "path";
-
 import pty from "node-pty";
 import chokidar from "chokidar";
+import { simpleGit } from "simple-git";
+import dotenv from "dotenv";
+import rateLimit from "express-rate-limit";
 
+dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// Rate Limiting for production safety
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: "Too many requests from this IP, please try again after 15 minutes" }
+});
+
+app.use(limiter);
+
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+app.use(cors({
+  origin: FRONTEND_URL,
+  methods: ["GET", "POST"],
+  credentials: true
+}));
+
 app.use(express.json());
+
+/* -------------------- SECURITY HELPERS -------------------- */
+
+/**
+ * Strips dangerous characters and directory traversal attempts (../)
+ */
+function sanitizePath(input) {
+  if (typeof input !== "string") return "";
+  // Remove control characters, null bytes, and ".."
+  return input.replace(/[\x00-\x1f\x7f]/g, "")
+              .replace(/\.\./g, "")
+              .replace(/[<>:"|?*]/g, ""); // Windows invalid chars
+}
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -28,6 +60,20 @@ const roomQueues = new Map();   // roomId -> { running, queue }
 const roomTerminals = new Map(); // roomId -> ptyProcess
 const roomTerminalHistory = new Map(); // roomId -> string (last N chars)
 const roomWatchers = new Map(); // roomId -> chokidarWatcher
+const roomCleanupTimers = new Map(); // roomId -> timeoutId
+
+function cleanupRoomFolder(roomId) {
+  const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
+  if (existsSync(roomCwd)) {
+    console.log(`[CLEANUP] Deleting stale room folder: ${roomId}`);
+    try {
+      rmSync(roomCwd, { recursive: true, force: true });
+    } catch (e) {
+      console.error(`[CLEANUP:ERROR] Failed to delete ${roomId}:`, e.message);
+    }
+  }
+  roomCleanupTimers.delete(roomId);
+}
 
 function ensureWatcher(roomId, roomCwd) {
   if (roomWatchers.has(roomId)) return;
@@ -160,18 +206,27 @@ wss.on("connection", (ws, req) => {
       const data = JSON.parse(msg.toString());
 
       if (data.type === "join" && data.roomId) {
-        if (!roomClients.has(data.roomId)) {
-          roomClients.set(data.roomId, new Set());
+        const cleanRoomId = sanitizePath(data.roomId);
+        if (!roomClients.has(cleanRoomId)) {
+          roomClients.set(cleanRoomId, new Set());
         }
-        roomClients.get(data.roomId).add(ws);
-        ws.roomId = data.roomId;
+        
+        // Cancel any pending cleanup if a user joins
+        if (roomCleanupTimers.has(cleanRoomId)) {
+          console.log(`[WS] User joined ${cleanRoomId}. Cancelling pending cleanup.`);
+          clearTimeout(roomCleanupTimers.get(cleanRoomId));
+          roomCleanupTimers.delete(cleanRoomId);
+        }
+
+        roomClients.get(cleanRoomId).add(ws);
+        ws.roomId = cleanRoomId;
         ws.isTerminal = false;
 
-        const roomCwd = join(tmpdir(), `liveshare_room_${data.roomId}`);
+        const roomCwd = join(tmpdir(), `liveshare_room_${cleanRoomId}`);
         if (!existsSync(roomCwd)) mkdirSync(roomCwd, { recursive: true });
-        ensureWatcher(data.roomId, roomCwd);
+        ensureWatcher(cleanRoomId, roomCwd);
 
-        console.log(`[WS] Client joined room: ${data.roomId}`);
+        console.log(`[WS] Client joined room: ${cleanRoomId}`);
       }
     } catch (e) {
       console.error("WS message parse error", e);
@@ -180,7 +235,15 @@ wss.on("connection", (ws, req) => {
 
   ws.on("close", () => {
     if (ws.roomId && !ws.isTerminal && roomClients.has(ws.roomId)) {
-      roomClients.get(ws.roomId).delete(ws);
+      const clients = roomClients.get(ws.roomId);
+      clients.delete(ws);
+      
+      // Automatic 60-second cleanup if room is empty
+      if (clients.size === 0) {
+        console.log(`[WS] Room ${ws.roomId} is empty. Scheduling cleanup in 60s...`);
+        const timerId = setTimeout(() => cleanupRoomFolder(ws.roomId), 60000);
+        roomCleanupTimers.set(ws.roomId, timerId);
+      }
     }
   });
 });
@@ -546,6 +609,135 @@ app.post("/fs/save", (req, res) => {
   }
 });
 
+/* -------------------- GIT INTEGRATION -------------------- */
+const getGit = (roomId) => {
+  const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
+  return simpleGit(roomCwd);
+};
+
+app.get("/git/status", async (req, res) => {
+  const { roomId } = req.query;
+  if (!roomId) return res.status(400).json({ error: "roomId needed" });
+  try {
+    const git = getGit(roomId);
+    const isRepo = await git.checkIsRepo();
+    if (!isRepo) return res.json({ isRepo: false });
+
+    const status = await git.status();
+    res.json({
+      isRepo: true,
+      modified: status.modified,
+      not_added: status.not_added,
+      staged: status.staged,
+      deleted: status.deleted,
+      created: status.created,
+      current: status.current,
+      tracking: status.tracking,
+      ahead: status.ahead,
+      behind: status.behind
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/git/init", async (req, res) => {
+  const { roomId } = req.body;
+  try {
+    const git = getGit(roomId);
+    await git.init();
+    res.json({ success: true, message: "Git initialized." });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/git/stage", async (req, res) => {
+  const { roomId, filePaths } = req.body;
+  try {
+    const git = getGit(roomId);
+    await git.add(filePaths);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/git/unstage", async (req, res) => {
+  const { roomId, filePaths } = req.body;
+  try {
+    const git = getGit(roomId);
+    await git.reset(["HEAD", ...filePaths]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/git/commit", async (req, res) => {
+  const { roomId, message, authorName, authorEmail } = req.body;
+  try {
+    const git = getGit(roomId);
+    if (authorName && authorEmail) {
+      await git.addConfig("user.name", authorName);
+      await git.addConfig("user.email", authorEmail);
+    }
+    await git.commit(message);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/git/remote", async (req, res) => {
+  const { roomId, remoteUrl } = req.body;
+  try {
+    const git = getGit(roomId);
+    const remotes = await git.getRemotes();
+    if (remotes.find(r => r.name === "origin")) {
+      await git.removeRemote("origin");
+    }
+    await git.addRemote("origin", remoteUrl);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/git/sync", async (req, res) => {
+  const { roomId, pat, username, action } = req.body;
+  try {
+    const git = getGit(roomId);
+    const remote = await git.remote(["get-url", "origin"]);
+    const authUrl = remote.trim().replace("https://github.com/", `https://${username}:${pat}@github.com/`);
+
+    if (action === "push") {
+      await git.push(authUrl, "main"); // or current branch
+    } else if (action === "pull") {
+      await git.pull(authUrl, "main");
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/git/diff", async (req, res) => {
+  const { roomId, filePath, staged } = req.query;
+  try {
+    const git = getGit(roomId);
+    let diff;
+    if (staged === "true") {
+      diff = await git.diff(["--staged", filePath]);
+    } else {
+      diff = await git.diff([filePath]);
+    }
+    res.json({ diff });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* -------------------- TEST ROUTE -------------------- */
 
 app.get("/", (req, res) => {
@@ -554,8 +746,8 @@ app.get("/", (req, res) => {
 
 /* -------------------- SERVER START -------------------- */
 
-const PORT = 1236;
+const PORT = process.env.PORT || 1236;
 
 server.listen(PORT, () => {
-  console.log(`Execution server running at http://localhost:${PORT}`);
+  console.log(`Execution server running on port ${PORT}`);
 });

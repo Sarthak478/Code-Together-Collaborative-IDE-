@@ -1,7 +1,6 @@
 import { useCallback, useState, useEffect } from "react"
 import { EXT_TO_LANG } from "../constants/editorConfigs"
-
-const API_URL = "http://localhost:1236"
+import { API_URL } from "../config"
 
 export default function useFileSystem(ydoc, provider, isCreating, roomId, isHost) {
   const [tree, setTree] = useState({}) // Maps parentPath -> Array of children

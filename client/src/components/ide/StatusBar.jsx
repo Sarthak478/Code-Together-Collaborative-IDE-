@@ -10,7 +10,7 @@ export default function StatusBar({ activeLanguage, roomMode, terminalOpen, isHo
       {/* Left side */}
       <div style={{ display: "flex", height: "100%" }}>
         <div className="status-item" style={{ background: "rgba(0,0,0,0.15)", fontWeight: 600 }}>
-          <span style={{ fontSize: 13 }}>◆</span> LiveShare {roomMode === "ide" ? "IDE" : "Standard"}
+          <span style={{ fontSize: 13 }}>◆</span> CodeTogether {roomMode === "ide" ? "IDE" : "Standard"}
         </div>
         <div className="status-item" title={actualRoomType === "interview" ? (isHost ? "Interviewer" : "Candidate") : "Room Host"}>
           <span style={{ fontSize: 13 }}>{isHost ? "👑" : "👤"}</span> {actualRoomType === "interview" ? (isHost ? "Interviewer" : "Candidate") : (isHost ? "(Host)" : "")} @{username}

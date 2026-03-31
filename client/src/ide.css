@@ -4,7 +4,20 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-/* ── File Explorer ───────────────────────────────────── */
+/* ── Glassmorphism & UI Roots ──────────────────────────── */
+:root {
+  --ide-glass: rgba(255, 255, 255, 0.05);
+  --ide-glass-border: rgba(255, 255, 255, 0.08);
+  --ide-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.ide-glass-effect {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: var(--ide-glass);
+  border: 1px solid var(--ide-glass-border);
+}
+
 .ide-file-tree {
   user-select: none;
 }
@@ -241,6 +254,47 @@
 
 .ide-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Premium Buttons & Icons ───────────────────────────── */
+.ide-btn-premium {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.ide-btn-premium:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+  filter: brightness(1.1);
+}
+
+.ide-btn-premium:active {
+  transform: scale(0.97);
+}
+
+.ide-icon-pulse {
+  animation: iconPulse 2s infinite;
+}
+
+@keyframes iconPulse {
+  0% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0.6; transform: scale(1); }
+}
+
+/* ── Floating Navbar ────────────────────────────────── */
+.ide-navbar-floating {
+  margin: 10px;
+  border-radius: 12px;
+  box-shadow: var(--ide-shadow);
+  height: 52px !important;
 }
 
 /* ── Animations ──────────────────────────────────────── */
