@@ -206,7 +206,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
 
   return (
     <div style={{ 
-      height: "100vh", 
+      minHeight: "100vh", 
       display: "flex", 
       alignItems: "center", 
       justifyContent: "center", 
@@ -214,7 +214,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
       color: currentTheme.textPrimary, 
       fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif",
       position: "relative",
-      overflow: "hidden",
+      overflow: "auto",
       transition: "background 0.3s ease, color 0.3s ease"
     }}>
       {/* Animated Background Elements */}
