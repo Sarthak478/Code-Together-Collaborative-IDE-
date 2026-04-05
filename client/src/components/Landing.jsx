@@ -348,9 +348,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
             style={{ 
               margin: 0, 
               fontSize: 32, 
-              background: currentTheme.gradient,
               WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
               backgroundClip: "text",
               fontWeight: 800,
               marginBottom: 8,
