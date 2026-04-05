@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { API_URL } from "../config"
 import CodeMirror from "@uiw/react-codemirror"
 import { keymap } from "@codemirror/view"
 import { indentWithTab } from "@codemirror/commands"
@@ -15,6 +16,11 @@ import TabBar from "./ide/TabBar"
 import TerminalPanel from "./ide/TerminalPanel"
 import ExtensionsPanel from "./ide/ExtensionsPanel"
 import StatusBar from "./ide/StatusBar"
+import AIPanel from "./ide/AIPanel"
+import VideoCall from "./editor/VideoCall"
+import SourceControlPanel from "./ide/SourceControlPanel"
+import DiffModal from "./ui/DiffModal"
+import { LogOut, AlertCircle, GitBranch, MessageSquare, Sparkles, Blocks, Bot, Terminal } from "lucide-react"
 
 
 export default function IDERoom(props) {
@@ -22,6 +28,7 @@ export default function IDERoom(props) {
   
   // Terminal Resize Handle State
   const [isResizingTerminal, setIsResizingTerminal] = useState(false)
+  const [activeDiff, setActiveDiff] = useState(null) // { path, staged }
   const isResizingTerminalRef = useRef(false)
 
   // Sync ref with state for mousemove event listener
@@ -95,8 +102,10 @@ export default function IDERoom(props) {
         actualRoomType={ide.actualRoomType}
         isHost={ide.isHost}
         username={ide.editor.username}
+        callActive={ide.callActive}
+        onToggleCall={() => ide.setCallActive(!ide.callActive)}
         onToggleSettings={() => ide.setSettingsOpen(true)}
-        onLeave={ide.onLeave}
+        onLeave={() => ide.setExitConfirmOpen(true)}
         headerBg={ide.headerBg}
         borderCol={ide.borderCol}
         textColor={ide.textColor}
@@ -174,62 +183,33 @@ export default function IDERoom(props) {
           ))}
         </div>
 
-        {/* Right Toggle Panel Controls */}
+        {/* Right Side: Interview + Preview */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, height: "100%" }}>
-          {ide.actualRoomType !== "broadcast" && (
-            <button
-              onClick={() => ide.toggleRightPanel("chat")}
-              style={{
-                background: ide.rightPanel === "chat" ? (ide.isDark ? "rgba(137, 180, 250, 0.2)" : "rgba(13, 110, 253, 0.1)") : "transparent",
-                color: ide.rightPanel === "chat" ? ide.accent : ide.textColor,
-                border: "none", height: "100%", padding: "0 12px", borderRadius: 6,
-                cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                fontWeight: 600, fontSize: 13
-              }}
-            >
-              💬 Chat
-            </button>
-          )}
-
-          <button
-            onClick={() => ide.toggleRightPanel("extensions")}
-            style={{
-              background: ide.rightPanel === "extensions" ? (ide.isDark ? "rgba(137, 180, 250, 0.2)" : "rgba(13, 110, 253, 0.1)") : "transparent",
-              color: ide.rightPanel === "extensions" ? ide.accent : ide.textColor,
-              border: "none", height: "100%", padding: "0 12px", borderRadius: 6,
-              cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-              fontWeight: 600, fontSize: 13
-            }}
-          >
-            🧩 Tools
-          </button>
-
-          <button
-            onClick={() => {
-              const nextState = !ide.terminalOpen;
-              ide.setTerminalOpen(nextState);
-              if (nextState) {
-                ide.syncFilesToTerminal();
-              }
-            }}
-            style={{
-              background: ide.terminalOpen ? (ide.isDark ? "rgba(137, 180, 250, 0.2)" : "rgba(13, 110, 253, 0.1)") : "transparent",
-              color: ide.terminalOpen ? ide.accent : ide.textColor,
-              border: "none", height: "100%", padding: "0 12px", borderRadius: 6,
-              cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-              fontWeight: 600, fontSize: 13
-            }}
-          >
-            &gt;_ Terminal
-          </button>
-
           {ide.actualRoomType === "interview" && (
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginLeft: 16 }}>
-              <div style={{ background: "#a6e3a1", color: "#1e1e2e", padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px" }}>
+              <div style={{ 
+                background: "rgba(166, 227, 161, 0.15)", color: "#a6e3a1", padding: "4px 12px", 
+                borderRadius: 20, fontSize: 11, fontWeight: "bold", textTransform: "uppercase", 
+                letterSpacing: "1px", border: "1px solid rgba(166, 227, 161, 0.2)",
+                display: "flex", alignItems: "center", gap: 6
+              }}>
                 🎓 Interview Mode
               </div>
-              <div style={{ color: ide.textColor, fontSize: 13, fontWeight: "bold", fontFamily: "monospace", opacity: 0.8 }}>
+              <div style={{ 
+                color: ide.textColor, fontSize: 13, fontWeight: "bold", fontFamily: "monospace", 
+                opacity: 0.8, background: "rgba(255,255,255,0.03)", padding: "4px 10px",
+                borderRadius: 8, border: `1px solid ${ide.borderCol}`
+              }}>
                 ⏱️ {new Date(ide.interviewTime * 1000).toISOString().substr(11, 8)}
+              </div>
+              <div style={{
+                background: ide.isHost ? "rgba(249, 226, 175, 0.1)" : "rgba(137, 180, 250, 0.1)",
+                color: ide.isHost ? "#f9e2af" : "#89b4fa",
+                fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8,
+                border: `1px solid ${ide.isHost ? "rgba(249, 226, 175, 0.2)" : "rgba(137, 180, 250, 0.2)"}`,
+                textTransform: "uppercase", letterSpacing: "0.5px"
+              }}>
+                {ide.isHost ? "👑 Interviewer" : "👤 Candidate"}
               </div>
             </div>
           )}
@@ -251,7 +231,59 @@ export default function IDERoom(props) {
       {/* ── Main content row ── */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         
-        {/* File Explorer (Left) */}
+        {/* Left Mini Sidebar for Panels */}
+        <div style={{ 
+          width: 48, borderRight: `1px solid ${ide.borderCol}`, background: "rgba(0,0,0,0.1)",
+          display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 12, gap: 4
+        }}>
+          {ide.actualRoomType !== "broadcast" && (
+            <IDEPanelToggleButton 
+              icon={<MessageSquare size={20} />} 
+              active={ide.rightPanel === "chat"} 
+              onClick={() => ide.toggleRightPanel("chat")} 
+              accent={ide.accent} 
+              count={ide.visibleChatMsgs.length}
+              title="Chat"
+            />
+          )}
+          <IDEPanelToggleButton 
+            icon={<GitBranch size={20} />} 
+            active={ide.rightPanel === "git"} 
+            onClick={() => ide.toggleRightPanel("git")} 
+            accent={ide.accent} 
+            title="Source Control"
+          />
+          <IDEPanelToggleButton 
+            icon={<Blocks size={20} />} 
+            active={ide.rightPanel === "extensions"} 
+            onClick={() => ide.toggleRightPanel("extensions")} 
+            accent={ide.accent} 
+            title="Extensions"
+          />
+          <IDEPanelToggleButton 
+            icon={<Bot size={20} />} 
+            active={ide.rightPanel === "ai"} 
+            onClick={() => ide.toggleRightPanel("ai")} 
+            accent={ide.accent} 
+            title="AI Coder"
+          />
+
+          <div style={{ width: 24, height: 1, background: ide.borderCol, margin: "4px 0" }} />
+
+          <IDEPanelToggleButton 
+            icon={<Terminal size={20} />} 
+            active={ide.terminalOpen} 
+            onClick={() => {
+              const nextState = !ide.terminalOpen;
+              ide.setTerminalOpen(nextState);
+              if (nextState) ide.syncFilesToTerminal();
+            }} 
+            accent={ide.accent} 
+            title="Terminal"
+          />
+        </div>
+
+        {/* File Explorer */}
         <FileExplorer
           fs={ide.fs}
           activeFile={ide.activeFile}
@@ -314,7 +346,7 @@ export default function IDERoom(props) {
                   ) : (
                     <>
                       <div style={{ fontSize: 64 }}>🛠️</div>
-                      <div style={{ fontSize: 18, fontWeight: 600 }}>LiveShare Collaborative IDE</div>
+                      <div style={{ fontSize: 18, fontWeight: 600 }}>CodeTogether Collaborative IDE</div>
                       <div style={{ fontSize: 13, marginTop: 8 }}>Select or create a file to start coding</div>
                     </>
                   )}
@@ -385,6 +417,28 @@ export default function IDERoom(props) {
                     actualRoomType={ide.actualRoomType}
                     isHost={ide.isHost}
                   />
+                ) : ide.rightPanel === "git" ? (
+                  <SourceControlPanel
+                    roomId={ide.roomId}
+                    gitStatus={ide.gitStatus}
+                    isGitLoading={ide.isGitLoading}
+                    onRefresh={ide.refreshGitStatus}
+                    onViewDiff={(path, staged) => setActiveDiff({ path, staged })}
+                    username={ide.editor.username}
+                    themeData={{ bg: ide.bg, textColor: ide.textColor, borderCol: ide.borderCol, accent: ide.accent, inputBg: ide.inputBg, panelBg: ide.panelBg, headerBg: ide.headerBg }}
+                  />
+                ) : ide.rightPanel === "ai" ? (
+                  <AIPanel
+                    activeFile={ide.activeFile}
+                    activeYText={ide.activeYText}
+                    textColor={ide.textColor}
+                    borderCol={ide.borderCol}
+                    panelBg={ide.panelBg}
+                    inputBg={ide.inputBg}
+                    accent={ide.accent}
+                    isDark={ide.isDark}
+                    headerBg={ide.headerBg}
+                  />
                 ) : (
                   <ExtensionsPanel
                     textColor={ide.textColor}
@@ -438,6 +492,75 @@ export default function IDERoom(props) {
         />
       )}
 
+      {/* Exit Confirmation Modal */}
+      {ide.exitConfirmOpen && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0, 
+          background: "rgba(0,0,0,0.6)", zIndex: 3000, display: "flex", 
+          alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)"
+        }}>
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0, y: 10 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            className="ide-glass-effect"
+            style={{
+              background: ide.panelBg, border: `1px solid ${ide.borderCol}`, 
+              borderRadius: 20, padding: 32, width: 360, textAlign: "center",
+              boxShadow: "0 30px 60px rgba(0,0,0,0.5)"
+            }}
+          >
+            <div style={{ 
+              width: 56, height: 56, borderRadius: "50%", background: "rgba(243, 139, 168, 0.1)", 
+              display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" 
+            }}>
+               <LogOut size={28} color="#f38ba8" />
+            </div>
+            <h3 style={{ margin: "0 0 12px 0", color: ide.textColor, fontSize: 20, fontWeight: 800 }}>Ready to leave?</h3>
+            <p style={{ margin: "0 0 28px 0", color: ide.textColor, fontSize: 14, opacity: 0.6, lineHeight: 1.6 }}>
+              Are you sure you want to exit? <br />
+              All unsaved progress and session data will be permanently cleared.
+            </p>
+            <div style={{ display: "flex", gap: 12 }}>
+              <button 
+                onClick={() => ide.setExitConfirmOpen(false)}
+                className="ide-btn-premium"
+                style={{
+                  flex: 1, background: ide.inputBg, color: ide.textColor, 
+                  border: `1px solid ${ide.borderCol}`, justifyContent: "center"
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  ide.setExitConfirmOpen(false);
+                  ide.onLeave();
+                }}
+                className="ide-btn-premium"
+                style={{
+                  flex: 1, background: "#f38ba8", color: "#1e1e2e", 
+                  border: "none", justifyContent: "center"
+                }}
+              >
+                Yes, Exit Room
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Video Call Bubbles */}
+      {ide.callActive && (
+        <VideoCall 
+          roomId={ide.roomId}
+          username={ide.editor.username}
+          peerId={ide.peerId}
+          setPeerId={ide.setPeerId}
+          activeUsers={ide.visibleActiveUsersList}
+          themeData={{ accent: ide.accent, textColor: ide.textColor, panelBg: ide.panelBg }}
+        />
+      )}
+
       {/* Toasts */}
       <div style={{ position: "fixed", bottom: 60, right: 20, zIndex: 1000, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
         <AnimatePresence>
@@ -458,6 +581,62 @@ export default function IDERoom(props) {
           ))}
         </AnimatePresence>
       </div>
+      {/* Git Diff Modal */}
+      {activeDiff && (
+        <DiffModal 
+          roomId={ide.roomId}
+          filePath={activeDiff.path}
+          staged={activeDiff.staged}
+          onClose={() => setActiveDiff(null)}
+          themeData={{ accent: ide.accent, textColor: ide.textColor, panelBg: ide.panelBg, isDark: ide.isDark, borderCol: ide.borderCol, inputBg: ide.inputBg }}
+          onStage={async (path) => {
+            await fetch(`${API_URL}/git/stage`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ roomId: ide.roomId, filePaths: [path] })
+            })
+            ide.refreshGitStatus()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function IDEPanelToggleButton({ icon, active, onClick, accent, count, title }) {
+  return (
+    <div style={{ position: "relative" }}>
+      <button 
+        onClick={onClick}
+        title={title}
+        style={{ 
+          background: "transparent", border: "none", cursor: "pointer", 
+          color: active ? accent : "rgba(255,255,255,0.4)",
+          transition: "all 0.2s",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          width: 36, height: 36, borderRadius: 8,
+          ...(active ? { background: "rgba(255,255,255,0.05)" } : {})
+        }}
+        onMouseEnter={e => { if (!active) e.currentTarget.style.color = "rgba(255,255,255,0.7)" }}
+        onMouseLeave={e => { if (!active) e.currentTarget.style.color = "rgba(255,255,255,0.4)" }}
+      >
+        {icon}
+      </button>
+      {active && (
+        <motion.div 
+          layoutId="ide-active-panel-indicator"
+          style={{ position: "absolute", left: -12, top: "50%", transform: "translateY(-50%)", width: 2, height: 20, background: accent, borderRadius: "0 2px 2px 0" }}
+        />
+      )}
+      {count > 0 && !active && (
+        <div style={{ 
+          position: "absolute", top: -2, right: -2, background: accent, color: "#1e1e2e", 
+          fontSize: 9, fontWeight: 800, width: 14, height: 14, borderRadius: "50%",
+          display: "flex", alignItems: "center", justifyContent: "center"
+        }}>
+          {count > 9 ? "9+" : count}
+        </div>
+      )}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { generateRoomId } from "../utils/helpers"
 import { motion, AnimatePresence } from "framer-motion"
+import { COLLAB_URL } from "../config"
 
 /* ─── Theme Configuration ──────────────────────────────────────────────── */
 const themes = {
@@ -143,7 +144,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
     
     setIsValidating(true)
     try {
-      const res = await fetch("http://127.0.0.1:1235/rooms")
+      const res = await fetch(`${COLLAB_URL}/rooms`)
       const activeRooms = await res.json()
       const exists = activeRooms.includes(roomId.trim().replace(/^#/, ''))
       setRoomExists(exists)
@@ -168,7 +169,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
     
     setIsJoining(true)
     try {
-      const res = await fetch("http://127.0.0.1:1235/rooms")
+      const res = await fetch(`${COLLAB_URL}/rooms`)
       const activeRooms = await res.json()
       
       if (!activeRooms.includes(id)) {
@@ -347,24 +348,31 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
             style={{ 
               margin: 0, 
               fontSize: 32, 
-              // background: currentTheme.gradient,
+              background: currentTheme.gradient,
               WebkitBackgroundClip: "text",
-              // WebkitTextFillColor: "transparent",
+              WebkitTextFillColor: "transparent",
               backgroundClip: "text",
-              fontWeight: 700,
-              marginBottom: 8
+              fontWeight: 800,
+              marginBottom: 8,
+              letterSpacing: "-0.5px"
             }}
           >
-            ⚡ LiveShare IDE
+            ⚡ CodeTogether IDE
           </motion.h1>
-          <p style={{ 
-            fontSize: 13, 
-            marginTop: 0, 
-            color: currentTheme.textSecondary,
-            fontWeight: 500
-          }}>
-            Real-time collaborative coding environment
-          </p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 4 }}>
+            <p style={{ 
+              fontSize: 13, 
+              margin: 0, 
+              color: currentTheme.textSecondary,
+              fontWeight: 500
+            }}>
+              Real-time collaborative coding environment
+            </p>
+            <span style={{ 
+              fontSize: 9, background: currentTheme.accent, color: "#fff", 
+              padding: "2px 8px", borderRadius: 20, fontWeight: 700, letterSpacing: "0.5px" 
+            }}>v2.0</span>
+          </div>
         </div>
         
         {/* Username Input */}

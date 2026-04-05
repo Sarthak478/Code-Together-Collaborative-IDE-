@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from "react"
+import { API_URL } from "../../config"
 
 /**
  * TerminalPanel — Integrated terminal using xterm.js + WebSocket to server PTY.
@@ -70,12 +71,12 @@ export default function TerminalPanel({ roomId, height, isDark, borderCol, heade
         fitRef.current = fitAddon
 
         // Connect to server terminal WebSocket
-        ws = new WebSocket(`ws://127.0.0.1:1236/terminal?roomId=${encodeURIComponent(roomId)}`)
+        ws = new WebSocket(`${API_URL.replace("http","ws")}/terminal?roomId=${encodeURIComponent(roomId)}`)
         wsRef.current = ws
 
         ws.onopen = () => {
           term.writeln("\x1b[1;36m╔═══════════════════════════════════════╗\x1b[0m")
-          term.writeln("\x1b[1;36m║    LiveShare Terminal Connected       ║\x1b[0m")
+          term.writeln("\x1b[1;36m║   CodeTogether Terminal Connected     ║\x1b[0m")
           term.writeln("\x1b[1;36m╚═══════════════════════════════════════╝\x1b[0m")
           term.writeln("")
 

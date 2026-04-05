@@ -9,6 +9,7 @@ import { yCollab } from "y-codemirror.next"
 import { LANGUAGES, THEMES, FONT_FAMILIES, EXT_TO_LANG } from "../constants/editorConfigs"
 import { loadPersonalPrefs, savePersonalPrefs } from "../utils/helpers"
 import useFileSystem from "./useFileSystem"
+import { WS_URL, API_URL } from "../config"
 
 export default function useIDERoom({ roomId, initialRoomType, isCreating, username, onLeave }) {
   /* ── Yjs stable refs ── */
@@ -19,7 +20,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     const persistence = new IndexeddbPersistence(`liveshare-room-${roomId}`, ydoc)
 
     const provider = new HocuspocusProvider({
-      url: "ws://127.0.0.1:1235",
+      url: WS_URL,
       name: roomId,
       document: ydoc,
     })
@@ -75,6 +76,10 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   /* ── Preview Panel ── */
   const [previewOpen, setPreviewOpen] = useState(false)
 
+  /* ── Video Call State ── */
+  const [callActive, setCallActive] = useState(false)
+  const [peerId, setPeerId] = useState(null)
+
   /* ── Chat & Moderation ── */
   const [showUsersList, setShowUsersList] = useState(true)
   const [chatMessages, setChatMessages] = useState([])
@@ -94,6 +99,30 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
   }, [])
 
+  /* ── Version Control (Git) State ── */
+  const [gitStatus, setGitStatus] = useState(null) // { isRepo, modified, staged, etc }
+  const [isGitLoading, setIsGitLoading] = useState(false)
+
+  const refreshGitStatus = useCallback(async () => {
+    setIsGitLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/git/status?roomId=${roomId}`)
+      const data = await res.json()
+      setGitStatus(data)
+    } catch (err) {
+      console.error("Git Status Error:", err)
+    } finally {
+      setIsGitLoading(false)
+    }
+  }, [roomId])
+
+  // Refresh git status periodically or when files change significantly
+  useEffect(() => {
+    refreshGitStatus()
+    const interval = setInterval(refreshGitStatus, 15000) // Every 15s
+    return () => clearInterval(interval)
+  }, [refreshGitStatus])
+
   /* ── Personal UI ── */
   const [personalPrefs, setPersonalPrefs] = useState(() => {
     const p = loadPersonalPrefs()
@@ -104,6 +133,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   }, [])
 
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false)
   const [roomTheme, setRoomTheme] = useState(null)
   const [roomFont, setRoomFont] = useState(null)
   const activeTheme = roomTheme ?? personalPrefs.theme
@@ -138,7 +168,8 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       id: s[0],
       name: s[1].user.name,
       color: s[1].user.color || "#89b4fa",
-      activeFile: s[1].user.activeFile || null
+      activeFile: s[1].user.activeFile || null,
+      peerId: s[1].user.peerId || null
     })))
     if (validStates.length === 0) return
 
@@ -213,7 +244,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     recalcHost()
 
     // Execution WS
-    const ws = new WebSocket("ws://127.0.0.1:1236")
+    const ws = new WebSocket(`${API_URL.replace("http","ws")}`)
     ws.onopen = () => ws.send(JSON.stringify({ type: "join", roomId }))
     ws.onmessage = (event) => {
       try {
@@ -258,10 +289,11 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     if (state && state.user) {
       provider.awareness.setLocalStateField("user", {
         ...state.user,
-        activeFile
+        activeFile,
+        peerId
       })
     }
-  }, [activeFile, editor])
+  }, [activeFile, peerId, editor])
 
   /* ── Chat Toast ── */
   useEffect(() => {
@@ -369,6 +401,21 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     const code = activeYText?.toString() || ""
     if (!code.trim()) { addToast("⚠️ Cannot run an empty file."); return }
 
+    // Intercept Heavy ML Workloads
+    if (activeLanguage === "python" && (code.includes("import tensorflow") || code.includes("from tensorflow"))) {
+      const proceed = window.confirm(
+        "⚠️ Heavy Compute Detected!\n\n" +
+        "It looks like you are importing TensorFlow. Running machine learning models on our cloud CPUs may crash the room and terminate your session.\n\n" +
+        "INSTRUCTIONS FOR LOCAL GPU:\n" +
+        `1. Open your computer's terminal (not this web terminal).\n` +
+        `2. Run this command: npx liveshare-agent connect --room ${roomId}\n` +
+        "3. Your web IDE will now use your local hardware!\n\n" +
+        "(Note: Local Agent is currently in Beta)\n\n" +
+        "Are you absolutely sure you want to run this code on the cloud?"
+      )
+      if (!proceed) return
+    }
+
     try {
       // ✅ Fixed: use fs.getFileContent (returns string) instead of fs.getFileContent (was undefined)
       const allFiles = fs.getAllFiles().map(f => ({
@@ -378,7 +425,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
 
       setTerminalOpen(true)
 
-      const res = await fetch("http://127.0.0.1:1236/sync-and-run", {
+      const res = await fetch(`${API_URL}/sync-and-run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -407,7 +454,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
         content: fs.getFileContent(f.path)
       }))
 
-      await fetch("http://127.0.0.1:1236/sync", {
+      await fetch(`${API_URL}/sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomId, files: allFiles })
@@ -536,6 +583,9 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     isPersistenceSynced,
     // UI state
     settingsOpen, setSettingsOpen,
+    exitConfirmOpen, setExitConfirmOpen,
+    callActive, setCallActive,
+    peerId, setPeerId,
     toasts,
     // Users
     activeUsers, visibleActiveUsersList, hostName,
