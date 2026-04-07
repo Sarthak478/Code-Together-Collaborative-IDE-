@@ -28,7 +28,7 @@ export default function SettingsPanel({
   roomTheme, roomFont, onSetRoomTheme,
   chatEnabled, onToggleChatEnabled, showUsersList, onToggleShowUsers,
   pushRoomUI, clearRoomUI, isHost, activeUsers, hostName, kickUser,
-  themeData = {}, username
+  themeData = {}, username, clientID
 }) {
   const { 
     bg = "#1e1e2e", 
@@ -242,7 +242,7 @@ export default function SettingsPanel({
                </div>
                
                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {activeUsers.filter(u => u.name !== username).map(u => (
+                  {activeUsers.filter(u => u.id !== clientID).map(u => (
                     <div key={u.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "rgba(255,255,255,0.02)", borderRadius: 12, border: `1px solid ${borderCol}` }}>
                       <span style={{ fontSize: 13, fontWeight: 600 }}>@{u.name}</span>
                       <button 

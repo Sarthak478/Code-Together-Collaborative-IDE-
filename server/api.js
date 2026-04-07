@@ -20,7 +20,7 @@ const app = express();
 // Rate Limiting for production safety
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 10000, // limit each IP to 10000 requests per windowMs
   message: { error: "Too many requests from this IP, please try again after 15 minutes" }
 });
 
@@ -33,7 +33,7 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: "1000mb" }));
 
 /* -------------------- SECURITY HELPERS -------------------- */
 
@@ -44,8 +44,8 @@ function sanitizePath(input) {
   if (typeof input !== "string") return "";
   // Remove control characters, null bytes, and ".."
   return input.replace(/[\x00-\x1f\x7f]/g, "")
-              .replace(/\.\./g, "")
-              .replace(/[<>:"|?*]/g, ""); // Windows invalid chars
+    .replace(/\.\./g, "")
+    .replace(/[<>:"|?*]/g, ""); // Windows invalid chars
 }
 
 const server = http.createServer(app);
@@ -61,6 +61,7 @@ const roomTerminals = new Map(); // roomId -> ptyProcess
 const roomTerminalHistory = new Map(); // roomId -> string (last N chars)
 const roomWatchers = new Map(); // roomId -> chokidarWatcher
 const roomCleanupTimers = new Map(); // roomId -> timeoutId
+const roomLastResizer = new Map(); // roomId -> { clientId, cols, rows, time }
 
 function cleanupRoomFolder(roomId) {
   const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
@@ -73,6 +74,16 @@ function cleanupRoomFolder(roomId) {
     }
   }
   roomCleanupTimers.delete(roomId);
+
+  // Terminate all PTY processes related to this room
+  for (const [key, ptyProcess] of roomTerminals.entries()) {
+    if (key.startsWith(`${roomId}_`)) {
+      try { ptyProcess.kill(); } catch (e) {}
+      roomTerminals.delete(key);
+      roomTerminalHistory.delete(key);
+      roomLastResizer.delete(key);
+    }
+  }
 }
 
 function ensureWatcher(roomId, roomCwd) {
@@ -80,7 +91,10 @@ function ensureWatcher(roomId, roomCwd) {
 
   console.log(`[WATCHER] Starting for room ${roomId} at ${roomCwd}`);
   const watcher = chokidar.watch(roomCwd, {
-    ignored: [/(^|[\/\\])\../, "**/node_modules/**", "**/.git/**"],
+    ignored: [
+      /(^|[\/\\])\../,
+      "**/.git/**"
+    ],
     persistent: true,
     ignoreInitial: true,
     depth: 10,
@@ -89,17 +103,32 @@ function ensureWatcher(roomId, roomCwd) {
 
   roomWatchers.set(roomId, watcher);
 
+  const pendingChanges = new Set();
+  let notifyTimeout = null;
+
   const notifyChange = (filePath) => {
     let rel = relative(roomCwd, filePath).replace(/\\/g, "/");
     if (!rel.startsWith("/")) rel = "/" + rel;
     const parentPath = dirname(rel).replace(/\\/g, "/");
+    const safeParent = (parentPath === "." || parentPath === "/") ? "/" : parentPath;
 
-    console.log(`[FS:EVENT] ${rel} in room ${roomId}`);
-    broadcast(roomId, {
-      type: "fs:changed",
-      path: rel,
-      parentPath: parentPath === "." ? "/" : parentPath,
-    });
+    pendingChanges.add(safeParent);
+
+    if (!notifyTimeout) {
+      notifyTimeout = setTimeout(() => {
+        const paths = Array.from(pendingChanges);
+        pendingChanges.clear();
+        notifyTimeout = null;
+
+        for (const p of paths) {
+          broadcast(roomId, {
+            type: "fs:changed",
+            path: p,
+            parentPath: p
+          });
+        }
+      }, 500);
+    }
   };
 
   watcher
@@ -117,17 +146,19 @@ wss.on("connection", (ws, req) => {
 
   if (url.pathname === "/terminal") {
     const roomId = url.searchParams.get("roomId");
+    const terminalId = url.searchParams.get("terminalId") || "1";
     if (!roomId) { ws.close(); return; }
 
+    const termKey = `${roomId}_${terminalId}`;
     const shell = platform() === "win32" ? "powershell.exe" : "bash";
     const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
     if (!existsSync(roomCwd)) {
       mkdirSync(roomCwd, { recursive: true });
     }
 
-    // Spawn new PTY if not exists for this room
-    if (!roomTerminals.has(roomId)) {
-      console.log(`Spawning terminal for room ${roomId} using ${shell} at ${roomCwd}`);
+    // Spawn new PTY if not exists for this room+terminal
+    if (!roomTerminals.has(termKey)) {
+      console.log(`Spawning terminal ${terminalId} for room ${roomId} using ${shell} at ${roomCwd}`);
 
       const ptyProcess = pty.spawn(shell, [], {
         name: "xterm-color",
@@ -137,42 +168,43 @@ wss.on("connection", (ws, req) => {
         env: process.env
       });
 
-      roomTerminals.set(roomId, ptyProcess);
-      roomTerminalHistory.set(roomId, "");
+      roomTerminals.set(termKey, ptyProcess);
+      roomTerminalHistory.set(termKey, "");
 
       ptyProcess.onData((data) => {
-        // Broadcast to all terminal clients in room
+        // Broadcast to all clients assigned to this specific terminal
         wss.clients.forEach(client => {
-          if (client.roomId === roomId && client.isTerminal && client.readyState === 1) {
+          if (client.roomId === roomId && client.terminalId === terminalId && client.isTerminal && client.readyState === 1) {
             client.send(JSON.stringify({ type: "output", data }));
           }
         });
 
         // Save history (last 5000 chars)
-        let hist = roomTerminalHistory.get(roomId) + data;
+        let hist = roomTerminalHistory.get(termKey) + data;
         if (hist.length > 5000) hist = hist.slice(-5000);
-        roomTerminalHistory.set(roomId, hist);
+        roomTerminalHistory.set(termKey, hist);
       });
 
       ptyProcess.onExit(({ exitCode }) => {
-        console.log(`Terminal for room ${roomId} exited with code ${exitCode}`);
-        roomTerminals.delete(roomId);
+        console.log(`Terminal ${terminalId} for room ${roomId} exited with code ${exitCode}`);
+        roomTerminals.delete(termKey);
         wss.clients.forEach(client => {
-          if (client.roomId === roomId && client.isTerminal && client.readyState === 1) {
+          if (client.roomId === roomId && client.terminalId === terminalId && client.isTerminal && client.readyState === 1) {
             client.send(JSON.stringify({ type: "exit", code: exitCode }));
           }
         });
       });
     }
 
-    // Start file watcher for the room
+    // Start file watcher for the room (only initiates once per room anyway)
     ensureWatcher(roomId, roomCwd);
 
     ws.roomId = roomId;
+    ws.terminalId = terminalId;
     ws.isTerminal = true;
 
     // Send history to new client
-    const hist = roomTerminalHistory.get(roomId);
+    const hist = roomTerminalHistory.get(termKey);
     if (hist) {
       ws.send(JSON.stringify({ type: "output", data: hist }));
     }
@@ -180,13 +212,23 @@ wss.on("connection", (ws, req) => {
     ws.on("message", (msg) => {
       try {
         const data = JSON.parse(msg.toString());
-        const ptyProcess = roomTerminals.get(roomId);
+        const ptyProcess = roomTerminals.get(termKey);
         if (!ptyProcess) return;
 
         if (data.type === "input") {
           ptyProcess.write(data.data);
         } else if (data.type === "resize") {
-          try { ptyProcess.resize(data.cols, data.rows); } catch (e) { }
+          const now = Date.now();
+          const last = roomLastResizer.get(termKey);
+
+          // Debounce and only resize if significantly different or from a new active user
+          if (!last || last.cols !== data.cols || last.rows !== data.rows) {
+            try {
+              ptyProcess.resize(data.cols, data.rows);
+              roomLastResizer.set(termKey, { cols: data.cols, rows: data.rows, time: now });
+              console.log(`[TERMINAL] Resized terminal ${terminalId} in ${roomId} to ${data.cols}x${data.rows}`);
+            } catch (e) { }
+          }
         }
       } catch (e) {
         console.error("Terminal WS message error", e);
@@ -210,7 +252,7 @@ wss.on("connection", (ws, req) => {
         if (!roomClients.has(cleanRoomId)) {
           roomClients.set(cleanRoomId, new Set());
         }
-        
+
         // Cancel any pending cleanup if a user joins
         if (roomCleanupTimers.has(cleanRoomId)) {
           console.log(`[WS] User joined ${cleanRoomId}. Cancelling pending cleanup.`);
@@ -237,7 +279,7 @@ wss.on("connection", (ws, req) => {
     if (ws.roomId && !ws.isTerminal && roomClients.has(ws.roomId)) {
       const clients = roomClients.get(ws.roomId);
       clients.delete(ws);
-      
+
       // Automatic 60-second cleanup if room is empty
       if (clients.size === 0) {
         console.log(`[WS] Room ${ws.roomId} is empty. Scheduling cleanup in 60s...`);
@@ -446,7 +488,13 @@ app.post("/sync-and-run", (req, res) => {
       writeFileSync(fullPath, f.content || "", "utf8");
     });
 
-    const ptyProcess = roomTerminals.get(roomId);
+    let ptyProcess = roomTerminals.get(`${roomId}_1`);
+    if (!ptyProcess) {
+       // fallback, try to find any terminal for this room
+       const fallbackKey = Array.from(roomTerminals.keys()).find(k => k.startsWith(`${roomId}_`));
+       if (fallbackKey) ptyProcess = roomTerminals.get(fallbackKey);
+    }
+
     if (!ptyProcess) {
       return res.status(400).json({ error: "No active terminal session in this room." });
     }
@@ -520,6 +568,26 @@ app.post("/sync", (req, res) => {
   } catch (error) {
     console.error("Sync error:", error);
     res.status(500).json({ error: "Failed to write virtual files to server disk." });
+  }
+});
+
+/* -------------------- CLEAR ROOM FILES (for folder re-import) ---- */
+
+app.post("/fs/clear-room", (req, res) => {
+  const { roomId } = req.body;
+  if (!roomId) return res.status(400).json({ error: "roomId required" });
+
+  const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
+
+  try {
+    if (existsSync(roomCwd)) {
+      rmSync(roomCwd, { recursive: true, force: true });
+    }
+    mkdirSync(roomCwd, { recursive: true });
+    res.json({ success: true, message: "Room files cleared" });
+  } catch (error) {
+    console.error("Clear room error:", error);
+    res.status(500).json({ error: "Failed to clear room files" });
   }
 });
 

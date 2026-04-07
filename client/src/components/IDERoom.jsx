@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { API_URL } from "../config"
-import CodeMirror from "@uiw/react-codemirror"
-import { keymap } from "@codemirror/view"
-import { indentWithTab } from "@codemirror/commands"
+import Editor from "@monaco-editor/react"
 
 import useIDERoom from "../hooks/useIDERoom"
 import Navbar from "./editor/Navbar"
@@ -30,6 +28,20 @@ export default function IDERoom(props) {
   const [isResizingTerminal, setIsResizingTerminal] = useState(false)
   const [activeDiff, setActiveDiff] = useState(null) // { path, staged }
   const isResizingTerminalRef = useRef(false)
+  
+  // Ralph Automation State
+  const [ralphPrompt, setRalphPrompt] = useState(null)
+  const [sendTerminalCommand, setSendTerminalCommand] = useState(null)
+
+  const handleAskRalph = useCallback((log) => {
+    // Open AI panel if not already open
+    if (ide.rightPanel !== "ai") ide.toggleRightPanel("ai")
+    setRalphPrompt("I encountered this error in my terminal. Analyze it and provide a fix:\n\n```\n" + log + "\n```")
+  }, [ide])
+
+  const handleSendCommandReady = useCallback((sendFn) => {
+    setSendTerminalCommand(() => sendFn)
+  }, [])
 
   // Sync ref with state for mousemove event listener
   useEffect(() => {
@@ -321,15 +333,14 @@ export default function IDERoom(props) {
           <div style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", flexDirection: "row" }}>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
               {ide.activeFile && !ide.isSyncingFile && ide.isPersistenceSynced ? (
-                <CodeMirror
+                <Editor
                   key={ide.activeFile}
-                  extensions={[
-                    ...ide.extensions,
-                    keymap.of([indentWithTab])
-                  ]}
-                  theme={ide.cmBaseTheme}
-                  style={{ flex: 1, fontSize: `${ide.activeFontSize}px`, fontFamily: ide.activeFontFamily, height: "100%" }}
-                  readOnly={!ide.canEdit}
+                  height="100%"
+                  width="100%"
+                  language={ide.activeLanguage}
+                  theme={ide.monacoTheme}
+                  options={ide.monacoOptions}
+                  onMount={(editor, monaco) => ide.onEditorMount(editor, monaco)}
                 />
               ) : (
                 <div style={{
@@ -387,6 +398,8 @@ export default function IDERoom(props) {
               headerBg={ide.headerBg}
               textColor={ide.textColor}
               accent={ide.accent}
+              onAskRalph={handleAskRalph}
+              onSendCommandReady={handleSendCommandReady}
             />
           )}
         </div>
@@ -406,11 +419,11 @@ export default function IDERoom(props) {
                   <ChatPanel
                     messages={ide.visibleChatMsgs}
                     chatInput={ide.chatInput}
-                    setChatInput={ide.setChatInput}
+                    onChatInputChange={ide.setChatInput}
                     chatTarget={ide.chatTarget}
-                    setChatTarget={ide.setChatTarget}
-                    onSendMessage={ide.sendChat}
-                    activeUsers={ide.visibleActiveUsersList}
+                    onChatTargetChange={ide.setChatTarget}
+                    onSendChat={ide.sendChat}
+                    visibleActiveUsersList={ide.visibleActiveUsersList}
                     themeData={{ bg: ide.bg, textColor: ide.textColor, borderCol: ide.borderCol, accent: ide.accent, inputBg: ide.inputBg, panelBg: ide.panelBg, headerBg: ide.headerBg }}
                     chatEnabled={ide.chatEnabled}
                     username={ide.editor.username}
@@ -438,9 +451,16 @@ export default function IDERoom(props) {
                     accent={ide.accent}
                     isDark={ide.isDark}
                     headerBg={ide.headerBg}
+                    autoPrompt={ralphPrompt}
+                    fileSystem={ide.fs}
+                    ydoc={ide.editor.ydoc}
+                    roomId={ide.roomId}
+                    openFile={ide.openFile}
+                    sendTerminalCommand={sendTerminalCommand}
                   />
                 ) : (
                   <ExtensionsPanel
+                    roomMap={ide.editor.roomMap}
                     textColor={ide.textColor}
                     borderCol={ide.borderCol}
                     panelBg={ide.panelBg}
@@ -489,6 +509,7 @@ export default function IDERoom(props) {
           kickUser={ide.kickUser}
           themeData={{ bg: ide.bg, headerBg: ide.headerBg, textColor: ide.textColor, borderCol: ide.borderCol, accent: ide.accent, inputBg: ide.inputBg, isDark: ide.isDark, panelBg: ide.panelBg }}
           username={ide.editor.username}
+          clientID={ide.editor.provider.awareness.clientID}
         />
       )}
 
