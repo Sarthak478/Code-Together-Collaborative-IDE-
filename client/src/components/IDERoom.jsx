@@ -12,13 +12,12 @@ import OutputPanel from "./editor/OutputPanel"
 import FileExplorer from "./ide/FileExplorer"
 import TabBar from "./ide/TabBar"
 import TerminalPanel from "./ide/TerminalPanel"
-import ExtensionsPanel from "./ide/ExtensionsPanel"
 import StatusBar from "./ide/StatusBar"
 import AIPanel from "./ide/AIPanel"
 import VideoCall from "./editor/VideoCall"
 import SourceControlPanel from "./ide/SourceControlPanel"
 import DiffModal from "./ui/DiffModal"
-import { LogOut, AlertCircle, GitBranch, MessageSquare, Sparkles, Blocks, Bot, Terminal } from "lucide-react"
+import { LogOut, AlertCircle, GitBranch, MessageSquare, Sparkles, Bot, Terminal } from "lucide-react"
 
 
 export default function IDERoom(props) {
@@ -117,6 +116,7 @@ export default function IDERoom(props) {
         callActive={ide.callActive}
         onToggleCall={() => ide.setCallActive(!ide.callActive)}
         onToggleSettings={() => ide.setSettingsOpen(true)}
+        onToggleGit={() => ide.toggleRightPanel("git")}
         onLeave={() => ide.setExitConfirmOpen(true)}
         headerBg={ide.headerBg}
         borderCol={ide.borderCol}
@@ -264,13 +264,6 @@ export default function IDERoom(props) {
             onClick={() => ide.toggleRightPanel("git")} 
             accent={ide.accent} 
             title="Source Control"
-          />
-          <IDEPanelToggleButton 
-            icon={<Blocks size={20} />} 
-            active={ide.rightPanel === "extensions"} 
-            onClick={() => ide.toggleRightPanel("extensions")} 
-            accent={ide.accent} 
-            title="Extensions"
           />
           <IDEPanelToggleButton 
             icon={<Bot size={20} />} 
@@ -438,6 +431,8 @@ export default function IDERoom(props) {
                     onRefresh={ide.refreshGitStatus}
                     onViewDiff={(path, staged) => setActiveDiff({ path, staged })}
                     username={ide.editor.username}
+                    personalPrefs={ide.personalPrefs}
+                    onOpenSettings={() => ide.setSettingsOpen(true)}
                     themeData={{ bg: ide.bg, textColor: ide.textColor, borderCol: ide.borderCol, accent: ide.accent, inputBg: ide.inputBg, panelBg: ide.panelBg, headerBg: ide.headerBg }}
                   />
                 ) : ide.rightPanel === "ai" ? (
@@ -458,17 +453,7 @@ export default function IDERoom(props) {
                     openFile={ide.openFile}
                     sendTerminalCommand={sendTerminalCommand}
                   />
-                ) : (
-                  <ExtensionsPanel
-                    roomMap={ide.editor.roomMap}
-                    textColor={ide.textColor}
-                    borderCol={ide.borderCol}
-                    panelBg={ide.panelBg}
-                    accent={ide.accent}
-                    isDark={ide.isDark}
-                    headerBg={ide.headerBg}
-                  />
-                )}
+                ) : null}
               </div>
             </motion.div>
           )}
@@ -507,9 +492,14 @@ export default function IDERoom(props) {
           activeUsers={ide.visibleActiveUsersList}
           hostName={ide.hostName}
           kickUser={ide.kickUser}
+          restrictedUsers={ide.restrictedUsers}
+          restrictUser={ide.restrictUser}
+          unrestrictUser={ide.unrestrictUser}
           themeData={{ bg: ide.bg, headerBg: ide.headerBg, textColor: ide.textColor, borderCol: ide.borderCol, accent: ide.accent, inputBg: ide.inputBg, isDark: ide.isDark, panelBg: ide.panelBg }}
           username={ide.editor.username}
           clientID={ide.editor.provider.awareness.clientID}
+          roomId={ide.roomId}
+          refreshGitStatus={ide.refreshGitStatus}
         />
       )}
 

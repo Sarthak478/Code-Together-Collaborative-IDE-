@@ -7,25 +7,39 @@ import {
   ShieldCheck, 
   User,
   Hash,
-  Crown
+  Crown,
+  UserPlus,
+  Check
 } from "lucide-react"
+
+import { useState } from "react"
 
 /* ─── Navbar Component ──────────────────────────────────────────── */
 export default function Navbar({
   roomId, actualRoomType, isHost, username,
   callActive, onToggleCall,
-  onToggleSettings, onLeave, onToggleGit,
-  headerBg, borderCol, textColor, accent,
-  gitStatus
+  onToggleSettings, onLeave,
+  headerBg, borderCol, textColor, accent
 }) {
-  const hasChanges = (gitStatus?.modified?.length || 0) + (gitStatus?.not_added?.length || 0) > 0
+  const [copied, setCopied] = useState(false)
 
-  const GithubIcon = ({ size = 18, color = "currentColor" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
-      <path d="M9 18c-4.51 2-5-2-7-2" />
-    </svg>
-  )
+  const handleInvite = async () => {
+    try {
+      await navigator.clipboard.writeText(roomId)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      const el = document.createElement("textarea")
+      el.value = roomId
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand("copy")
+      document.body.removeChild(el)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
   return (
     <div 
       className="ide-navbar-floating ide-glass-effect"
@@ -108,26 +122,22 @@ export default function Navbar({
         </button>
         
         <button 
-          onClick={onToggleGit} 
-          title="Source Control" 
+          onClick={handleInvite}
+          title={copied ? "Room ID Copied!" : "Copy Room ID to invite collaborators"}
           style={{ 
-            background: hasChanges ? `${accent}15` : "rgba(255,255,255,0.05)", 
-            border: `1px solid ${hasChanges ? accent : borderCol}`, 
-            cursor: "pointer", width: 36, height: 36, borderRadius: 10,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: hasChanges ? accent : textColor, transition: "all 0.2s",
-            position: "relative"
+            background: copied ? `${accent}22` : "transparent", 
+            border: copied ? `1px solid ${accent}44` : `1px solid ${borderCol}`, 
+            cursor: "pointer", 
+            color: copied ? "#a6e3a1" : accent, 
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            height: 36, padding: "0 12px", borderRadius: 10, transition: "all 0.2s",
+            fontSize: 12, fontWeight: 600
           }}
-          onMouseEnter={e => e.currentTarget.style.background = hasChanges ? `${accent}25` : "rgba(255,255,255,0.1)"}
-          onMouseLeave={e => e.currentTarget.style.background = hasChanges ? `${accent}15` : "rgba(255,255,255,0.05)"}
+          onMouseEnter={e => { if (!copied) e.currentTarget.style.background = "rgba(255,255,255,0.05)" }}
+          onMouseLeave={e => { if (!copied) e.currentTarget.style.background = "transparent" }}
         >
-          <GithubIcon size={18} color={hasChanges ? accent : textColor} />
-          {hasChanges && (
-            <div style={{ 
-              position: "absolute", top: -2, right: -2, width: 8, height: 8, 
-              background: "#ff9e64", borderRadius: "50%", border: `2px solid ${headerBg}` 
-            }} />
-          )}
+          {copied ? <Check size={16} /> : <UserPlus size={16} />}
+          <span>{copied ? "Copied!" : "Invite"}</span>
         </button>
 
         <button 

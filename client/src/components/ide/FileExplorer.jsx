@@ -12,7 +12,19 @@ import {
   FolderUp,
   Search,
   MoreVertical,
-  X
+  X,
+  Pencil,
+  Trash2,
+  FileJson,
+  FileType,
+  FileType2,
+  Terminal as TerminalIcon,
+  Image as ImageIcon,
+  Settings as SettingsIcon,
+  Database,
+  Shield,
+  Layout,
+  Globe
 } from "lucide-react"
 
 export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canEdit, textColor, borderCol, inputBg, panelBg, accent, isDark, headerBg }) {
@@ -22,6 +34,9 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
   const [creatingType, setCreatingType] = useState(null) // 'file' | 'folder' | null
   const [newName, setNewName] = useState("")
   const [expandedFolders, setExpandedFolders] = useState(new Set([]))
+  const [renamingPath, setRenamingPath] = useState(null)
+  const [renameValue, setRenameValue] = useState("")
+  const renameInputRef = useRef(null)
   const fileInputRef = useRef(null)
   const folderInputRef = useRef(null)
   const creationInputRef = useRef(null)
@@ -33,6 +48,32 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
       creationInputRef.current.focus()
     }
   }, [creatingType, creatingIn])
+
+  // Focus rename input when it appears
+  useEffect(() => {
+    if (renamingPath && renameInputRef.current) {
+      renameInputRef.current.focus()
+      renameInputRef.current.select()
+    }
+  }, [renamingPath])
+
+  const startRename = (path, currentName) => {
+    setRenamingPath(path)
+    setRenameValue(currentName)
+  }
+
+  const handleRenameSubmit = async (e) => {
+    if (e.key === "Enter" && renameValue.trim() && renameValue.trim() !== renamingPath.split("/").pop()) {
+      const path = renamingPath
+      const newN = renameValue.trim()
+      setRenamingPath(null)
+      setRenameValue("")
+      if (fs.renameEntry) await fs.renameEntry(path, newN)
+    } else if (e.key === "Escape") {
+      setRenamingPath(null)
+      setRenameValue("")
+    }
+  }
 
   const handleImport = async (e, mode) => {
     const files = Array.from(e.target.files)
@@ -118,6 +159,38 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
 
   // Root children for tree view
   const rootChildren = useMemo(() => fs.getChildren("/"), [fs, fs.version])
+
+  const handleDelete = async (path, type) => {
+    const itemName = path.split("/").pop()
+    const confirmMsg = type === "folder" 
+      ? `Are you sure you want to delete the folder "${itemName}" and all its contents?`
+      : `Are you sure you want to delete "${itemName}"?`
+    
+    if (window.confirm(confirmMsg)) {
+      if (fs.deleteEntry) await fs.deleteEntry(path)
+    }
+  }
+
+  const getFileIcon = (name) => {
+    const ext = name.split(".").pop().toLowerCase()
+    const props = { size: 14 }
+    
+    switch (ext) {
+      case "json": return <FileJson {...props} color="#f9e2af" />
+      case "md": return <FileType {...props} color="#89b4fa" />
+      case "css": case "scss": return <FileType2 {...props} color="#fab387" />
+      case "py": return <FileType2 {...props} color="#89dceb" />
+      case "js": case "jsx": return <FileCode {...props} color="#f9e2af" />
+      case "ts": case "tsx": return <FileCode {...props} color="#89b4fa" />
+      case "html": return <Globe {...props} color="#eba0ac" />
+      case "png": case "jpg": case "jpeg": case "svg": case "gif": return <ImageIcon {...props} color="#a6e3a1" />
+      case "yaml": case "yml": case "toml": return <SettingsIcon {...props} color="#94e2d5" />
+      case "sql": return <Database {...props} color="#cba6f7" />
+      case "env": return <Shield {...props} color="#eba0ac" />
+      case "sh": case "bash": return <TerminalIcon {...props} color="#89dceb" />
+      default: return <FileCode {...props} />
+    }
+  }
 
   return (
     <div 
@@ -320,6 +393,13 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
                     textColor={textColor}
                     accent={accent}
                     depth={0}
+                    startRename={startRename}
+                    renamingPath={renamingPath}
+                    renameValue={renameValue}
+                    setRenameValue={setRenameValue}
+                    renameInputRef={renameInputRef}
+                    handleRenameSubmit={handleRenameSubmit}
+                    onDelete={handleDelete}
                   />
                 ) : (
                   <FileItem
@@ -330,6 +410,15 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
                     textColor={textColor}
                     accent={accent}
                     depth={0}
+                    canEdit={canEdit}
+                    startRename={startRename}
+                    renamingPath={renamingPath}
+                    renameValue={renameValue}
+                    setRenameValue={setRenameValue}
+                    renameInputRef={renameInputRef}
+                    handleRenameSubmit={handleRenameSubmit}
+                    onDelete={handleDelete}
+                    getFileIcon={getFileIcon}
                   />
                 )
               ))
@@ -342,10 +431,11 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
 }
 
 /* ── Folder Node (recursive) ── */
-function FolderNode({ entry, fs, activeFile, onFileClick, expandedFolders, toggleFolder, canEdit, startCreation, creatingIn, creatingType, creationInputRef, newName, setNewName, handleCreateSubmit, setCreatingType, setCreatingIn, textColor, accent, depth }) {
+function FolderNode({ entry, fs, activeFile, onFileClick, expandedFolders, toggleFolder, canEdit, startCreation, creatingIn, creatingType, creationInputRef, newName, setNewName, handleCreateSubmit, setCreatingType, setCreatingIn, textColor, accent, depth, startRename, renamingPath, renameValue, setRenameValue, renameInputRef, handleRenameSubmit, onDelete }) {
   const isExpanded = expandedFolders.has(entry.path)
   const children = fs.getChildren(entry.path)
   const [isHovered, setIsHovered] = useState(false)
+  const isRenaming = renamingPath === entry.path
 
   return (
     <div>
@@ -370,12 +460,30 @@ function FolderNode({ entry, fs, activeFile, onFileClick, expandedFolders, toggl
       >
         {isExpanded ? <ChevronDown size={12} opacity={0.5} /> : <ChevronRight size={12} opacity={0.5} />}
         <Folder size={14} fill={isExpanded ? `${accent}33` : "transparent"} color={isExpanded ? accent : textColor} />
-        <span style={{ fontSize: 13, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {entry.name}
-        </span>
+        {isRenaming ? (
+          <input
+            ref={renameInputRef}
+            value={renameValue}
+            onChange={e => setRenameValue(e.target.value)}
+            onKeyDown={handleRenameSubmit}
+            onClick={e => e.stopPropagation()}
+            style={{ flex: 1, background: "rgba(255,255,255,0.08)", border: `1px solid ${accent}`, borderRadius: 4, color: textColor, fontSize: 12, padding: "2px 6px", outline: "none" }}
+          />
+        ) : (
+          <span style={{ fontSize: 13, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {entry.name}
+          </span>
+        )}
         {/* Per-folder action buttons */}
-        {canEdit && isHovered && (
+        {canEdit && isHovered && !isRenaming && (
           <div style={{ display: "flex", gap: 2 }} onClick={e => e.stopPropagation()}>
+            <button
+              title="Rename"
+              onClick={() => startRename(entry.path, entry.name)}
+              style={{ background: "transparent", border: "none", cursor: "pointer", color: textColor, padding: 2, opacity: 0.7 }}
+            >
+              <Pencil size={11} />
+            </button>
             <button
               title={`New File in ${entry.name}`}
               onClick={() => startCreation("file", entry.path)}
@@ -389,6 +497,13 @@ function FolderNode({ entry, fs, activeFile, onFileClick, expandedFolders, toggl
               style={{ background: "transparent", border: "none", cursor: "pointer", color: accent, padding: 2, opacity: 0.7 }}
             >
               <FolderPlus size={12} />
+            </button>
+            <button
+              title={`Delete ${entry.name}`}
+              onClick={() => onDelete(entry.path, "folder")}
+              style={{ background: "transparent", border: "none", cursor: "pointer", color: "#f38ba8", padding: 2, opacity: 0.7 }}
+            >
+              <Trash2 size={12} />
             </button>
           </div>
         )}
@@ -434,6 +549,13 @@ function FolderNode({ entry, fs, activeFile, onFileClick, expandedFolders, toggl
                 textColor={textColor}
                 accent={accent}
                 depth={depth + 1}
+                startRename={startRename}
+                renamingPath={renamingPath}
+                renameValue={renameValue}
+                setRenameValue={setRenameValue}
+                renameInputRef={renameInputRef}
+                handleRenameSubmit={handleRenameSubmit}
+                onDelete={onDelete}
               />
             ) : (
               <FileItem
@@ -444,6 +566,14 @@ function FolderNode({ entry, fs, activeFile, onFileClick, expandedFolders, toggl
                 textColor={textColor}
                 accent={accent}
                 depth={depth + 1}
+                canEdit={canEdit}
+                startRename={startRename}
+                renamingPath={renamingPath}
+                renameValue={renameValue}
+                setRenameValue={setRenameValue}
+                renameInputRef={renameInputRef}
+                handleRenameSubmit={handleRenameSubmit}
+                onDelete={onDelete}
               />
             )
           ))}
@@ -487,32 +617,68 @@ const CreationInput = forwardRef(function CreationInput({ creatingType, newName,
 })
 
 /* ── File Item ── */
-function FileItem({ file, isActive, onClick, textColor, accent, depth }) {
+function FileItem({ file, isActive, onClick, textColor, accent, depth, canEdit, startRename, renamingPath, renameValue, setRenameValue, renameInputRef, handleRenameSubmit, onDelete, getFileIcon }) {
+  const [isHovered, setIsHovered] = useState(false)
+  const isRenaming = renamingPath === file.path
+
+  if (isRenaming) {
+    return (
+      <div
+        style={{
+          padding: `4px 8px 4px ${8 + (depth + 1) * 16}px`,
+          borderRadius: 6, display: "flex", alignItems: "center", gap: 8,
+          background: `${accent}10`, height: 30, boxSizing: "border-box"
+        }}
+      >
+        <FileCode size={14} color={accent} />
+        <input
+          ref={renameInputRef}
+          value={renameValue}
+          onChange={e => setRenameValue(e.target.value)}
+          onKeyDown={handleRenameSubmit}
+          style={{ flex: 1, background: "rgba(255,255,255,0.08)", border: `1px solid ${accent}`, borderRadius: 4, color: textColor, fontSize: 12, padding: "2px 6px", outline: "none" }}
+        />
+      </div>
+    )
+  }
+
   return (
     <div 
       className={`ide-file-item ${isActive ? 'active' : ''}`}
       onClick={() => onClick(file.path)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
         padding: `4px 8px 4px ${8 + (depth + 1) * 16}px`,
-        borderRadius: 6,
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        background: isActive ? `${accent}15` : "transparent",
+        borderRadius: 6, display: "flex", alignItems: "center", gap: 8,
+        background: isActive ? `${accent}15` : (isHovered ? "rgba(255,255,255,0.03)" : "transparent"),
         color: isActive ? accent : textColor,
-        transition: "all 0.15s ease",
-        height: 30,
-        boxSizing: "border-box",
-        cursor: "pointer"
+        transition: "all 0.15s ease", height: 30, boxSizing: "border-box", cursor: "pointer"
       }}
-      onMouseEnter={e => { if(!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.03)" }}
-      onMouseLeave={e => { if(!isActive) e.currentTarget.style.background = isActive ? `${accent}15` : "transparent" }}
     >
-      <FileCode size={14} opacity={isActive ? 1 : 0.6} />
-      <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      {getFileIcon ? getFileIcon(file.name) : <FileCode size={14} opacity={isActive ? 1 : 0.6} />}
+      <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
         {file.name}
       </span>
-      {isActive && (
+      {canEdit && isHovered && (
+        <div style={{ display: "flex", gap: 2 }} onClick={e => e.stopPropagation()}>
+          <button
+            title="Rename"
+            onClick={e => { e.stopPropagation(); startRename && startRename(file.path, file.name) }}
+            style={{ background: "transparent", border: "none", cursor: "pointer", color: textColor, padding: 2, opacity: 0.6, flexShrink: 0 }}
+          >
+            <Pencil size={11} />
+          </button>
+          <button
+            title="Delete"
+            onClick={e => { e.stopPropagation(); onDelete && onDelete(file.path, "file") }}
+            style={{ background: "transparent", border: "none", cursor: "pointer", color: "#f38ba8", padding: 2, opacity: 0.6, flexShrink: 0 }}
+          >
+            <Trash2 size={11} />
+          </button>
+        </div>
+      )}
+      {isActive && !isHovered && (
         <div style={{ width: 4, height: 4, borderRadius: "50%", background: accent, marginLeft: "auto" }} />
       )}
     </div>

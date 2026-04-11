@@ -12,6 +12,7 @@ import chokidar from "chokidar";
 import { simpleGit } from "simple-git";
 import dotenv from "dotenv";
 import rateLimit from "express-rate-limit";
+import axios from "axios";
 
 dotenv.config();
 
@@ -29,7 +30,7 @@ app.use(limiter);
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 app.use(cors({
   origin: FRONTEND_URL,
-  methods: ["GET", "POST"],
+  methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
 
@@ -78,7 +79,7 @@ function cleanupRoomFolder(roomId) {
   // Terminate all PTY processes related to this room
   for (const [key, ptyProcess] of roomTerminals.entries()) {
     if (key.startsWith(`${roomId}_`)) {
-      try { ptyProcess.kill(); } catch (e) {}
+      try { ptyProcess.kill(); } catch (e) { }
       roomTerminals.delete(key);
       roomTerminalHistory.delete(key);
       roomLastResizer.delete(key);
@@ -490,9 +491,9 @@ app.post("/sync-and-run", (req, res) => {
 
     let ptyProcess = roomTerminals.get(`${roomId}_1`);
     if (!ptyProcess) {
-       // fallback, try to find any terminal for this room
-       const fallbackKey = Array.from(roomTerminals.keys()).find(k => k.startsWith(`${roomId}_`));
-       if (fallbackKey) ptyProcess = roomTerminals.get(fallbackKey);
+      // fallback, try to find any terminal for this room
+      const fallbackKey = Array.from(roomTerminals.keys()).find(k => k.startsWith(`${roomId}_`));
+      if (fallbackKey) ptyProcess = roomTerminals.get(fallbackKey);
     }
 
     if (!ptyProcess) {
@@ -627,6 +628,26 @@ app.get("/content", (req, res) => {
   }
 });
 
+app.delete("/fs/delete", (req, res) => {
+  const { roomId, path } = req.body;
+  if (!roomId || !path) return res.status(400).json({ error: "roomId and path are required" });
+
+  const fullPath = join(tmpdir(), `liveshare_room_${roomId}`, path.replace(/^\//, ""));
+
+  try {
+    if (existsSync(fullPath)) {
+      rmSync(fullPath, { recursive: true, force: true });
+      res.json({ success: true, message: "Deleted successfully" });
+    } else {
+      res.status(404).json({ error: "File or folder not found" });
+    }
+  } catch (error) {
+    console.error("Delete error:", error);
+    res.status(500).json({ error: "Failed to delete item" });
+  }
+});
+
+
 app.post("/fs/create", (req, res) => {
   const { roomId, type, path } = req.body;
   try {
@@ -692,8 +713,12 @@ app.get("/git/status", async (req, res) => {
     if (!isRepo) return res.json({ isRepo: false });
 
     const status = await git.status();
+    const remotes = await git.getRemotes(true);
+    const origin = remotes.find(r => r.name === "origin");
+
     res.json({
       isRepo: true,
+      remoteUrl: origin ? origin.refs.fetch : null,
       modified: status.modified,
       not_added: status.not_added,
       staged: status.staged,
@@ -712,6 +737,10 @@ app.get("/git/status", async (req, res) => {
 app.post("/git/init", async (req, res) => {
   const { roomId } = req.body;
   try {
+    const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
+    if (!existsSync(roomCwd)) {
+      mkdirSync(roomCwd, { recursive: true });
+    }
     const git = getGit(roomId);
     await git.init();
     res.json({ success: true, message: "Git initialized." });
@@ -772,20 +801,148 @@ app.post("/git/remote", async (req, res) => {
   }
 });
 
-app.post("/git/sync", async (req, res) => {
-  const { roomId, pat, username, action } = req.body;
+app.post("/git/push", async (req, res) => {
+  const { roomId, pat, username } = req.body;
+
+  if (!pat || !username) {
+    return res.status(400).json({ error: "GitHub PAT and username required" });
+  }
+
   try {
     const git = getGit(roomId);
-    const remote = await git.remote(["get-url", "origin"]);
-    const authUrl = remote.trim().replace("https://github.com/", `https://${username}:${pat}@github.com/`);
 
-    if (action === "push") {
-      await git.push(authUrl, "main"); // or current branch
-    } else if (action === "pull") {
-      await git.pull(authUrl, "main");
+    // Get current branch
+    const status = await git.status();
+    const currentBranch = status.current;
+
+    // Get remote URL
+    let remoteUrl;
+    try {
+      remoteUrl = await git.remote(["get-url", "origin"]);
+      remoteUrl = remoteUrl.trim();
+    } catch (e) {
+      return res.status(400).json({ error: "No remote repository configured. Please connect to a GitHub repository first." });
     }
-    res.json({ success: true });
+
+    // Create authenticated URL
+    const authUrl = remoteUrl.replace("https://github.com/", `https://${username}:${pat}@github.com/`);
+
+    // Set upstream if not set
+    try {
+      await git.push(["-u", authUrl, currentBranch]);
+    } catch (pushErr) {
+      // If first push fails, try force with lease
+      if (pushErr.message.includes("rejected") || pushErr.message.includes("failed to push")) {
+        return res.status(400).json({
+          error: "Push rejected. The remote contains work you don't have locally. Try pulling first."
+        });
+      }
+      throw pushErr;
+    }
+
+    res.json({ success: true, message: `Pushed to ${currentBranch}` });
   } catch (err) {
+    console.error("Push error:", err);
+
+    // Handle authentication errors
+    if (err.message.includes("Authentication failed") || err.message.includes("Invalid username or password")) {
+      return res.status(401).json({ error: "Authentication failed. Please check your GitHub PAT." });
+    }
+
+    // Handle other errors
+    res.status(500).json({ error: err.message || "Failed to push to GitHub" });
+  }
+});
+
+app.post("/git/pull", async (req, res) => {
+  const { roomId, pat, username } = req.body;
+
+  if (!pat || !username) {
+    return res.status(400).json({ error: "GitHub PAT and username required" });
+  }
+
+  try {
+    const git = getGit(roomId);
+
+    // Get current branch
+    const status = await git.status();
+    const currentBranch = status.current;
+
+    // Get remote URL
+    let remoteUrl;
+    try {
+      remoteUrl = await git.remote(["get-url", "origin"]);
+      remoteUrl = remoteUrl.trim();
+    } catch (e) {
+      return res.status(400).json({ error: "No remote repository configured. Please connect to a GitHub repository first." });
+    }
+
+    // Create authenticated URL
+    const authUrl = remoteUrl.replace("https://github.com/", `https://${username}:${pat}@github.com/`);
+
+    // Pull changes
+    await git.pull(authUrl, currentBranch, { "--no-rebase": null });
+
+    res.json({ success: true, message: `Pulled from ${currentBranch}` });
+  } catch (err) {
+    console.error("Pull error:", err);
+
+    // Handle authentication errors
+    if (err.message.includes("Authentication failed") || err.message.includes("Invalid username or password")) {
+      return res.status(401).json({ error: "Authentication failed. Please check your GitHub PAT." });
+    }
+
+    // Handle merge conflicts
+    if (err.message.includes("CONFLICT") || err.message.includes("Automatic merge failed")) {
+      return res.status(409).json({ error: "Merge conflict detected. Please resolve conflicts manually." });
+    }
+
+    // Handle other errors
+    res.status(500).json({ error: err.message || "Failed to pull from GitHub" });
+  }
+});
+
+app.post("/git/user-repos", async (req, res) => {
+  const { pat } = req.body;
+  if (!pat) return res.status(400).json({ error: "PAT required" });
+
+  try {
+    const response = await axios.get("https://api.github.com/user/repos", {
+      params: { sort: "updated", per_page: 100 },
+      headers: {
+        "Authorization": `token ${pat}`,
+        "Accept": "application/vnd.github.v3+json"
+      }
+    });
+    res.json(response.data.map(r => ({ name: r.full_name, url: r.clone_url })));
+  } catch (err) {
+    console.error("Fetch repos error:", err.response?.data || err.message);
+    res.status(err.response?.status || 500).json({
+      error: err.response?.data?.message || err.message || "Failed to fetch repositories"
+    });
+  }
+});
+
+app.post("/git/branch", async (req, res) => {
+  const { roomId, branchName, action } = req.body;
+  if (!roomId || !branchName || !action) {
+    return res.status(400).json({ error: "roomId, branchName, and action required" });
+  }
+
+  try {
+    const git = getGit(roomId);
+    if (action === "rename") {
+      await git.branch(["-m", branchName]);
+    } else if (action === "create") {
+      await git.checkout(["-b", branchName]);
+    } else if (action === "checkout") {
+      await git.checkout(branchName);
+    } else {
+      return res.status(400).json({ error: "Invalid action" });
+    }
+    res.json({ success: true, message: `Branch ${action === 'rename' ? 'renamed' : action === 'create' ? 'created' : 'switched'} to ${branchName}` });
+  } catch (err) {
+    console.error("Branch action error:", err);
     res.status(500).json({ error: err.message });
   }
 });

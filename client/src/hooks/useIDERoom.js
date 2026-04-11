@@ -53,8 +53,12 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   const [output, setOutput] = useState("")
   const [runner, setRunner] = useState(null)
 
-  const canEdit = isHost || actualRoomType === "collaborative" || actualRoomType === "interview"
-  const canRun = isHost || actualRoomType === "collaborative" || actualRoomType === "interview"
+  /* canEdit: host always can; others check room type AND not individually restricted */
+  const myClientId = editor.provider.awareness.clientID
+  const [restrictedUsers, setRestrictedUsers] = useState([])
+  const isRestricted = !isHost && restrictedUsers.includes(myClientId)
+  const canEdit = !isRestricted && (isHost || actualRoomType === "collaborative" || actualRoomType === "interview")
+  const canRun = !isRestricted && (isHost || actualRoomType === "collaborative" || actualRoomType === "interview")
   const canChangeRoom = isHost
 
   /* ── File System ── */
@@ -218,6 +222,9 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       if (showUsers !== undefined) setShowUsersList(showUsers)
       const kicked = roomMap.get("kickedUsers") || []
       setKickedUsers(kicked)
+
+      const restricted = roomMap.get("restrictedUsers") || []
+      setRestrictedUsers(restricted)
 
       if (kicked.length > 0 && !isHost && (kicked.includes(editor.username) || kicked.includes(editor.provider.awareness.clientID))) {
         alert("You have been removed from the room by the host.")
@@ -555,6 +562,26 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     }])
   }, [kickedUsers, editor])
 
+  const restrictUser = useCallback((clientId, userName) => {
+    if (!restrictedUsers.includes(clientId)) {
+      editor.roomMap.set("restrictedUsers", [...restrictedUsers, clientId])
+      editor.chatArray.push([{
+        id: Date.now().toString() + Math.random(),
+        sender: "System", target: "all",
+        text: `@${userName}'s edit access was revoked.`, type: "system_kick", timestamp: Date.now()
+      }])
+    }
+  }, [restrictedUsers, editor])
+
+  const unrestrictUser = useCallback((clientId, userName) => {
+    editor.roomMap.set("restrictedUsers", restrictedUsers.filter(id => id !== clientId))
+    editor.chatArray.push([{
+      id: Date.now().toString() + Math.random(),
+      sender: "System", target: "all",
+      text: `@${userName}'s edit access was restored.`, type: "system_kick", timestamp: Date.now()
+    }])
+  }, [restrictedUsers, editor])
+
   /* ── Room UI actions ── */
   const pushRoomUI = useCallback(() => {
     editor.roomMap.set("roomTheme", personalPrefs.theme)
@@ -614,14 +641,14 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     peerId, setPeerId,
     toasts,
     // Users
-    activeUsers, visibleActiveUsersList, hostName,
+    activeUsers, visibleActiveUsersList, hostName, restrictedUsers,
     // Chat
     chatEnabled, showUsersList, visibleChatMsgs,
     chatInput, setChatInput, chatTarget, setChatTarget,
     // Actions
-    runCode, syncFilesToTerminal, downloadCode, saveCode, sendChat, kickUser,
+    runCode, syncFilesToTerminal, downloadCode, saveCode, sendChat, kickUser, restrictUser, unrestrictUser,
     onLeave, updatePersonalPref, pushRoomUI, clearRoomUI,
     onToggleChatEnabled, onToggleShowUsers, onSetRoomTheme,
-    setOutput, addToast,
+    setOutput, addToast, gitStatus, isGitLoading, refreshGitStatus
   }
 }

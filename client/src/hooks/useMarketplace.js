@@ -40,11 +40,16 @@ export function useMarketplace(roomMap) {
 
   const installExtension = useCallback(async (extension) => {
     const id = `${extension.namespace}.${extension.name}`
-    if (installedExtensions.includes(id)) return
+    if (installedExtensions.some(e => (typeof e === 'string' ? e : e.id) === id)) return
     
     try {
       if (roomMap) {
-        roomMap.set("installedExtensions", [...installedExtensions, id])
+        const extData = {
+          id,
+          displayName: extension.displayName || extension.name,
+          iconUrl: extension.iconUrl || "https://open-vsx.org/favicon.ico"
+        };
+        roomMap.set("installedExtensions", [...installedExtensions, extData])
       }
     } catch (err) {
       console.error(err)

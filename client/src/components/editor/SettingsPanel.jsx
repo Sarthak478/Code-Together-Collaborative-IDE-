@@ -13,8 +13,11 @@ import {
   Users,
   AlertTriangle,
   GitBranch,
-  Terminal
+  Terminal,
+  Play
 } from "lucide-react"
+
+import { API_URL } from "../../config"
 
 const GithubIcon = ({ size = 16, color = "currentColor" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -28,7 +31,7 @@ export default function SettingsPanel({
   roomTheme, roomFont, onSetRoomTheme,
   chatEnabled, onToggleChatEnabled, showUsersList, onToggleShowUsers,
   pushRoomUI, clearRoomUI, isHost, activeUsers, hostName, kickUser,
-  themeData = {}, username, clientID
+  themeData = {}, username, clientID, roomId, refreshGitStatus
 }) {
   const { 
     bg = "#1e1e2e", 
@@ -42,6 +45,19 @@ export default function SettingsPanel({
   } = themeData
   const activeTheme = roomTheme ?? personalPrefs.theme
   const canChangeRoom = isHost
+
+  const handleInitRepo = async () => {
+    try {
+      await fetch(`${API_URL}/git/init`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId })
+      });
+      if (refreshGitStatus) refreshGitStatus();
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   return (
     <>
@@ -162,8 +178,22 @@ export default function SettingsPanel({
                           placeholder="ghp_xxxxxxxxxxxx"
                           value={personalPrefs.githubPat || ""}
                           onChange={e => updatePersonalPref("githubPat", e.target.value)}
-                          style={{ width: "100%", background: "rgba(0,0,0,0.3)", color: textColor, border: `1px solid ${borderCol}`, borderRadius: 8, padding: "8px 12px", fontSize: 11, outline: "none", boxSizing: "border-box" }}
+                          style={{ width: "100%", background: "rgba(0,0,0,0.3)", color: textColor, border: `1px solid ${borderCol}`, borderRadius: 8, padding: "8px 12px", fontSize: 11, outline: "none", boxSizing: "border-box", marginBottom: 6 }}
                         />
+                        {personalPrefs.githubPat && personalPrefs.githubPat.trim() !== "" && roomId && (
+                           <button 
+                             onClick={handleInitRepo}
+                             style={{ 
+                               width: "100%", padding: "6px 0", borderRadius: 8, background: accent, 
+                               color: "#1e1e2e", border: "none", fontSize: 10, fontWeight: 800, 
+                               cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                               marginTop: 4
+                             }}
+                           >
+                              <Play size={10} />
+                              Initialize Git Repository
+                           </button>
+                        )}
                         <div style={{ fontSize: 9, opacity: 0.4, marginTop: 6, fontStyle: "italic" }}>
                           Requires <b>'repo'</b> scope. Classic tokens are recommended.
                         </div>
