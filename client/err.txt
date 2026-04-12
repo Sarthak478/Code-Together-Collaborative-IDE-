@@ -1,0 +1,5 @@
+TypeError: monacoEditorPlugin is not a function
+    at file:///C:/Users/pc/Downloads/LiveShare/client/vite.config.js:11:5
+    at ModuleJob.run (node:internal/modules/esm/module_job:271:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:547:26)
+    at async importModuleDynamicallyWrapper (node:internal/vm/module:436:15)

@@ -221,58 +221,7 @@ export default function Navbar({
           <span>{callActive ? "End Call" : "Join Call"}</span>
         </button>
         
-        {/* GitHub Button */}
-        <button 
-          onClick={onToggleGit} 
-          title="Source Control" 
-          style={{ 
-            background: hasChanges ? `linear-gradient(135deg, ${colors.accent}15, ${colors.warning}15)` : colors.surface, 
-            border: `1px solid ${hasChanges ? colors.accent : colors.border}`, 
-            cursor: "pointer", 
-            width: 40, 
-            height: 40, 
-            borderRadius: 10,
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "center",
-            color: hasChanges ? colors.accent : colors.text, 
-            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-            position: "relative",
-            boxShadow: hasChanges ? `0 2px 6px ${colors.accent}30` : "none",
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.transform = "translateY(-2px)"
-            e.currentTarget.style.boxShadow = `0 4px 12px ${hasChanges ? colors.accent : colors.primary}40`
-            e.currentTarget.style.background = hasChanges 
-              ? `linear-gradient(135deg, ${colors.accent}25, ${colors.warning}25)` 
-              : isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,1)"
-            e.currentTarget.style.borderColor = hasChanges ? colors.accent : colors.primary
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.transform = "translateY(0)"
-            e.currentTarget.style.boxShadow = hasChanges ? `0 2px 6px ${colors.accent}30` : "none"
-            e.currentTarget.style.background = hasChanges 
-              ? `linear-gradient(135deg, ${colors.accent}15, ${colors.warning}15)` 
-              : colors.surface
-            e.currentTarget.style.borderColor = hasChanges ? colors.accent : colors.border
-          }}
-        >
-          <GithubIcon size={18} color={hasChanges ? colors.accent : colors.text} />
-          {hasChanges && (
-            <div style={{ 
-              position: "absolute", 
-              top: -2, 
-              right: -2, 
-              width: 10, 
-              height: 10, 
-              background: colors.danger, 
-              borderRadius: "50%", 
-              border: `2px solid ${colors.background}`,
-              animation: "pulse 1s infinite",
-            }} />
-          )}
-        </button>
-
+       
         {/* Settings Button */}
         <button 
           onClick={onToggleSettings} 

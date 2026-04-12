@@ -7,7 +7,7 @@ body,
   height: 100%;
   margin: 0;
   padding: 0;
-  overflow: auto;
+  overflow: hidden;
 }
 
 /* Reset button defaults so our inline styles take over fully */

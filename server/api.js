@@ -12,7 +12,8 @@ import chokidar from "chokidar";
 import { simpleGit } from "simple-git";
 import dotenv from "dotenv";
 import rateLimit from "express-rate-limit";
-
+import axios from "axios";
+ 
 dotenv.config();
 
 const app = express();
@@ -20,7 +21,7 @@ const app = express();
 // Rate Limiting for production safety
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 10000, // limit each IP to 10000 requests per windowMs
   message: { error: "Too many requests from this IP, please try again after 15 minutes" }
 });
 
@@ -29,11 +30,11 @@ app.use(limiter);
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 app.use(cors({
   origin: FRONTEND_URL,
-  methods: ["GET", "POST"],
+  methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: "1000mb" }));
 
 /* -------------------- SECURITY HELPERS -------------------- */
 
@@ -44,8 +45,8 @@ function sanitizePath(input) {
   if (typeof input !== "string") return "";
   // Remove control characters, null bytes, and ".."
   return input.replace(/[\x00-\x1f\x7f]/g, "")
-              .replace(/\.\./g, "")
-              .replace(/[<>:"|?*]/g, ""); // Windows invalid chars
+    .replace(/\.\./g, "")
+    .replace(/[<>:"|?*]/g, ""); // Windows invalid chars
 }
 
 const server = http.createServer(app);
@@ -61,6 +62,7 @@ const roomTerminals = new Map(); // roomId -> ptyProcess
 const roomTerminalHistory = new Map(); // roomId -> string (last N chars)
 const roomWatchers = new Map(); // roomId -> chokidarWatcher
 const roomCleanupTimers = new Map(); // roomId -> timeoutId
+const roomLastResizer = new Map(); // roomId -> { clientId, cols, rows, time }
 
 function cleanupRoomFolder(roomId) {
   const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
@@ -73,6 +75,16 @@ function cleanupRoomFolder(roomId) {
     }
   }
   roomCleanupTimers.delete(roomId);
+
+  // Terminate all PTY processes related to this room
+  for (const [key, ptyProcess] of roomTerminals.entries()) {
+    if (key.startsWith(`${roomId}_`)) {
+      try { ptyProcess.kill(); } catch (e) { }
+      roomTerminals.delete(key);
+      roomTerminalHistory.delete(key);
+      roomLastResizer.delete(key);
+    }
+  }
 }
 
 function ensureWatcher(roomId, roomCwd) {
@@ -80,7 +92,10 @@ function ensureWatcher(roomId, roomCwd) {
 
   console.log(`[WATCHER] Starting for room ${roomId} at ${roomCwd}`);
   const watcher = chokidar.watch(roomCwd, {
-    ignored: [/(^|[\/\\])\../, "**/node_modules/**", "**/.git/**"],
+    ignored: [
+      /(^|[\/\\])\../,
+      "**/.git/**"
+    ],
     persistent: true,
     ignoreInitial: true,
     depth: 10,
@@ -89,17 +104,32 @@ function ensureWatcher(roomId, roomCwd) {
 
   roomWatchers.set(roomId, watcher);
 
+  const pendingChanges = new Set();
+  let notifyTimeout = null;
+
   const notifyChange = (filePath) => {
     let rel = relative(roomCwd, filePath).replace(/\\/g, "/");
     if (!rel.startsWith("/")) rel = "/" + rel;
     const parentPath = dirname(rel).replace(/\\/g, "/");
+    const safeParent = (parentPath === "." || parentPath === "/") ? "/" : parentPath;
 
-    console.log(`[FS:EVENT] ${rel} in room ${roomId}`);
-    broadcast(roomId, {
-      type: "fs:changed",
-      path: rel,
-      parentPath: parentPath === "." ? "/" : parentPath,
-    });
+    pendingChanges.add(safeParent);
+
+    if (!notifyTimeout) {
+      notifyTimeout = setTimeout(() => {
+        const paths = Array.from(pendingChanges);
+        pendingChanges.clear();
+        notifyTimeout = null;
+
+        for (const p of paths) {
+          broadcast(roomId, {
+            type: "fs:changed",
+            path: p,
+            parentPath: p
+          });
+        }
+      }, 500);
+    }
   };
 
   watcher
@@ -117,17 +147,19 @@ wss.on("connection", (ws, req) => {
 
   if (url.pathname === "/terminal") {
     const roomId = url.searchParams.get("roomId");
+    const terminalId = url.searchParams.get("terminalId") || "1";
     if (!roomId) { ws.close(); return; }
 
+    const termKey = `${roomId}_${terminalId}`;
     const shell = platform() === "win32" ? "powershell.exe" : "bash";
     const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
     if (!existsSync(roomCwd)) {
       mkdirSync(roomCwd, { recursive: true });
     }
 
-    // Spawn new PTY if not exists for this room
-    if (!roomTerminals.has(roomId)) {
-      console.log(`Spawning terminal for room ${roomId} using ${shell} at ${roomCwd}`);
+    // Spawn new PTY if not exists for this room+terminal
+    if (!roomTerminals.has(termKey)) {
+      console.log(`Spawning terminal ${terminalId} for room ${roomId} using ${shell} at ${roomCwd}`);
 
       const ptyProcess = pty.spawn(shell, [], {
         name: "xterm-color",
@@ -137,42 +169,43 @@ wss.on("connection", (ws, req) => {
         env: process.env
       });
 
-      roomTerminals.set(roomId, ptyProcess);
-      roomTerminalHistory.set(roomId, "");
+      roomTerminals.set(termKey, ptyProcess);
+      roomTerminalHistory.set(termKey, "");
 
       ptyProcess.onData((data) => {
-        // Broadcast to all terminal clients in room
+        // Broadcast to all clients assigned to this specific terminal
         wss.clients.forEach(client => {
-          if (client.roomId === roomId && client.isTerminal && client.readyState === 1) {
+          if (client.roomId === roomId && client.terminalId === terminalId && client.isTerminal && client.readyState === 1) {
             client.send(JSON.stringify({ type: "output", data }));
           }
         });
 
         // Save history (last 5000 chars)
-        let hist = roomTerminalHistory.get(roomId) + data;
+        let hist = roomTerminalHistory.get(termKey) + data;
         if (hist.length > 5000) hist = hist.slice(-5000);
-        roomTerminalHistory.set(roomId, hist);
+        roomTerminalHistory.set(termKey, hist);
       });
 
       ptyProcess.onExit(({ exitCode }) => {
-        console.log(`Terminal for room ${roomId} exited with code ${exitCode}`);
-        roomTerminals.delete(roomId);
+        console.log(`Terminal ${terminalId} for room ${roomId} exited with code ${exitCode}`);
+        roomTerminals.delete(termKey);
         wss.clients.forEach(client => {
-          if (client.roomId === roomId && client.isTerminal && client.readyState === 1) {
+          if (client.roomId === roomId && client.terminalId === terminalId && client.isTerminal && client.readyState === 1) {
             client.send(JSON.stringify({ type: "exit", code: exitCode }));
           }
         });
       });
     }
 
-    // Start file watcher for the room
+    // Start file watcher for the room (only initiates once per room anyway)
     ensureWatcher(roomId, roomCwd);
 
     ws.roomId = roomId;
+    ws.terminalId = terminalId;
     ws.isTerminal = true;
 
     // Send history to new client
-    const hist = roomTerminalHistory.get(roomId);
+    const hist = roomTerminalHistory.get(termKey);
     if (hist) {
       ws.send(JSON.stringify({ type: "output", data: hist }));
     }
@@ -180,13 +213,23 @@ wss.on("connection", (ws, req) => {
     ws.on("message", (msg) => {
       try {
         const data = JSON.parse(msg.toString());
-        const ptyProcess = roomTerminals.get(roomId);
+        const ptyProcess = roomTerminals.get(termKey);
         if (!ptyProcess) return;
 
         if (data.type === "input") {
           ptyProcess.write(data.data);
         } else if (data.type === "resize") {
-          try { ptyProcess.resize(data.cols, data.rows); } catch (e) { }
+          const now = Date.now();
+          const last = roomLastResizer.get(termKey);
+
+          // Debounce and only resize if significantly different or from a new active user
+          if (!last || last.cols !== data.cols || last.rows !== data.rows) {
+            try {
+              ptyProcess.resize(data.cols, data.rows);
+              roomLastResizer.set(termKey, { cols: data.cols, rows: data.rows, time: now });
+              console.log(`[TERMINAL] Resized terminal ${terminalId} in ${roomId} to ${data.cols}x${data.rows}`);
+            } catch (e) { }
+          }
         }
       } catch (e) {
         console.error("Terminal WS message error", e);
@@ -210,7 +253,7 @@ wss.on("connection", (ws, req) => {
         if (!roomClients.has(cleanRoomId)) {
           roomClients.set(cleanRoomId, new Set());
         }
-        
+
         // Cancel any pending cleanup if a user joins
         if (roomCleanupTimers.has(cleanRoomId)) {
           console.log(`[WS] User joined ${cleanRoomId}. Cancelling pending cleanup.`);
@@ -237,7 +280,7 @@ wss.on("connection", (ws, req) => {
     if (ws.roomId && !ws.isTerminal && roomClients.has(ws.roomId)) {
       const clients = roomClients.get(ws.roomId);
       clients.delete(ws);
-      
+
       // Automatic 60-second cleanup if room is empty
       if (clients.size === 0) {
         console.log(`[WS] Room ${ws.roomId} is empty. Scheduling cleanup in 60s...`);
@@ -446,7 +489,13 @@ app.post("/sync-and-run", (req, res) => {
       writeFileSync(fullPath, f.content || "", "utf8");
     });
 
-    const ptyProcess = roomTerminals.get(roomId);
+    let ptyProcess = roomTerminals.get(`${roomId}_1`);
+    if (!ptyProcess) {
+      // fallback, try to find any terminal for this room
+      const fallbackKey = Array.from(roomTerminals.keys()).find(k => k.startsWith(`${roomId}_`));
+      if (fallbackKey) ptyProcess = roomTerminals.get(fallbackKey);
+    }
+
     if (!ptyProcess) {
       return res.status(400).json({ error: "No active terminal session in this room." });
     }
@@ -523,6 +572,26 @@ app.post("/sync", (req, res) => {
   }
 });
 
+/* -------------------- CLEAR ROOM FILES (for folder re-import) ---- */
+
+app.post("/fs/clear-room", (req, res) => {
+  const { roomId } = req.body;
+  if (!roomId) return res.status(400).json({ error: "roomId required" });
+
+  const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
+
+  try {
+    if (existsSync(roomCwd)) {
+      rmSync(roomCwd, { recursive: true, force: true });
+    }
+    mkdirSync(roomCwd, { recursive: true });
+    res.json({ success: true, message: "Room files cleared" });
+  } catch (error) {
+    console.error("Clear room error:", error);
+    res.status(500).json({ error: "Failed to clear room files" });
+  }
+});
+
 /* -------------------- REST FILE SYSTEM ENDPOINTS -------------------- */
 
 app.get("/tree", (req, res) => {
@@ -558,6 +627,26 @@ app.get("/content", (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.delete("/fs/delete", (req, res) => {
+  const { roomId, path } = req.body;
+  if (!roomId || !path) return res.status(400).json({ error: "roomId and path are required" });
+
+  const fullPath = join(tmpdir(), `liveshare_room_${roomId}`, path.replace(/^\//, ""));
+
+  try {
+    if (existsSync(fullPath)) {
+      rmSync(fullPath, { recursive: true, force: true });
+      res.json({ success: true, message: "Deleted successfully" });
+    } else {
+      res.status(404).json({ error: "File or folder not found" });
+    }
+  } catch (error) {
+    console.error("Delete error:", error);
+    res.status(500).json({ error: "Failed to delete item" });
+  }
+});
+
 
 app.post("/fs/create", (req, res) => {
   const { roomId, type, path } = req.body;
@@ -624,8 +713,12 @@ app.get("/git/status", async (req, res) => {
     if (!isRepo) return res.json({ isRepo: false });
 
     const status = await git.status();
+    const remotes = await git.getRemotes(true);
+    const origin = remotes.find(r => r.name === "origin");
+
     res.json({
       isRepo: true,
+      remoteUrl: origin ? origin.refs.fetch : null,
       modified: status.modified,
       not_added: status.not_added,
       staged: status.staged,
@@ -644,6 +737,10 @@ app.get("/git/status", async (req, res) => {
 app.post("/git/init", async (req, res) => {
   const { roomId } = req.body;
   try {
+    const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
+    if (!existsSync(roomCwd)) {
+      mkdirSync(roomCwd, { recursive: true });
+    }
     const git = getGit(roomId);
     await git.init();
     res.json({ success: true, message: "Git initialized." });
@@ -704,20 +801,148 @@ app.post("/git/remote", async (req, res) => {
   }
 });
 
-app.post("/git/sync", async (req, res) => {
-  const { roomId, pat, username, action } = req.body;
+app.post("/git/push", async (req, res) => {
+  const { roomId, pat, username } = req.body;
+
+  if (!pat || !username) {
+    return res.status(400).json({ error: "GitHub PAT and username required" });
+  }
+
   try {
     const git = getGit(roomId);
-    const remote = await git.remote(["get-url", "origin"]);
-    const authUrl = remote.trim().replace("https://github.com/", `https://${username}:${pat}@github.com/`);
 
-    if (action === "push") {
-      await git.push(authUrl, "main"); // or current branch
-    } else if (action === "pull") {
-      await git.pull(authUrl, "main");
+    // Get current branch
+    const status = await git.status();
+    const currentBranch = status.current;
+
+    // Get remote URL
+    let remoteUrl;
+    try {
+      remoteUrl = await git.remote(["get-url", "origin"]);
+      remoteUrl = remoteUrl.trim();
+    } catch (e) {
+      return res.status(400).json({ error: "No remote repository configured. Please connect to a GitHub repository first." });
     }
-    res.json({ success: true });
+
+    // Create authenticated URL
+    const authUrl = remoteUrl.replace("https://github.com/", `https://${username}:${pat}@github.com/`);
+
+    // Set upstream if not set
+    try {
+      await git.push(["-u", authUrl, currentBranch]);
+    } catch (pushErr) {
+      // If first push fails, try force with lease
+      if (pushErr.message.includes("rejected") || pushErr.message.includes("failed to push")) {
+        return res.status(400).json({
+          error: "Push rejected. The remote contains work you don't have locally. Try pulling first."
+        });
+      }
+      throw pushErr;
+    }
+
+    res.json({ success: true, message: `Pushed to ${currentBranch}` });
   } catch (err) {
+    console.error("Push error:", err);
+
+    // Handle authentication errors
+    if (err.message.includes("Authentication failed") || err.message.includes("Invalid username or password")) {
+      return res.status(401).json({ error: "Authentication failed. Please check your GitHub PAT." });
+    }
+
+    // Handle other errors
+    res.status(500).json({ error: err.message || "Failed to push to GitHub" });
+  }
+});
+
+app.post("/git/pull", async (req, res) => {
+  const { roomId, pat, username } = req.body;
+
+  if (!pat || !username) {
+    return res.status(400).json({ error: "GitHub PAT and username required" });
+  }
+
+  try {
+    const git = getGit(roomId);
+
+    // Get current branch
+    const status = await git.status();
+    const currentBranch = status.current;
+
+    // Get remote URL
+    let remoteUrl;
+    try {
+      remoteUrl = await git.remote(["get-url", "origin"]);
+      remoteUrl = remoteUrl.trim();
+    } catch (e) {
+      return res.status(400).json({ error: "No remote repository configured. Please connect to a GitHub repository first." });
+    }
+
+    // Create authenticated URL
+    const authUrl = remoteUrl.replace("https://github.com/", `https://${username}:${pat}@github.com/`);
+
+    // Pull changes
+    await git.pull(authUrl, currentBranch, { "--no-rebase": null });
+
+    res.json({ success: true, message: `Pulled from ${currentBranch}` });
+  } catch (err) {
+    console.error("Pull error:", err);
+
+    // Handle authentication errors
+    if (err.message.includes("Authentication failed") || err.message.includes("Invalid username or password")) {
+      return res.status(401).json({ error: "Authentication failed. Please check your GitHub PAT." });
+    }
+
+    // Handle merge conflicts
+    if (err.message.includes("CONFLICT") || err.message.includes("Automatic merge failed")) {
+      return res.status(409).json({ error: "Merge conflict detected. Please resolve conflicts manually." });
+    }
+
+    // Handle other errors
+    res.status(500).json({ error: err.message || "Failed to pull from GitHub" });
+  }
+});
+
+app.post("/git/user-repos", async (req, res) => {
+  const { pat } = req.body;
+  if (!pat) return res.status(400).json({ error: "PAT required" });
+
+  try {
+    const response = await axios.get("https://api.github.com/user/repos", {
+      params: { sort: "updated", per_page: 100 },
+      headers: {
+        "Authorization": `token ${pat}`,
+        "Accept": "application/vnd.github.v3+json"
+      }
+    });
+    res.json(response.data.map(r => ({ name: r.full_name, url: r.clone_url })));
+  } catch (err) {
+    console.error("Fetch repos error:", err.response?.data || err.message);
+    res.status(err.response?.status || 500).json({
+      error: err.response?.data?.message || err.message || "Failed to fetch repositories"
+    });
+  }
+});
+
+app.post("/git/branch", async (req, res) => {
+  const { roomId, branchName, action } = req.body;
+  if (!roomId || !branchName || !action) {
+    return res.status(400).json({ error: "roomId, branchName, and action required" });
+  }
+
+  try {
+    const git = getGit(roomId);
+    if (action === "rename") {
+      await git.branch(["-m", branchName]);
+    } else if (action === "create") {
+      await git.checkout(["-b", branchName]);
+    } else if (action === "checkout") {
+      await git.checkout(branchName);
+    } else {
+      return res.status(400).json({ error: "Invalid action" });
+    }
+    res.json({ success: true, message: `Branch ${action === 'rename' ? 'renamed' : action === 'create' ? 'created' : 'switched'} to ${branchName}` });
+  } catch (err) {
+    console.error("Branch action error:", err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -1,10 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react"
-import CodeMirror from "@uiw/react-codemirror"
-import { EditorView } from "@codemirror/view"
-import { EditorState } from "@codemirror/state"
+import { MonacoBinding } from "y-monaco"
 import * as Y from "yjs"
 import { HocuspocusProvider } from "@hocuspocus/provider"
-import { yCollab } from "y-codemirror.next"
 
 import { LANGUAGES, THEMES, FONT_FAMILIES, CURSORS } from "../constants/editorConfigs"
 import { loadPersonalPrefs, savePersonalPrefs } from "../utils/helpers"
@@ -171,6 +168,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     const earliest = validStates.reduce((best, cur) => {
       const t = cur[1].user.joinTime ?? Infinity
       const bestT = best[1].user.joinTime ?? Infinity
+      if (t === bestT) return cur[0] < best[0] ? cur : best
       return t < bestT ? cur : best
     }, validStates[0])
 
@@ -197,15 +195,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
 
     provider.on("synced", () => {
       const states = Array.from(provider.awareness.getStates().entries())
-      const isDuplicate = states.some(([clientId, state]) =>
-        clientId !== provider.awareness.clientID &&
-        state.user?.name === username
-      )
 
-      if (isDuplicate) {
-        onLeave(`⚠️ The username '@${username}' is already taken in this room. Please choose a different name.`)
-        return
-      }
     })
 
     const onRoomChange = () => {
@@ -239,7 +229,27 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     chatArray.observe(onChatChange)
     onChatChange()
 
-    provider.awareness.on("change", recalcHost)
+    const onAwarenessChange = () => {
+      recalcHost()
+
+      const states = Array.from(provider.awareness.getStates().entries())
+      const myId = provider.awareness.clientID
+      
+      const isDuplicate = states.some(([id, state]) => {
+        if (id === myId) return false
+        if (state.user?.name !== username) return false
+        
+        const otherJoin = state.user?.joinTime ?? Infinity
+        const myJoin = editor.joinTime ?? Infinity
+        return otherJoin < myJoin || (otherJoin === myJoin && id < myId)
+      })
+
+      if (isDuplicate) {
+         onLeave(`⚠️ The username '@${username}' is already taken in this room. Please choose a different name.`)
+      }
+    }
+
+    provider.awareness.on("change", onAwarenessChange)
     recalcHost()
 
     const ws = new WebSocket(API_URL.replace("http", "ws"))
@@ -318,7 +328,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
 
   /* ── Chat Actions ── */
   const sendChat = useCallback((e) => {
-    e.preventDefault()
+    if (e && e.preventDefault) e.preventDefault()
     if (!chatInput.trim() || !chatEnabled) return
     editor.chatArray.push([{
       id: Date.now().toString() + Math.random(),
@@ -434,17 +444,48 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     editor.roomMap.set("roomTheme", value)
   }, [editor.roomMap])
 
-  /* ── Dynamic CodeMirror extensions ── */
-  const langExt = useMemo(() => LANGUAGES.find(l => l.id === language)?.ext ?? LANGUAGES[0].ext, [language])
-  const fontExt = useMemo(() => EditorView.theme({ "&": { fontSize: `${activeFontSize}px`, fontFamily: activeFontFamily }, ".cm-content": { fontFamily: activeFontFamily } }), [activeFontSize, activeFontFamily])
-  const collabExt = useMemo(() => yCollab(editor.ytext, editor.provider.awareness), [editor.ytext, editor.provider.awareness])
-  const readOnlyExt = useMemo(() => EditorState.readOnly.of(!canEdit), [canEdit])
-  const extensions = useMemo(() => [langExt, fontExt, collabExt, readOnlyExt], [langExt, fontExt, collabExt, readOnlyExt])
+  /* ── Monaco Setup ── */
+  const bindingRef = useRef(null)
+
+  const onEditorMount = useCallback((monacoEditor, monaco) => {
+    if (!editor.ytext || !editor.provider.awareness) return
+
+    if (bindingRef.current) {
+      bindingRef.current.destroy()
+    }
+
+    bindingRef.current = new MonacoBinding(
+      editor.ytext,
+      monacoEditor.getModel(),
+      new Set([monacoEditor]),
+      editor.provider.awareness
+    )
+  }, [editor.ytext, editor.provider.awareness])
+
+  useEffect(() => {
+    return () => {
+      if (bindingRef.current) {
+        bindingRef.current.destroy()
+        bindingRef.current = null
+      }
+    }
+  }, [])
 
   /* ── Theme ── */
   const themeDef = THEMES.find(t => t.id === activeTheme) || THEMES[0]
   const { base: cmBaseTheme, bg, header: headerBg, toolbar: toolbarBg, text: textColor, panel: panelBg, border: borderCol, input: inputBg, accent } = themeDef
   const isDark = cmBaseTheme === "dark"
+
+  const monacoTheme = isDark ? "vs-dark" : "light"
+  const monacoOptions = useMemo(() => ({
+    fontSize: activeFontSize,
+    fontFamily: activeFontFamily,
+    readOnly: !canEdit,
+    minimap: { enabled: false },
+    automaticLayout: true,
+  }), [activeFontSize, activeFontFamily, canEdit])
+
+
 
   /* ── Filtered lists ── */
   const visibleChatMsgs = chatMessages.filter(m => m.target === "all" || m.target === editor.username || m.sender === editor.username)
@@ -458,7 +499,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
 
   return {
     // Editor core
-    editor, extensions, cmBaseTheme,
+    editor, onEditorMount, cmBaseTheme, monacoTheme, monacoOptions,
     // Room state
     roomId, language, actualRoomType, output, runner,
     // Permissions

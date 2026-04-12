@@ -1,25 +1,15 @@
-import { python } from "@codemirror/lang-python"
-import { javascript } from "@codemirror/lang-javascript"
-import { cpp } from "@codemirror/lang-cpp"
-import { java } from "@codemirror/lang-java"
-import { rust } from "@codemirror/lang-rust"
-import { go } from "@codemirror/lang-go"
-import { html } from "@codemirror/lang-html"
-import { sql } from "@codemirror/lang-sql"
-import { markdown } from "@codemirror/lang-markdown"
-
 /* ─── Language registry ─────────────────────────────────────────── */
 export const LANGUAGES = [
-  { id: "python", label: "Python", ext: python(), snippet: "print('Welcome to CodeTogether')" },
-  { id: "javascript", label: "JavaScript", ext: javascript(), snippet: "console.log('Welcome to CodeTogether');" },
-  { id: "typescript", label: "TypeScript", ext: javascript({ typescript: true }), snippet: "console.log('Welcome to CodeTogether');" },
-  { id: "cpp", label: "C++", ext: cpp(), snippet: '#include <iostream>\n\nint main() {\n    std::cout << "Welcome to CodeTogether" << std::endl;\n    return 0;\n}' },
-  { id: "java", label: "Java", ext: java(), snippet: 'class Main {\n    public static void main(String[] args) {\n        System.out.println("Welcome to CodeTogether");\n    }\n}' },
-  { id: "rust", label: "Rust", ext: rust(), snippet: 'fn main() {\n    println!("Welcome to CodeTogether");\n}' },
-  { id: "go", label: "Go", ext: go(), snippet: 'package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Welcome to CodeTogether")\n}' },
-  { id: "html", label: "HTML", ext: html(), snippet: '<h1>Welcome to CodeTogether</h1>' },
-  { id: "sql", label: "SQL", ext: sql(), snippet: "-- Welcome to CodeTogether\nSELECT 'Welcome to CodeTogether';" },
-  { id: "markdown", label: "Markdown", ext: markdown(), snippet: '# Welcome to CodeTogether' },
+  { id: "python", label: "Python", snippet: "print('Welcome to CodeTogether')" },
+  { id: "javascript", label: "JavaScript", snippet: "console.log('Welcome to CodeTogether');" },
+  { id: "typescript", label: "TypeScript", snippet: "console.log('Welcome to CodeTogether');" },
+  { id: "cpp", label: "C++", snippet: '#include <iostream>\n\nint main() {\n    std::cout << "Welcome to CodeTogether" << std::endl;\n    return 0;\n}' },
+  { id: "java", label: "Java", snippet: 'class Main {\n    public static void main(String[] args) {\n        System.out.println("Welcome to CodeTogether");\n    }\n}' },
+  { id: "rust", label: "Rust", snippet: 'fn main() {\n    println!("Welcome to CodeTogether");\n}' },
+  { id: "go", label: "Go", snippet: 'package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Welcome to CodeTogether")\n}' },
+  { id: "html", label: "HTML", snippet: '<h1>Welcome to CodeTogether</h1>' },
+  { id: "sql", label: "SQL", snippet: "-- Welcome to CodeTogether\nSELECT 'Welcome to CodeTogether';" },
+  { id: "markdown", label: "Markdown", snippet: '# Welcome to CodeTogether' },
 ]
 
 export const FONT_FAMILIES = [
@@ -59,24 +49,24 @@ export const EXT_TO_LANG = {
   'tsx': 'typescript',
   'cpp': 'cpp',
   'cc': 'cpp',
-  'c': 'cpp',
-  'h': 'cpp',
+  'c': 'c',
+  'h': 'c',
   'hpp': 'cpp',
   'java': 'java',
   'rs': 'rust',
   'go': 'go',
   'html': 'html',
   'htm': 'html',
-  'css': 'html',
+  'css': 'css',
   'sql': 'sql',
   'md': 'markdown',
-  'json': 'javascript',
-  'xml': 'html',
-  'yaml': 'markdown',
-  'yml': 'markdown',
+  'json': 'json',
+  'xml': 'xml',
+  'yaml': 'yaml',
+  'yml': 'yaml',
   'txt': 'markdown',
-  'sh': 'javascript',
-  'bash': 'javascript',
+  'sh': 'shell',
+  'bash': 'shell',
   'toml': 'markdown',
   'cfg': 'markdown',
   'env': 'markdown',

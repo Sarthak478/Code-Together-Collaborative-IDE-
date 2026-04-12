@@ -1,4 +1,4 @@
-import CodeMirror from "@uiw/react-codemirror"
+import Editor from "@monaco-editor/react"
 import useEditorRoom from "../hooks/useEditorRoom"
 import { API_URL } from "../config"
 import { motion, AnimatePresence } from "framer-motion"
@@ -135,7 +135,14 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
             <div style={{ flex: 1, overflow: "hidden" }}>
-              <CodeMirror height="100%" theme={room.cmBaseTheme} extensions={room.extensions} />
+              <Editor 
+                height="100%" 
+                width="100%"
+                language={room.language} 
+                theme={room.monacoTheme} 
+                options={room.monacoOptions} 
+                onMount={(editor, monaco) => room.onEditorMount(editor, monaco)} 
+              />
             </div>
 
             {room.previewOpen && (

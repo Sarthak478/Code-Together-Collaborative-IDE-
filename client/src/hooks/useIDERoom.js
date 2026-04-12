@@ -1,10 +1,8 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react"
-import { EditorView } from "@codemirror/view"
-import { EditorState } from "@codemirror/state"
+import { MonacoBinding } from "y-monaco"
 import * as Y from "yjs"
 import { HocuspocusProvider } from "@hocuspocus/provider"
 import { IndexeddbPersistence } from "y-indexeddb"
-import { yCollab } from "y-codemirror.next"
 
 import { LANGUAGES, THEMES, FONT_FAMILIES, EXT_TO_LANG } from "../constants/editorConfigs"
 import { loadPersonalPrefs, savePersonalPrefs } from "../utils/helpers"
@@ -55,8 +53,12 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   const [output, setOutput] = useState("")
   const [runner, setRunner] = useState(null)
 
-  const canEdit = isHost || actualRoomType === "collaborative" || actualRoomType === "interview"
-  const canRun = isHost || actualRoomType === "collaborative" || actualRoomType === "interview"
+  /* canEdit: host always can; others check room type AND not individually restricted */
+  const myClientId = editor.provider.awareness.clientID
+  const [restrictedUsers, setRestrictedUsers] = useState([])
+  const isRestricted = !isHost && restrictedUsers.includes(myClientId)
+  const canEdit = !isRestricted && (isHost || actualRoomType === "collaborative" || actualRoomType === "interview")
+  const canRun = !isRestricted && (isHost || actualRoomType === "collaborative" || actualRoomType === "interview")
   const canChangeRoom = isHost
 
   /* ── File System ── */
@@ -176,6 +178,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     const earliest = validStates.reduce((best, cur) => {
       const t = cur[1].user.joinTime ?? Infinity
       const bestT = best[1].user.joinTime ?? Infinity
+      if (t === bestT) return cur[0] < best[0] ? cur : best
       return t < bestT ? cur : best
     }, validStates[0])
 
@@ -198,15 +201,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     const { provider, roomMap, chatArray } = editor
 
     provider.on("synced", () => {
-      // Check for duplicate username among other connected clients
-      const states = Array.from(provider.awareness.getStates().entries())
-      const isDuplicate = states.some(([clientId, state]) =>
-        clientId !== provider.awareness.clientID && state.user?.name === username
-      )
-      if (isDuplicate && !isHost) {
-        onLeave(`⚠️ The username '@${username}' is already taken in this room.`)
-        return
-      }
+
 
       // Auto-detect room mode for joiners
       const mode = roomMap.get("roomMode")
@@ -228,6 +223,9 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       const kicked = roomMap.get("kickedUsers") || []
       setKickedUsers(kicked)
 
+      const restricted = roomMap.get("restrictedUsers") || []
+      setRestrictedUsers(restricted)
+
       if (kicked.length > 0 && !isHost && (kicked.includes(editor.username) || kicked.includes(editor.provider.awareness.clientID))) {
         alert("You have been removed from the room by the host.")
         onLeave()
@@ -240,7 +238,27 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     chatArray.observe(onChatChange)
     onChatChange()
 
-    provider.awareness.on("change", recalcHost)
+    const onAwarenessChange = () => {
+      recalcHost()
+
+      const states = Array.from(provider.awareness.getStates().entries())
+      const myId = provider.awareness.clientID
+      
+      const isDuplicate = states.some(([id, state]) => {
+        if (id === myId) return false
+        if (state.user?.name !== editor.username) return false
+        
+        const otherJoin = state.user?.joinTime ?? Infinity
+        const myJoin = editor.joinTime ?? Infinity
+        return otherJoin < myJoin || (otherJoin === myJoin && id < myId)
+      })
+
+      if (isDuplicate) {
+         onLeave(`⚠️ The username '@${editor.username}' is already taken in this room. Please choose a different name.`)
+      }
+    }
+
+    provider.awareness.on("change", onAwarenessChange)
     recalcHost()
 
     // Execution WS
@@ -353,33 +371,52 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   }, [activeFile, fs.tree])
   const activeLanguage = activeFileEntry?.language || "python"
 
-  const langExt = useMemo(() => {
-    const lang = LANGUAGES.find(l => l.id === activeLanguage)
-    return lang?.ext ?? LANGUAGES[0].ext
-  }, [activeLanguage])
-
   const activeYText = useMemo(() => {
     if (!activeFile) return null
     return fs.getFileText(activeFile)
   }, [activeFile, fs])
 
-  const collabExt = useMemo(() => {
-    if (!activeYText || !editor.provider.awareness) return []
-    // ✅ Re-memoize yCollab only when the Y.Text truly changes
-    return yCollab(activeYText, editor.provider.awareness)
-  }, [activeYText, editor.provider.awareness])
+  const bindingRef = useRef(null)
 
-  const fontExt = useMemo(() => EditorView.theme({
-    "&": { fontSize: `${activeFontSize}px`, fontFamily: activeFontFamily },
-    ".cm-content": { fontFamily: activeFontFamily },
-  }), [activeFontSize, activeFontFamily])
+  const onEditorMount = useCallback((monacoEditor, monaco) => {
+    if (!activeFile || !editor.provider.awareness || !activeYText) return
 
-  const readOnlyExt = useMemo(() => EditorState.readOnly.of(!canEdit), [canEdit])
+    if (bindingRef.current) {
+      bindingRef.current.destroy()
+    }
 
-  const extensions = useMemo(() => {
-    if (!activeYText) return [langExt, fontExt, readOnlyExt]
-    return [langExt, fontExt, collabExt, readOnlyExt]
-  }, [langExt, fontExt, collabExt, readOnlyExt, activeYText])
+    bindingRef.current = new MonacoBinding(
+      activeYText,
+      monacoEditor.getModel(),
+      new Set([monacoEditor]),
+      editor.provider.awareness
+    )
+
+  }, [activeFile, activeYText, editor.provider.awareness])
+
+  /* Cleanup binding when active file changes or unmounts */
+  useEffect(() => {
+    return () => {
+      if (bindingRef.current) {
+        bindingRef.current.destroy()
+        bindingRef.current = null
+      }
+    }
+  }, [activeFile])
+
+  /* ── Theme ── */
+  const themeDef = THEMES.find(t => t.id === activeTheme) || THEMES[0]
+  const { base: cmBaseTheme, bg, header: headerBg, toolbar: toolbarBg, text: textColor, panel: panelBg, border: borderCol, input: inputBg, accent } = themeDef
+  const isDark = cmBaseTheme === "dark"
+
+  const monacoTheme = isDark ? "vs-dark" : "light"
+  const monacoOptions = useMemo(() => ({
+    fontSize: activeFontSize,
+    fontFamily: activeFontFamily,
+    readOnly: !canEdit,
+    minimap: { enabled: false },
+    automaticLayout: true,
+  }), [activeFontSize, activeFontFamily, canEdit])
 
   /* ── Auto-open default file ── */
   useEffect(() => {
@@ -508,7 +545,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
 
   /* ── Chat actions ── */
   const sendChat = useCallback((e) => {
-    e.preventDefault()
+    if (e && e.preventDefault) e.preventDefault()
     if (!chatInput.trim() || !chatEnabled) return
     editor.chatArray.push([{
       id: Date.now().toString() + Math.random(),
@@ -524,6 +561,26 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       sender: "System", target: "all", text: `@${userName} was removed.`, type: "system_kick", timestamp: Date.now()
     }])
   }, [kickedUsers, editor])
+
+  const restrictUser = useCallback((clientId, userName) => {
+    if (!restrictedUsers.includes(clientId)) {
+      editor.roomMap.set("restrictedUsers", [...restrictedUsers, clientId])
+      editor.chatArray.push([{
+        id: Date.now().toString() + Math.random(),
+        sender: "System", target: "all",
+        text: `@${userName}'s edit access was revoked.`, type: "system_kick", timestamp: Date.now()
+      }])
+    }
+  }, [restrictedUsers, editor])
+
+  const unrestrictUser = useCallback((clientId, userName) => {
+    editor.roomMap.set("restrictedUsers", restrictedUsers.filter(id => id !== clientId))
+    editor.chatArray.push([{
+      id: Date.now().toString() + Math.random(),
+      sender: "System", target: "all",
+      text: `@${userName}'s edit access was restored.`, type: "system_kick", timestamp: Date.now()
+    }])
+  }, [restrictedUsers, editor])
 
   /* ── Room UI actions ── */
   const pushRoomUI = useCallback(() => {
@@ -545,10 +602,6 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     setRightPanel(prev => prev === panel ? null : panel)
   }, [])
 
-  /* ── Theme ── */
-  const themeDef = THEMES.find(t => t.id === activeTheme) || THEMES[0]
-  const { base: cmBaseTheme, bg, header: headerBg, toolbar: toolbarBg, text: textColor, panel: panelBg, border: borderCol, input: inputBg, accent } = themeDef
-  const isDark = cmBaseTheme === "dark"
 
   /* ── Filtered lists ── */
   const visibleChatMsgs = chatMessages.filter(m => m.target === "all" || m.target === editor.username || m.sender === editor.username)
@@ -559,7 +612,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   })
 
   return {
-    editor, extensions, cmBaseTheme, fs,
+    editor, onEditorMount, monacoTheme, monacoOptions, fs,
     // Files & Tabs
     openFiles, activeFile, activeFileEntry, activeLanguage, activeYText,
     openFile, closeFile,
@@ -588,14 +641,14 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     peerId, setPeerId,
     toasts,
     // Users
-    activeUsers, visibleActiveUsersList, hostName,
+    activeUsers, visibleActiveUsersList, hostName, restrictedUsers,
     // Chat
     chatEnabled, showUsersList, visibleChatMsgs,
     chatInput, setChatInput, chatTarget, setChatTarget,
     // Actions
-    runCode, syncFilesToTerminal, downloadCode, saveCode, sendChat, kickUser,
+    runCode, syncFilesToTerminal, downloadCode, saveCode, sendChat, kickUser, restrictUser, unrestrictUser,
     onLeave, updatePersonalPref, pushRoomUI, clearRoomUI,
     onToggleChatEnabled, onToggleShowUsers, onSetRoomTheme,
-    setOutput, addToast,
+    setOutput, addToast, gitStatus, isGitLoading, refreshGitStatus
   }
 }
