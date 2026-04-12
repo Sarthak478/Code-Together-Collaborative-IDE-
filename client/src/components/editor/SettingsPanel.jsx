@@ -146,16 +146,7 @@ export default function SettingsPanel({
                       <GitBranch size={14} /> Git Configuration
                    </div>
                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                      <div>
-                        <label style={{ fontSize: 11, opacity: 0.5, display: "block", marginBottom: 4 }}>Author Email</label>
-                        <input 
-                          type="text" 
-                          placeholder="your@email.com"
-                          value={personalPrefs.gitEmail || ""}
-                          onChange={e => updatePersonalPref("gitEmail", e.target.value)}
-                          style={{ width: "100%", background: inputBg, color: textColor, border: `1px solid ${borderCol}`, borderRadius: 8, padding: "8px 12px", fontSize: 12, outline: "none" }}
-                        />
-                      </div>
+
                       <div style={{ background: "rgba(255,255,255,0.01)", padding: 10, borderRadius: 8, border: `1px solid ${borderCol}`, borderStyle: "dashed" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 800, color: accent, marginBottom: 6 }}>
                           <GithubIcon size={14} color={accent} /> GitHub Integration
