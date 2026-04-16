@@ -1,14 +1,13 @@
 import { useState } from "react"
 import { 
-  Play, 
-  Download, 
-  Terminal, 
-  Code,
+  Rocket, 
+  ArrowDownToLine, 
+  Braces,
   Users,
   UserPlus,
   Check,
-  Eye,
-  EyeOff
+  ScanEye,
+  ScanLine
 } from "lucide-react"
 
 export default function Toolbar({
@@ -59,8 +58,9 @@ export default function Toolbar({
       className="ide-glass-effect"
       style={{ 
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "8px 16px", margin: "0 10px 10px 10px", borderRadius: 12,
-        height: 48, boxSizing: "border-box", border: `1px solid ${borderCol}`
+        padding: "8px 16px", margin: "0 10px 10px 10px", borderRadius: 14,
+        height: 48, boxSizing: "border-box", border: `1px solid ${borderCol}`,
+        backgroundImage: "linear-gradient(135deg, rgba(203,166,247,0.02) 0%, transparent 50%, rgba(137,180,250,0.02) 100%)"
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -70,20 +70,20 @@ export default function Toolbar({
           disabled={!canRun}
           className="ide-btn-premium"
           style={{
-            background: canRun ? accent : inputBg,
+            background: canRun ? `linear-gradient(135deg, ${accent}, rgba(137,180,250,0.9))` : inputBg,
             color: canRun ? "#fff" : textColor,
             opacity: !canRun ? 0.4 : 1,
             border: `1px solid ${canRun ? accent : borderCol}`,
             cursor: !canRun ? "not-allowed" : "pointer",
-            boxShadow: canRun ? `0 4px 15px ${accent}44` : "none"
+            boxShadow: canRun ? `0 4px 20px ${accent}44, 0 0 30px ${accent}15` : "none"
           }}
         >
           {runner === editorAwarenessClientID ? (
             <div className="ide-icon-pulse">⚙️</div>
           ) : (
-            <Play size={16} fill={canRun ? "#fff" : "transparent"} />
+            <Rocket size={16} fill={canRun ? "#fff" : "transparent"} />
           )}
-          <span>{runner ? "Running..." : "Run Engine"}</span>
+          <span style={{ fontFamily: "'Manrope', sans-serif", letterSpacing: "0.02em" }}>{runner ? "Running..." : "Run Engine"}</span>
         </button>
 
         {/* Download Button */}
@@ -95,23 +95,24 @@ export default function Toolbar({
             border: `1px solid ${borderCol}`, cursor: "pointer"
           }}
         >
-          <Download size={16} />
-          <span>Sync & Download</span>
+          <ArrowDownToLine size={16} />
+          <span style={{ fontFamily: "'Manrope', sans-serif" }}>Sync & Download</span>
         </button>
 
         <div style={{ width: 1, height: 20, background: borderCol, margin: "0 4px" }} />
 
         {/* Language Selector */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.03)", padding: "4px 8px", borderRadius: 10, border: `1px solid ${borderCol}` }}>
-          <Code size={14} opacity={0.6} />
+          <Braces size={14} opacity={0.6} />
           <select
             value={language}
             onChange={(e) => onLanguageChange(e.target.value)}
             disabled={!canChangeLanguage}
             style={{
               background: "transparent", color: textColor, border: "none",
-              fontSize: 12, fontWeight: 700, outline: "none", cursor: "pointer",
-              fontFamily: "inherit"
+              fontSize: 12, fontWeight: 600, outline: "none", cursor: "pointer",
+              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+              letterSpacing: "0.01em"
             }}
           >
             <option value="python">Python 3</option>
@@ -166,8 +167,8 @@ export default function Toolbar({
           transition: "all 0.2s"
         }}
       >
-        {previewOpen ? <EyeOff size={14} /> : <Eye size={14} />}
-        <span>{previewOpen ? "Close Preview" : "Live Preview"}</span>
+        {previewOpen ? <ScanLine size={14} /> : <ScanEye size={14} />}
+        <span style={{ fontFamily: "'Manrope', sans-serif" }}>{previewOpen ? "Close Preview" : "Live Preview"}</span>
       </button>
 
       {/* Right Side: Active Users + Invite */}

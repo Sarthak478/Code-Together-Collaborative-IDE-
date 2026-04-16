@@ -34,7 +34,7 @@ export default function ChatPanel({
 
       {/* Messages Section */}
       <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-        {messages.length === 0 && <div style={{ textAlign: "center", opacity: 0.5, marginTop: 20, fontSize: 12 }}>No messages yet.</div>}
+        {messages.length === 0 && <div style={{ textAlign: "center", opacity: 0.5, marginTop: 20, fontSize: 12, fontFamily: "'Manrope', sans-serif" }}>No messages yet.</div>}
         {messages.map(m => {
           if (m.type === "system") {
             return <div key={m.id} style={{ fontSize: 11, textAlign: "center", opacity: 0.5, margin: "4px 0" }}>🚀 @{m.sender} ran the code</div>
@@ -49,7 +49,7 @@ export default function ChatPanel({
                 <span>@{m.sender}</span>
                 {m.target !== "all" && <span style={{ color: "#f9e2af", fontWeight: "bold" }}>(Whisper)</span>}
               </div>
-              <div style={{ background: isMe ? accent : inputBg, color: isMe ? "#1e1e2e" : textColor, padding: "8px 12px", borderRadius: 8, fontSize: 13, border: isMe ? "none" : `1px solid ${borderCol}` }}>
+              <div style={{ background: isMe ? accent : inputBg, color: isMe ? "#1e1e2e" : textColor, padding: "8px 12px", borderRadius: 8, fontSize: 13, border: isMe ? "none" : `1px solid ${borderCol}`, fontFamily: "'Manrope', sans-serif" }}>
                 {m.text}
               </div>
             </div>
@@ -62,7 +62,7 @@ export default function ChatPanel({
           <select
             value={chatTarget}
             onChange={e => onChatTargetChange(e.target.value)}
-            style={{ background: inputBg, color: textColor, border: `1px solid ${borderCol}`, padding: "4px 8px", borderRadius: 6, fontSize: 11 }}
+            style={{ background: inputBg, color: textColor, border: `1px solid ${borderCol}`, padding: "4px 8px", borderRadius: 6, fontSize: 11, fontFamily: "'Manrope', sans-serif", fontWeight: 500 }}
           >
             <option value="all">Send to Everyone</option>
             {Array.from(new Set(visibleActiveUsersList.filter(u => u.name !== username).map(u => u.name))).map(name => (
@@ -76,7 +76,7 @@ export default function ChatPanel({
             value={chatInput}
             onChange={e => onChatInputChange(e.target.value)}
             placeholder={chatEnabled ? "Type a message..." : "Chat disabled by host"}
-            style={{ flex: 1, padding: "8px 12px", borderRadius: 20, border: `1px solid ${borderCol}`, background: inputBg, color: textColor, outline: "none", fontSize: 13 }}
+            style={{ flex: 1, padding: "8px 12px", borderRadius: 20, border: `1px solid ${borderCol}`, background: inputBg, color: textColor, outline: "none", fontSize: 13, fontFamily: "'Manrope', sans-serif" }}
           />
           <button
             type="submit"

@@ -2,7 +2,7 @@ import Editor from "@monaco-editor/react"
 import useEditorRoom from "../hooks/useEditorRoom"
 import { API_URL } from "../config"
 import { motion, AnimatePresence } from "framer-motion"
-import { MessageSquare, GitBranch, Sparkles, AlertCircle, LogOut } from "lucide-react"
+import { MessageCircle, GitFork, Wand2, AlertCircle, DoorOpen } from "lucide-react"
 
 import Navbar from "./editor/Navbar"
 import Toolbar from "./editor/Toolbar"
@@ -26,7 +26,7 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
       style={{
         display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden",
         background: room.bg, color: room.textColor,
-        fontFamily: "'Inter', system-ui, sans-serif",
+        fontFamily: "'Manrope', 'Inter', system-ui, sans-serif",
         cursor: room.personalPrefs.cursor
       }}
     >
@@ -105,11 +105,12 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
         
         {/* Left Mini Sidebar for Panels */}
         <div style={{ 
-          width: 48, borderRight: `1px solid ${room.borderCol}`, background: "rgba(0,0,0,0.1)",
-          display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 12, gap: 4
+          width: 48, borderRight: `1px solid ${room.borderCol}`, background: "rgba(0,0,0,0.15)",
+          display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 12, gap: 4,
+          backgroundImage: "linear-gradient(180deg, rgba(203,166,247,0.03) 0%, transparent 40%, transparent 60%, rgba(137,180,250,0.02) 100%)"
         }}>
           <PanelToggleButton 
-            icon={<MessageSquare size={20} />} 
+            icon={<MessageCircle size={20} />} 
             active={room.rightPanel === "chat"} 
             onClick={() => room.toggleRightPanel("chat")} 
             accent={room.accent} 
@@ -117,14 +118,14 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
             title="Chat"
           />
           <PanelToggleButton 
-            icon={<GitBranch size={20} />} 
+            icon={<GitFork size={20} />} 
             active={room.rightPanel === "git"} 
             onClick={() => room.toggleRightPanel("git")} 
             accent={room.accent} 
             title="Source Control"
           />
           <PanelToggleButton 
-            icon={<Sparkles size={20} />} 
+            icon={<Wand2 size={20} />} 
             active={room.rightPanel === "ai"} 
             onClick={() => room.toggleRightPanel("ai")} 
             accent={room.accent} 
@@ -216,6 +217,8 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
                     onRefresh={room.refreshGitStatus}
                     onViewDiff={(path, staged) => setActiveDiff({ path, staged })}
                     username={username}
+                    personalPrefs={room.personalPrefs}
+                    onOpenSettings={() => room.setSettingsOpen(true)}
                     themeData={{ bg: room.bg, textColor: room.textColor, borderCol: room.borderCol, accent: room.accent, inputBg: room.inputBg, panelBg: room.panelBg, headerBg: room.headerBg }}
                   />
                 ) : room.rightPanel === "ai" && (
@@ -253,6 +256,8 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
           hostName={room.hostName}
           kickUser={room.kickUser}
           username={username}
+          roomId={roomId}
+          refreshGitStatus={room.refreshGitStatus}
           themeData={{ 
             bg: room.bg, 
             headerBg: room.headerBg, 
@@ -286,7 +291,7 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
               width: 56, height: 56, borderRadius: "50%", background: "rgba(243, 139, 168, 0.1)", 
               display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" 
             }}>
-               <LogOut size={28} color="#f38ba8" />
+               <DoorOpen size={28} color="#f38ba8" />
             </div>
             <h3 style={{ margin: "0 0 12px 0", color: room.textColor, fontSize: 20, fontWeight: 800 }}>Ready to leave?</h3>
             <p style={{ margin: "0 0 28px 0", color: room.textColor, fontSize: 14, opacity: 0.6, lineHeight: 1.6 }}>
@@ -366,27 +371,46 @@ function PanelToggleButton({ icon, active, onClick, accent, count, title }) {
         style={{ 
           background: "transparent", border: "none", cursor: "pointer", 
           color: active ? accent : "rgba(255,255,255,0.4)",
-          transition: "all 0.2s",
+          transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
           display: "flex", alignItems: "center", justifyContent: "center",
-          width: 36, height: 36, borderRadius: 8,
-          ...(active ? { background: "rgba(255,255,255,0.05)" } : {})
+          width: 36, height: 36, borderRadius: 10,
+          ...(active ? { background: "rgba(203,166,247,0.08)", boxShadow: `0 0 12px ${accent}20` } : {})
         }}
-        onMouseEnter={e => { if (!active) e.currentTarget.style.color = "rgba(255,255,255,0.7)" }}
-        onMouseLeave={e => { if (!active) e.currentTarget.style.color = "rgba(255,255,255,0.4)" }}
+        onMouseEnter={e => { 
+          if (!active) {
+            e.currentTarget.style.color = "rgba(255,255,255,0.8)"
+            e.currentTarget.style.background = "rgba(255,255,255,0.04)"
+            e.currentTarget.style.transform = "scale(1.1)"
+          }
+        }}
+        onMouseLeave={e => { 
+          if (!active) {
+            e.currentTarget.style.color = "rgba(255,255,255,0.4)"
+            e.currentTarget.style.background = "transparent"
+            e.currentTarget.style.transform = "scale(1)"
+          }
+        }}
       >
         {icon}
       </button>
       {active && (
         <motion.div 
           layoutId="active-panel-indicator"
-          style={{ position: "absolute", left: -12, top: "50%", transform: "translateY(-50%)", width: 2, height: 20, background: accent, borderRadius: "0 2px 2px 0" }}
+          style={{ 
+            position: "absolute", left: -12, top: "50%", transform: "translateY(-50%)", 
+            width: 3, height: 22, borderRadius: "0 3px 3px 0",
+            background: `linear-gradient(180deg, ${accent}, rgba(137,180,250,0.8))`,
+            boxShadow: `0 0 10px ${accent}40`
+          }}
         />
       )}
       {count > 0 && !active && (
         <div style={{ 
-          position: "absolute", top: -2, right: -2, background: accent, color: "#1e1e2e", 
-          fontSize: 9, fontWeight: 800, width: 14, height: 14, borderRadius: "50%",
-          display: "flex", alignItems: "center", justifyContent: "center"
+          position: "absolute", top: -3, right: -3, background: accent, color: "#1e1e2e", 
+          fontSize: 9, fontWeight: 800, width: 16, height: 16, borderRadius: "50%",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: `0 0 8px ${accent}50`,
+          animation: "breathe 2s ease-in-out infinite"
         }}>
           {count > 9 ? "9+" : count}
         </div>

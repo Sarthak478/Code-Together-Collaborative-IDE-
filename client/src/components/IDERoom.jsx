@@ -17,7 +17,7 @@ import AIPanel from "./ide/AIPanel"
 import VideoCall from "./editor/VideoCall"
 import SourceControlPanel from "./ide/SourceControlPanel"
 import DiffModal from "./ui/DiffModal"
-import { LogOut, AlertCircle, GitBranch, MessageSquare, Sparkles, Bot, Terminal } from "lucide-react"
+import { DoorOpen, AlertCircle, GitFork, MessageCircle, Wand2, Bot, TerminalSquare } from "lucide-react"
 
 
 export default function IDERoom(props) {
@@ -104,7 +104,7 @@ export default function IDERoom(props) {
       style={{
         display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden",
         background: ide.bg, color: ide.textColor,
-        fontFamily: "'Inter', system-ui, sans-serif"
+        fontFamily: "'Manrope', 'Inter', system-ui, sans-serif"
       }}
     >
       {/* ── Navbar ── */}
@@ -135,14 +135,17 @@ export default function IDERoom(props) {
           <button
             onClick={ide.runCode}
             disabled={!ide.canRun || !ide.activeFile}
+            className="ide-btn-premium"
             style={{
               display: "flex", alignItems: "center", gap: 6,
-              background: ide.canRun && ide.activeFile ? ide.accent : ide.inputBg,
+              background: ide.canRun && ide.activeFile ? `linear-gradient(135deg, ${ide.accent}, rgba(137,180,250,0.9))` : ide.inputBg,
               color: ide.canRun && ide.activeFile ? "#fff" : ide.textColor,
               opacity: (!ide.canRun || !ide.activeFile) ? 0.5 : 1,
               border: `1px solid ${ide.canRun && ide.activeFile ? ide.accent : ide.borderCol}`,
-              padding: "6px 16px", borderRadius: 6, fontWeight: 600, fontSize: 13,
-              cursor: (!ide.canRun || !ide.activeFile) ? "not-allowed" : "pointer"
+              padding: "6px 16px", borderRadius: 10, fontWeight: 600, fontSize: 13,
+              fontFamily: "'Manrope', sans-serif", letterSpacing: "0.01em",
+              cursor: (!ide.canRun || !ide.activeFile) ? "not-allowed" : "pointer",
+              boxShadow: (ide.canRun && ide.activeFile) ? `0 4px 20px ${ide.accent}44` : "none"
             }}
           >
             {ide.runner === ide.editor.username ? (
@@ -164,12 +167,13 @@ export default function IDERoom(props) {
             disabled={!ide.activeFile}
             style={{
               background: ide.inputBg, color: ide.textColor, opacity: !ide.activeFile ? 0.5 : 1,
-              border: `1px solid ${ide.borderCol}`, padding: "6px 12px", borderRadius: 6,
+              border: `1px solid ${ide.borderCol}`, padding: "6px 12px", borderRadius: 10,
               cursor: !ide.activeFile ? "not-allowed" : "pointer", fontSize: 13,
-              display: "flex", alignItems: "center", gap: 6
+              display: "flex", alignItems: "center", gap: 6,
+              fontFamily: "'Manrope', sans-serif", fontWeight: 500
             }}
           >
-            📥 Download Option
+            📥 Download
           </button>
         </div>
 
@@ -208,9 +212,9 @@ export default function IDERoom(props) {
                 🎓 Interview Mode
               </div>
               <div style={{ 
-                color: ide.textColor, fontSize: 13, fontWeight: "bold", fontFamily: "monospace", 
+                color: ide.textColor, fontSize: 13, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", 
                 opacity: 0.8, background: "rgba(255,255,255,0.03)", padding: "4px 10px",
-                borderRadius: 8, border: `1px solid ${ide.borderCol}`
+                borderRadius: 8, border: `1px solid ${ide.borderCol}`, letterSpacing: "0.02em"
               }}>
                 ⏱️ {new Date(ide.interviewTime * 1000).toISOString().substr(11, 8)}
               </div>
@@ -231,8 +235,9 @@ export default function IDERoom(props) {
             style={{
               background: ide.previewOpen ? "transparent" : (ide.isDark ? "rgba(137, 180, 250, 0.2)" : "rgba(13, 110, 253, 0.1)"),
               color: ide.previewOpen ? ide.textColor : ide.accent,
-              border: `1px solid ${ide.previewOpen ? "transparent" : ide.borderCol}`, cursor: "pointer", fontSize: 13, fontWeight: "bold",
-              padding: "4px 10px", borderRadius: 6, transition: "all 0.2s"
+              border: `1px solid ${ide.previewOpen ? "transparent" : ide.borderCol}`, cursor: "pointer", fontSize: 13, fontWeight: 600,
+              padding: "4px 10px", borderRadius: 10, transition: "all 0.2s",
+              fontFamily: "'Manrope', sans-serif"
             }}
           >
             {ide.previewOpen ? "❌ Close Preview" : "🚀 Open Preview"}
@@ -245,12 +250,13 @@ export default function IDERoom(props) {
         
         {/* Left Mini Sidebar for Panels */}
         <div style={{ 
-          width: 48, borderRight: `1px solid ${ide.borderCol}`, background: "rgba(0,0,0,0.1)",
-          display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 12, gap: 4
+          width: 48, borderRight: `1px solid ${ide.borderCol}`, background: "rgba(0,0,0,0.15)",
+          display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 12, gap: 4,
+          backgroundImage: "linear-gradient(180deg, rgba(203,166,247,0.03) 0%, transparent 40%, transparent 60%, rgba(137,180,250,0.02) 100%)"
         }}>
           {ide.actualRoomType !== "broadcast" && (
             <IDEPanelToggleButton 
-              icon={<MessageSquare size={20} />} 
+              icon={<MessageCircle size={20} />} 
               active={ide.rightPanel === "chat"} 
               onClick={() => ide.toggleRightPanel("chat")} 
               accent={ide.accent} 
@@ -259,24 +265,24 @@ export default function IDERoom(props) {
             />
           )}
           <IDEPanelToggleButton 
-            icon={<GitBranch size={20} />} 
+            icon={<GitFork size={20} />} 
             active={ide.rightPanel === "git"} 
             onClick={() => ide.toggleRightPanel("git")} 
             accent={ide.accent} 
             title="Source Control"
           />
           <IDEPanelToggleButton 
-            icon={<Bot size={20} />} 
+            icon={<Wand2 size={20} />} 
             active={ide.rightPanel === "ai"} 
             onClick={() => ide.toggleRightPanel("ai")} 
             accent={ide.accent} 
             title="AI Coder"
           />
 
-          <div style={{ width: 24, height: 1, background: ide.borderCol, margin: "4px 0" }} />
+          <div style={{ width: 24, height: 1, background: `linear-gradient(90deg, transparent, ${ide.borderCol}, transparent)`, margin: "8px 0" }} />
 
           <IDEPanelToggleButton 
-            icon={<Terminal size={20} />} 
+            icon={<TerminalSquare size={20} />} 
             active={ide.terminalOpen} 
             onClick={() => {
               const nextState = !ide.terminalOpen;
@@ -338,20 +344,21 @@ export default function IDERoom(props) {
               ) : (
                 <div style={{
                   flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
-                  justifyContent: "center", opacity: 0.4, gap: 16, background: ide.panelBg
+                  justifyContent: "center", opacity: 0.5, gap: 16, background: ide.panelBg,
+                  backgroundImage: "radial-gradient(ellipse at 50% 40%, rgba(203,166,247,0.04) 0%, transparent 70%)"
                 }}>
                   {(ide.isSyncingFile || !ide.isPersistenceSynced) ? (
                     <>
-                      <div style={{ width: 40, height: 40, border: `3px solid ${ide.accent}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>
+                      <div style={{ width: 44, height: 44, border: `3px solid ${ide.accent}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite", boxShadow: `0 0 20px ${ide.accent}20` }} />
+                      <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.5px", fontFamily: "'Manrope', sans-serif" }}>
                         {!ide.isPersistenceSynced ? "Initializing Offline Storage..." : "Synchronizing Workspace..."}
                       </div>
                     </>
                   ) : (
                     <>
-                      <div style={{ fontSize: 64 }}>🛠️</div>
-                      <div style={{ fontSize: 18, fontWeight: 600 }}>CodeTogether Collaborative IDE</div>
-                      <div style={{ fontSize: 13, marginTop: 8 }}>Select or create a file to start coding</div>
+                      <div style={{ fontSize: 64, filter: "drop-shadow(0 0 20px rgba(203,166,247,0.2))" }}>🛠️</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.03em", fontFamily: "'Space Grotesk', sans-serif", background: "linear-gradient(135deg, #cba6f7, #89b4fa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>CodeTogether Collaborative IDE</div>
+                      <div style={{ fontSize: 13, marginTop: 8, opacity: 0.7, fontFamily: "'Manrope', sans-serif" }}>Select or create a file to start coding</div>
                     </>
                   )}
                 </div>
@@ -524,7 +531,7 @@ export default function IDERoom(props) {
               width: 56, height: 56, borderRadius: "50%", background: "rgba(243, 139, 168, 0.1)", 
               display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" 
             }}>
-               <LogOut size={28} color="#f38ba8" />
+               <DoorOpen size={28} color="#f38ba8" />
             </div>
             <h3 style={{ margin: "0 0 12px 0", color: ide.textColor, fontSize: 20, fontWeight: 800 }}>Ready to leave?</h3>
             <p style={{ margin: "0 0 28px 0", color: ide.textColor, fontSize: 14, opacity: 0.6, lineHeight: 1.6 }}>
@@ -623,27 +630,46 @@ function IDEPanelToggleButton({ icon, active, onClick, accent, count, title }) {
         style={{ 
           background: "transparent", border: "none", cursor: "pointer", 
           color: active ? accent : "rgba(255,255,255,0.4)",
-          transition: "all 0.2s",
+          transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
           display: "flex", alignItems: "center", justifyContent: "center",
-          width: 36, height: 36, borderRadius: 8,
-          ...(active ? { background: "rgba(255,255,255,0.05)" } : {})
+          width: 36, height: 36, borderRadius: 10,
+          ...(active ? { background: "rgba(203,166,247,0.08)", boxShadow: `0 0 12px ${accent}20` } : {})
         }}
-        onMouseEnter={e => { if (!active) e.currentTarget.style.color = "rgba(255,255,255,0.7)" }}
-        onMouseLeave={e => { if (!active) e.currentTarget.style.color = "rgba(255,255,255,0.4)" }}
+        onMouseEnter={e => { 
+          if (!active) {
+            e.currentTarget.style.color = "rgba(255,255,255,0.8)"
+            e.currentTarget.style.background = "rgba(255,255,255,0.04)"
+            e.currentTarget.style.transform = "scale(1.1)"
+          }
+        }}
+        onMouseLeave={e => { 
+          if (!active) {
+            e.currentTarget.style.color = "rgba(255,255,255,0.4)"
+            e.currentTarget.style.background = "transparent"
+            e.currentTarget.style.transform = "scale(1)"
+          }
+        }}
       >
         {icon}
       </button>
       {active && (
         <motion.div 
           layoutId="ide-active-panel-indicator"
-          style={{ position: "absolute", left: -12, top: "50%", transform: "translateY(-50%)", width: 2, height: 20, background: accent, borderRadius: "0 2px 2px 0" }}
+          style={{ 
+            position: "absolute", left: -12, top: "50%", transform: "translateY(-50%)", 
+            width: 3, height: 22, borderRadius: "0 3px 3px 0",
+            background: `linear-gradient(180deg, ${accent}, rgba(137,180,250,0.8))`,
+            boxShadow: `0 0 10px ${accent}40`
+          }}
         />
       )}
       {count > 0 && !active && (
         <div style={{ 
-          position: "absolute", top: -2, right: -2, background: accent, color: "#1e1e2e", 
-          fontSize: 9, fontWeight: 800, width: 14, height: 14, borderRadius: "50%",
-          display: "flex", alignItems: "center", justifyContent: "center"
+          position: "absolute", top: -3, right: -3, background: accent, color: "#1e1e2e", 
+          fontSize: 9, fontWeight: 800, width: 16, height: 16, borderRadius: "50%",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: `0 0 8px ${accent}50`,
+          animation: "breathe 2s ease-in-out infinite"
         }}>
           {count > 9 ? "9+" : count}
         </div>

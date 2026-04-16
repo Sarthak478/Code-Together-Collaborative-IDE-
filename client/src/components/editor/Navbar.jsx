@@ -1,12 +1,12 @@
 import { 
-  Settings, 
-  LogOut, 
+  SlidersHorizontal, 
+  DoorOpen, 
   Video, 
   VideoOff, 
-  Zap, 
+  Rocket, 
   ShieldCheck, 
   User,
-  Hash,
+  AtSign,
   Crown,
   UserPlus,
   Check
@@ -52,13 +52,13 @@ export default function Navbar({
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: 8 }}>
           <div style={{ 
-            background: accent, width: 28, height: 28, borderRadius: 8, 
+            background: `linear-gradient(135deg, ${accent}, rgba(137,180,250,0.9))`, width: 30, height: 30, borderRadius: 10, 
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: `0 0 15px ${accent}44`
+            boxShadow: `0 0 20px ${accent}44, 0 0 40px ${accent}15`
           }}>
-            <Zap size={16} color="#fff" fill="#fff" />
+            <Rocket size={16} color="#fff" />
           </div>
-          <span style={{ fontWeight: 800, fontSize: 16, letterSpacing: "-0.5px", color: textColor }}>
+          <span style={{ fontFamily: "'Space Grotesk', 'Inter', sans-serif", fontWeight: 700, fontSize: 17, letterSpacing: "-0.03em", background: "linear-gradient(135deg, #e9e6f9, #cba6f7)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
             CodeTogether
           </span>
         </div>
@@ -69,15 +69,17 @@ export default function Navbar({
             borderRadius: 8, display: "flex", alignItems: "center", gap: 6,
             border: `1px solid ${borderCol}`
           }}>
-            <Hash size={12} opacity={0.5} />
-            <span style={{ color: "#cdd6f4", fontSize: 12, fontFamily: "monospace", fontWeight: 600 }}>{roomId}</span>
+            <AtSign size={12} opacity={0.5} />
+            <span style={{ color: "#cdd6f4", fontSize: 12, fontFamily: "'JetBrains Mono', 'Fira Code', monospace", fontWeight: 500, letterSpacing: "0.02em" }}>{roomId}</span>
           </div>
           
           <div style={{ 
-            background: "rgba(203, 166, 247, 0.1)", color: "#cba6f7", 
-            fontSize: 11, padding: "4px 10px", borderRadius: 8, 
-            textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.5px",
-            border: "1px solid rgba(203, 166, 247, 0.2)"
+            background: "rgba(203, 166, 247, 0.08)", color: "#cba6f7", 
+            fontSize: 10, padding: "4px 10px", borderRadius: 8, 
+            textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.08em",
+            fontFamily: "'Manrope', sans-serif",
+            border: "1px solid rgba(203, 166, 247, 0.15)",
+            backgroundImage: "linear-gradient(135deg, rgba(203,166,247,0.12), rgba(137,180,250,0.08))"
           }}>
             {actualRoomType}
           </div>
@@ -100,9 +102,13 @@ export default function Navbar({
         <div style={{ 
           display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", 
           background: "rgba(255,255,255,0.03)", borderRadius: 10,
-          border: `1px solid ${borderCol}`
+          border: `1px solid ${borderCol}`,
+          backgroundImage: "linear-gradient(135deg, rgba(166,227,161,0.03), transparent)"
         }}>
-          <div className="ide-icon-pulse" style={{ width: 6, height: 6, borderRadius: "50%", background: "#a6e3a1" }} />
+          <div style={{ position: "relative" }}>
+            <div className="ide-icon-pulse" style={{ width: 6, height: 6, borderRadius: "50%", background: "#a6e3a1" }} />
+            <div style={{ position: "absolute", top: -2, left: -2, width: 10, height: 10, borderRadius: "50%", border: "1px solid rgba(166,227,161,0.3)", animation: "breathe 2s ease-in-out infinite" }} />
+          </div>
           <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.8 }}>@{username}</span>
         </div>
 
@@ -152,7 +158,7 @@ export default function Navbar({
           onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
           onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
         >
-          <Settings size={18} />
+          <SlidersHorizontal size={18} />
         </button>
 
         <button
@@ -171,7 +177,7 @@ export default function Navbar({
           onMouseEnter={e => { e.currentTarget.style.background = "#f38ba8"; e.currentTarget.style.color = "#1e1e2e" }}
           onMouseLeave={e => { e.currentTarget.style.background = "rgba(243, 139, 168, 0.1)"; e.currentTarget.style.color = "#f38ba8" }}
         >
-          <LogOut size={18} />
+          <DoorOpen size={18} />
         </button>
       </div>
     </div>

@@ -734,8 +734,37 @@ app.get("/git/status", async (req, res) => {
   }
 });
 
+/* -------------------- ERROR MAPPING HELPER -------------------- */
+const simplifyGitError = (err) => {
+  const msg = err.message || String(err);
+  
+  if (msg.includes("Authentication failed") || msg.includes("Invalid username or password")) {
+    return "Your GitHub Token (PAT) is invalid or expired. Please check your settings.";
+  }
+  if (msg.includes("permission denied") || msg.includes("403")) {
+    return "Permission denied. Ensure your token has 'repo' scope enabled.";
+  }
+  if (msg.includes("remote: Repository not found")) {
+    return "GitHub repository not found. Please check the URL.";
+  }
+  if (msg.includes("couldn't find remote ref")) {
+    return "Branch not found on GitHub. Try pushing your code first.";
+  }
+  if (msg.includes("rejected") || msg.includes("non-fast-forward")) {
+    return "Sync blocked. Someone else has changed these files—try pulling changes first.";
+  }
+  if (msg.includes("CONFLICT") || msg.includes("Automatic merge failed")) {
+    return "Merge conflict! You'll need to manually resolve differences in the files.";
+  }
+  if (msg.includes("already exists") && msg.includes("remote origin")) {
+    return "Remote already exists. We've updated it to your new URL.";
+  }
+  
+  return msg.split(':').pop().trim() || "An unexpected Git error occurred.";
+};
+
 app.post("/git/init", async (req, res) => {
-  const { roomId } = req.body;
+  const { roomId, defaultBranch = "main", authorName, authorEmail } = req.body;
   try {
     const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
     if (!existsSync(roomCwd)) {
@@ -743,9 +772,18 @@ app.post("/git/init", async (req, res) => {
     }
     const git = getGit(roomId);
     await git.init();
-    res.json({ success: true, message: "Git initialized." });
+    
+    // Set default branch immediately
+    await git.checkout(["-b", defaultBranch]);
+    
+    // Configure author if provided
+    if (authorName) await git.addConfig("user.name", authorName);
+    if (authorEmail) await git.addConfig("user.email", authorEmail);
+    
+    res.json({ success: true, message: `Git initialized on '${defaultBranch}' branch.` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Init error:", err);
+    res.status(500).json({ error: simplifyGitError(err) });
   }
 });
 
@@ -843,14 +881,7 @@ app.post("/git/push", async (req, res) => {
     res.json({ success: true, message: `Pushed to ${currentBranch}` });
   } catch (err) {
     console.error("Push error:", err);
-
-    // Handle authentication errors
-    if (err.message.includes("Authentication failed") || err.message.includes("Invalid username or password")) {
-      return res.status(401).json({ error: "Authentication failed. Please check your GitHub PAT." });
-    }
-
-    // Handle other errors
-    res.status(500).json({ error: err.message || "Failed to push to GitHub" });
+    res.status(500).json({ error: simplifyGitError(err) });
   }
 });
 
@@ -881,24 +912,12 @@ app.post("/git/pull", async (req, res) => {
     const authUrl = remoteUrl.replace("https://github.com/", `https://${username}:${pat}@github.com/`);
 
     // Pull changes
-    await git.pull(authUrl, currentBranch, { "--no-rebase": null });
+    await git.pull(authUrl, currentBranch, { "--no-rebase": null, "--allow-unrelated-histories": null });
 
     res.json({ success: true, message: `Pulled from ${currentBranch}` });
   } catch (err) {
     console.error("Pull error:", err);
-
-    // Handle authentication errors
-    if (err.message.includes("Authentication failed") || err.message.includes("Invalid username or password")) {
-      return res.status(401).json({ error: "Authentication failed. Please check your GitHub PAT." });
-    }
-
-    // Handle merge conflicts
-    if (err.message.includes("CONFLICT") || err.message.includes("Automatic merge failed")) {
-      return res.status(409).json({ error: "Merge conflict detected. Please resolve conflicts manually." });
-    }
-
-    // Handle other errors
-    res.status(500).json({ error: err.message || "Failed to pull from GitHub" });
+    res.status(500).json({ error: simplifyGitError(err) });
   }
 });
 
@@ -907,19 +926,48 @@ app.post("/git/user-repos", async (req, res) => {
   if (!pat) return res.status(400).json({ error: "PAT required" });
 
   try {
+    // Intelligent Token Detection
+    const isFineGrained = pat.startsWith("github_pat_");
+    const authHeader = isFineGrained ? `Bearer ${pat}` : `token ${pat}`;
+    
+    const headers = {
+      "Authorization": authHeader,
+      "Accept": "application/vnd.github.v3+json",
+    };
+
+    // Fine-grained tokens perform better with the specific API version header
+    if (isFineGrained) {
+      headers["X-GitHub-Api-Version"] = "2022-11-28";
+    }
+
+    console.log(`[GitHub API] Fetching repos using ${isFineGrained ? "Fine-grained" : "Classic"} token prefix.`);
+
     const response = await axios.get("https://api.github.com/user/repos", {
-      params: { sort: "updated", per_page: 100 },
-      headers: {
-        "Authorization": `token ${pat}`,
-        "Accept": "application/vnd.github.v3+json"
-      }
+      params: { 
+        sort: "updated", 
+        per_page: 100,
+        type: "all",
+        affiliation: "owner,collaborator,organization_member"
+      },
+      headers
     });
+
+    if (response.data.length === 0) {
+      // Diagnostic log for empty results
+      console.warn(`[GitHub API] Success but 0 repos found. Token identity: ${pat.substring(0, 10)}...`);
+    }
+
     res.json(response.data.map(r => ({ name: r.full_name, url: r.clone_url })));
   } catch (err) {
-    console.error("Fetch repos error:", err.response?.data || err.message);
-    res.status(err.response?.status || 500).json({
-      error: err.response?.data?.message || err.message || "Failed to fetch repositories"
-    });
+    const errorData = err.response?.data || {};
+    console.error("Fetch repos error:", errorData.message || err.message);
+    
+    // Provide a more descriptive error if we can
+    const friendlyError = errorData.message?.includes("Bad credentials") 
+      ? "Invalid GitHub token. Please check your token and try again."
+      : (errorData.message || "Failed to fetch repositories");
+
+    res.status(err.response?.status || 500).json({ error: friendlyError });
   }
 });
 

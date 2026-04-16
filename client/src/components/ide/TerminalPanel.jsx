@@ -215,6 +215,7 @@ export default function TerminalPanel({ roomId, height, isDark, borderCol, heade
                 style={{
                   display: "flex", alignItems: "center", gap: 6, padding: "4px 12px", 
                   cursor: "pointer", fontSize: 11, fontWeight: 600,
+                  fontFamily: "'Manrope', sans-serif",
                   color: isActive ? textColor : textColor + "88",
                   background: isActive ? "transparent" : "rgba(0,0,0,0.1)",
                   borderRight: `1px solid ${borderCol}`,
@@ -222,7 +223,7 @@ export default function TerminalPanel({ roomId, height, isDark, borderCol, heade
                 }}
               >
                 <span style={{ color: isActive ? accent : "inherit", fontSize: 10 }}>⬤</span>
-                <span style={{ flex: 1 }}>Terminal {term.id}</span>
+                <span style={{ flex: 1, fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: "0.02em" }}>Terminal {term.id}</span>
                 {terminals.length > 1 && (
                   <X 
                     size={10} 

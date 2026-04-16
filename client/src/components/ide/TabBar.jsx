@@ -32,7 +32,7 @@ export default function TabBar({ openFiles, activeFile, onSelectFile, onCloseFil
             }}
           >
             <span style={{ fontSize: 12 }}>{getIcon(name)}</span>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120 }}>{name}</span>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120, fontFamily: "'Manrope', sans-serif", fontWeight: isActive ? 600 : 400, letterSpacing: "0.01em" }}>{name}</span>
             <span
               className="tab-close"
               onClick={(e) => { e.stopPropagation(); onCloseFile(filePath) }}
