@@ -304,7 +304,7 @@ export default function SettingsPanel({
                </div>
             </div>
           )}
-
+ 
           {/* Active Users */}
           {isHost && activeUsers.length > 1 && (
             <div style={{ marginBottom: 24 }}>
