@@ -1,23 +1,80 @@
 /* ═══════════════════════════════════════════════════════════════
    IDE-specific styles — LiveShare Collaborative IDE
+   Design System: "The Neon Substrate" — Vibe Coder Edition
    ═══════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
-/* ── Glassmorphism & UI Roots ──────────────────────────── */
+/* ── Design Tokens (Neon Substrate Palette) ─────────────── */
 :root {
-  --ide-glass: rgba(255, 255, 255, 0.05);
-  --ide-glass-border: rgba(255, 255, 255, 0.08);
+  /* Surface hierarchy */
+  --ns-void:            #0d0d1a;
+  --ns-surface:         #121220;
+  --ns-surface-mid:     #181828;
+  --ns-surface-high:    #1e1e2f;
+  --ns-surface-highest: #242437;
+  --ns-surface-bright:  #2a2a3f;
+
+  /* Neon accents */
+  --ns-primary:   #cba6f7;
+  --ns-secondary: #89b4fa;
+  --ns-tertiary:  #ff94a5;
+  --ns-green:     #a6e3a1;
+  --ns-amber:     #f9e2af;
+
+  /* Ghost borders */
+  --ns-ghost:       rgba(71, 70, 86, 0.25);
+  --ns-ghost-faint: rgba(71, 70, 86, 0.12);
+
+  /* Glassmorphism */
+  --ide-glass: rgba(24, 24, 40, 0.70);
+  --ide-glass-border: rgba(203, 166, 247, 0.08);
+  --ide-glass-highlight: rgba(203, 166, 247, 0.12);
   --ide-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+
+  /* Ambient glow */
+  --ns-glow-primary: 0 0 40px rgba(203, 166, 247, 0.08);
+  --ns-glow-hover:   0 0 20px rgba(203, 166, 247, 0.15);
+  --ns-glow-intense: 0 0 30px rgba(137, 180, 250, 0.2);
 }
 
+/* ── Atmospheric Base Layer ────────────────────────────── */
+.ide-root {
+  position: relative;
+}
+
+.ide-root::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  /* Subtle grid pattern — the "hacker matrix" substrate */
+  background-image:
+    linear-gradient(rgba(71, 70, 86, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(71, 70, 86, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* All children sit above the grid */
+.ide-root > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Glassmorphism Core ────────────────────────────────── */
 .ide-glass-effect {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
   background: var(--ide-glass);
   border: 1px solid var(--ide-glass-border);
+  /* Top-edge highlight simulating light hitting glass */
+  box-shadow:
+    inset 0 1px 0 0 var(--ide-glass-highlight),
+    var(--ns-glow-primary);
 }
 
+/* ── File Tree ─────────────────────────────────────────── */
 .ide-file-tree {
   user-select: none;
 }
@@ -28,20 +85,23 @@
   gap: 6px;
   padding: 4px 8px 4px 0;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .ide-file-item:hover {
   opacity: 1 !important;
+  background: rgba(203, 166, 247, 0.06);
 }
 
 .ide-file-item.active {
   font-weight: 600;
+  background: rgba(203, 166, 247, 0.1);
+  box-shadow: inset 3px 0 0 var(--ns-primary);
 }
 
 /* ── Tab Bar ─────────────────────────────────────────── */
@@ -50,6 +110,8 @@
   align-items: stretch;
   overflow-x: auto;
   scrollbar-width: none;
+  /* Subtle glow line under tabs */
+  box-shadow: inset 0 -1px 0 0 var(--ns-ghost-faint);
 }
 
 .ide-tab-bar::-webkit-scrollbar {
@@ -64,14 +126,15 @@
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
-  border-right: 1px solid var(--ide-border, #313244);
-  transition: background 0.15s ease;
+  border-right: 1px solid var(--ns-ghost-faint);
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
   position: relative;
   min-width: 0;
 }
 
 .ide-tab:hover {
   opacity: 1 !important;
+  background: rgba(137, 180, 250, 0.06);
 }
 
 .ide-tab .tab-close {
@@ -81,9 +144,9 @@
   justify-content: center;
   width: 18px;
   height: 18px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 11px;
-  transition: opacity 0.15s, background 0.15s;
+  transition: opacity 0.2s, background 0.2s, transform 0.15s;
   flex-shrink: 0;
 }
 
@@ -93,6 +156,8 @@
 
 .ide-tab .tab-close:hover {
   opacity: 1;
+  background: rgba(243, 139, 168, 0.15);
+  transform: scale(1.1);
 }
 
 /* ── Terminal ────────────────────────────────────────── */
@@ -110,8 +175,12 @@
 }
 
 .ide-terminal-container .xterm-viewport::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(203, 166, 247, 0.15);
   border-radius: 4px;
+}
+
+.ide-terminal-container .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(203, 166, 247, 0.25);
 }
 
 /* ── Resize Handle ───────────────────────────────────── */
@@ -121,14 +190,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s;
+  transition: background 0.2s, box-shadow 0.2s;
   position: relative;
   z-index: 5;
 }
 
 .ide-resize-handle:hover,
 .ide-resize-handle.dragging {
-  background: rgba(137, 180, 250, 0.3) !important;
+  background: linear-gradient(90deg, transparent, rgba(137, 180, 250, 0.3), transparent) !important;
+  box-shadow: 0 0 12px rgba(137, 180, 250, 0.15);
 }
 
 .ide-resize-handle::after {
@@ -136,12 +206,13 @@
   width: 40px;
   height: 2px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.15);
-  transition: background 0.15s;
+  background: rgba(203, 166, 247, 0.2);
+  transition: background 0.2s, width 0.2s;
 }
 
 .ide-resize-handle:hover::after {
   background: rgba(137, 180, 250, 0.6);
+  width: 60px;
 }
 
 /* ── Status Bar ──────────────────────────────────────── */
@@ -152,7 +223,9 @@
   height: 24px;
   padding: 0 10px;
   font-size: 11px;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Manrope', 'Inter', system-ui, sans-serif;
+  /* Gradient overlay for premium feel */
+  background-image: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 50%, rgba(255,255,255,0.03) 100%);
 }
 
 .ide-status-bar .status-item {
@@ -161,25 +234,28 @@
   gap: 4px;
   padding: 0 6px;
   cursor: default;
-  transition: background 0.15s;
+  transition: background 0.2s, color 0.2s;
   height: 100%;
+  font-weight: 500;
 }
 
 .ide-status-bar .status-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* ── Extensions Panel ────────────────────────────────── */
 .ide-ext-card {
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 12px;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s;
+  border: 1px solid var(--ns-ghost-faint);
 }
 
 .ide-ext-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(203, 166, 247, 0.08);
+  border-color: rgba(203, 166, 247, 0.2);
 }
 
 .ide-tool-btn {
@@ -187,18 +263,19 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: transform 0.1s ease, background 0.15s, border-color 0.15s;
+  transition: transform 0.15s ease, background 0.2s, border-color 0.2s, box-shadow 0.2s;
   border: 1px solid transparent;
 }
 
 .ide-tool-btn:hover {
   transform: translateX(3px);
+  box-shadow: 0 0 12px rgba(137, 180, 250, 0.08);
 }
 
 .ide-tool-btn:active {
-  transform: translateX(1px) scale(0.99);
+  transform: translateX(1px) scale(0.98);
 }
 
 /* ── Context Menu ────────────────────────────────────── */
@@ -206,10 +283,12 @@
   position: fixed;
   z-index: 9999;
   min-width: 180px;
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 4px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  animation: contextMenuIn 0.12s ease;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--ns-ghost);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: contextMenuIn 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .ide-context-menu-item {
@@ -217,25 +296,26 @@
   align-items: center;
   gap: 8px;
   padding: 7px 12px;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 12px;
-  transition: background 0.1s;
+  transition: background 0.15s, color 0.15s;
 }
 
 .ide-context-menu-item:hover {
-  background: rgba(137, 180, 250, 0.15);
+  background: rgba(203, 166, 247, 0.12);
 }
 
 .ide-context-menu-sep {
   height: 1px;
   margin: 4px 8px;
-  opacity: 0.3;
+  opacity: 0.2;
+  background: linear-gradient(90deg, transparent, var(--ns-primary), transparent);
 }
 
 @keyframes contextMenuIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale(0.92) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 /* ── Scrollbar (for panels) ──────────────────────────── */
@@ -248,15 +328,15 @@
 }
 
 .ide-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(203, 166, 247, 0.12);
   border-radius: 3px;
 }
 
 .ide-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(203, 166, 247, 0.25);
 }
 
-/* ── Premium Buttons & Icons ───────────────────────────── */
+/* ── Premium Buttons & Glow Effects ──────────────────── */
 .ide-btn-premium {
   display: flex;
   align-items: center;
@@ -265,36 +345,77 @@
   border-radius: 10px;
   font-weight: 600;
   font-size: 13px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Shimmer/sheen effect on hover */
+.ide-btn-premium::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; right: 0; bottom: 0;
+  width: 200%;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(255, 255, 255, 0.08) 45%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.08) 55%,
+    transparent 60%,
+    transparent 100%
+  );
+  transition: transform 0.6s ease;
+  pointer-events: none;
+}
+
+.ide-btn-premium:hover::before {
+  transform: translateX(50%);
 }
 
 .ide-btn-premium:hover {
-  transform: translateY(-1.5px);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
-  filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow: var(--ns-glow-hover);
+  filter: brightness(1.15);
 }
 
 .ide-btn-premium:active {
-  transform: scale(0.97);
+  transform: scale(0.97) translateY(0);
+  filter: brightness(0.95);
 }
 
+/* Glowing icon pulse animation */
 .ide-icon-pulse {
-  animation: iconPulse 2s infinite;
+  animation: iconPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 @keyframes iconPulse {
-  0% { opacity: 0.6; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.1); }
-  100% { opacity: 0.6; transform: scale(1); }
+  0% { opacity: 0.6; transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+  50% { opacity: 1; transform: scale(1.1); filter: drop-shadow(0 0 6px var(--ns-primary)); }
+  100% { opacity: 0.6; transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
 }
 
-/* ── Floating Navbar ────────────────────────────────── */
+/* ── Floating Navbar — Ambient Halo ─────────────────── */
 .ide-navbar-floating {
   margin: 10px;
-  border-radius: 12px;
-  box-shadow: var(--ide-shadow);
+  border-radius: 16px;
   height: 52px !important;
+  /* Ambient glow halo — the navbar "breathes" */
+  box-shadow:
+    var(--ide-shadow),
+    0 0 60px rgba(203, 166, 247, 0.06),
+    inset 0 1px 0 0 var(--ide-glass-highlight);
+  border-top: 1px solid rgba(203, 166, 247, 0.15) !important;
+  transition: box-shadow 0.4s ease;
+}
+
+.ide-navbar-floating:hover {
+  box-shadow:
+    var(--ide-shadow),
+    0 0 80px rgba(203, 166, 247, 0.1),
+    inset 0 1px 0 0 var(--ide-glass-highlight);
 }
 
 /* ── Animations ──────────────────────────────────────── */
@@ -308,20 +429,105 @@
   to { opacity: 1; transform: translateX(0); }
 }
 
+@keyframes fadeGlow {
+  0%, 100% { box-shadow: 0 0 20px rgba(203, 166, 247, 0.05); }
+  50% { box-shadow: 0 0 40px rgba(203, 166, 247, 0.12); }
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+/* The spin animation used by the loading spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ── Input inline rename ─────────────────────────────── */
 .ide-rename-input {
-  background: transparent;
-  border: 1px solid rgba(137, 180, 250, 0.5);
-  border-radius: 3px;
+  background: rgba(203, 166, 247, 0.05);
+  border: 1px solid rgba(203, 166, 247, 0.35);
+  border-radius: 6px;
   color: inherit;
   font-size: 13px;
-  padding: 1px 4px;
+  padding: 2px 6px;
   outline: none;
   width: 100%;
   font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .ide-rename-input:focus {
-  border-color: rgba(137, 180, 250, 0.8);
-  box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.15);
+  border-color: var(--ns-primary);
+  box-shadow: 0 0 0 3px rgba(203, 166, 247, 0.12), 0 0 12px rgba(203, 166, 247, 0.08);
+}
+
+/* ── Vibe Coder Micro-Enhancement Layer ──────────────── */
+
+/* Neon accent line on active panel indicator */
+.ide-root [style*="layoutId"] {
+  box-shadow: 0 0 8px currentColor;
+}
+
+/* Select dropdown styling for dark mode */
+.ide-root select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' stroke='%23cba6f7' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+  padding-right: 20px !important;
+}
+
+/* Global selection color */
+.ide-root ::selection {
+  background: rgba(203, 166, 247, 0.25);
+  color: #e9e6f9;
+}
+
+/* Toast glow enhancement */
+.ide-root [style*="borderLeft: 4px solid"] {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), -4px 0 12px rgba(203, 166, 247, 0.08);
+}
+
+/* Smooth focus ring for all focusable elements */
+.ide-root button:focus-visible,
+.ide-root input:focus-visible,
+.ide-root select:focus-visible {
+  outline: 2px solid rgba(203, 166, 247, 0.4);
+  outline-offset: 2px;
+}
+
+/* ── User Avatar Micro-animations ────────────────────── */
+.ide-root div[style*="borderRadius: \"50%\""][style*="fontWeight: \"bold\""] {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ide-root div[style*="borderRadius: \"50%\""][style*="fontWeight: \"bold\""]:hover {
+  box-shadow: 0 0 12px rgba(203, 166, 247, 0.3);
+}
+
+/* ── Monaco Editor Container Glow ────────────────────── */
+.monaco-editor {
+  border-radius: 0 !important;
+}
+
+.monaco-editor .overflow-guard {
+  border-radius: 0 !important;
+}
+
+/* Embed the vibe into the monaco minimap */
+.monaco-editor .minimap {
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.monaco-editor:hover .minimap {
+  opacity: 1;
+}
+
+/* ── Panel Slide Enhancements ────────────────────────── */
+.ide-root [style*="overflow: hidden"][style*="borderLeft: 1px"] {
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3), -2px 0 8px rgba(203, 166, 247, 0.04);
 }

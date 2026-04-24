@@ -167,7 +167,7 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
       : `Are you sure you want to delete "${itemName}"?`
     
     if (window.confirm(confirmMsg)) {
-      if (fs.deleteEntry) await fs.deleteEntry(path)
+      if (fs.deleteEntry) await fs.deleteEntry(path, type)
     }
   }
 
@@ -209,7 +209,7 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
         borderBottom: `1px solid ${borderCol}`, display: "flex", 
         alignItems: "center", justifyContent: "space-between" 
       }}>
-        <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", opacity: 0.6, letterSpacing: "1px" }}>
+        <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", opacity: 0.6, letterSpacing: "0.08em", fontFamily: "'Manrope', sans-serif" }}>
           Explorer
         </div>
         <div style={{ display: "flex", gap: 4 }}>
@@ -470,7 +470,7 @@ function FolderNode({ entry, fs, activeFile, onFileClick, expandedFolders, toggl
             style={{ flex: 1, background: "rgba(255,255,255,0.08)", border: `1px solid ${accent}`, borderRadius: 4, color: textColor, fontSize: 12, padding: "2px 6px", outline: "none" }}
           />
         ) : (
-          <span style={{ fontSize: 13, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 13, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Manrope', sans-serif" }}>
             {entry.name}
           </span>
         )}
@@ -657,7 +657,7 @@ function FileItem({ file, isActive, onClick, textColor, accent, depth, canEdit, 
       }}
     >
       {getFileIcon ? getFileIcon(file.name) : <FileCode size={14} opacity={isActive ? 1 : 0.6} />}
-      <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+      <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, fontFamily: "'Manrope', sans-serif" }}>
         {file.name}
       </span>
       {canEdit && isHovered && (

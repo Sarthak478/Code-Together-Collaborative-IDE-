@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&family=Source+Code+Pro:wght@400;500;700&family=Ubuntu+Mono:wght@400;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&family=Source+Code+Pro:wght@400;500;700&family=Ubuntu+Mono:wght@400;700&family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 @import './ide.css';
 
 html,
@@ -8,16 +8,37 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
+  /* Vibe: No harsh pure-black backgrounds, the void is deep navy */
+  background: #0d0d1a;
 }
+
+/* ── Landing page scroll override ──────────────────────── */
+/* When the landing page is mounted, lift the overflow:hidden so content
+   can scroll naturally at any font size or zoom level.                  */
+html:has(.landing-root),
+body:has(.landing-root),
+#root:has(.landing-root) {
+  overflow: auto;
+  height: auto;
+  min-height: 100%;
+}
+
+/* The background grid + particles are absolutely positioned inside
+   landing-root, so we need it to be at least full-viewport tall      */
+.landing-root {
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
 
 /* Reset button defaults so our inline styles take over fully */
 button {
-  font-family: inherit;
-  transition: opacity 0.15s, border-color 0.15s;
+  font-family: 'Manrope', 'Inter', system-ui, sans-serif;
+  transition: opacity 0.2s, border-color 0.2s, transform 0.15s, box-shadow 0.25s;
 }
 
 button:hover {
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 /* CodeMirror full-height fix */
@@ -37,4 +58,45 @@ button:hover {
 @keyframes slideInRight {
   from { transform: translateX(100%); opacity: 0.5; }
   to { transform: translateX(0); opacity: 1; }
+}
+
+/* ── Global Vibe Scrollbar ─────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(203, 166, 247, 0.15);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(203, 166, 247, 0.3);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(203, 166, 247, 0.15) transparent;
+}
+
+/* ── Smooth transitions for all interactive elements ───── */
+a, button, input, select, textarea {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Global text rendering for crispness ───────────────── */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }

@@ -6,6 +6,7 @@ import {
   Zap, 
   ShieldCheck, 
   User,
+  UserPlus,
   Hash,
   Crown,
   Activity,
@@ -16,7 +17,7 @@ import {
 export default function Navbar({
   roomId, actualRoomType, isHost, username,
   callActive, onToggleCall,
-  onToggleSettings, onLeave, onToggleGit,
+  onToggleSettings, onLeave, onToggleGit, onToggleAccessControl, onToggleInvite,
   headerBg, borderCol, textColor, accent,
   gitStatus
 }) {
@@ -220,8 +221,73 @@ export default function Navbar({
           {callActive ? <VideoOff size={16} /> : <Video size={16} />}
           <span>{callActive ? "End Call" : "Join Call"}</span>
         </button>
+
+        {isHost && (
+          <button 
+            onClick={onToggleAccessControl}
+            title="Access Control"
+            style={{ 
+              background: colors.surface, 
+              border: `1px solid ${colors.border}`, 
+              cursor: "pointer", 
+              width: 40, 
+              height: 40, 
+              borderRadius: 10,
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center",
+              color: colors.info, 
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = "translateY(-2px)"
+              e.currentTarget.style.background = isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,1)"
+              e.currentTarget.style.borderColor = colors.info
+              e.currentTarget.style.boxShadow = `0 4px 12px ${colors.info}40`
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = "translateY(0)"
+              e.currentTarget.style.background = colors.surface
+              e.currentTarget.style.borderColor = colors.border
+              e.currentTarget.style.boxShadow = "none"
+            }}
+          >
+            <ShieldCheck size={18} />
+          </button>
+        )}
+
+        <button 
+          onClick={onToggleInvite}
+          title="Invite Link"
+          style={{ 
+            background: colors.surface, 
+            border: `1px solid ${colors.border}`, 
+            cursor: "pointer", 
+            width: 40, 
+            height: 40, 
+            borderRadius: 10,
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center",
+            color: colors.primary, 
+            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.transform = "translateY(-2px)"
+            e.currentTarget.style.background = isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,1)"
+            e.currentTarget.style.borderColor = colors.primary
+            e.currentTarget.style.boxShadow = `0 4px 12px ${colors.primary}40`
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.transform = "translateY(0)"
+            e.currentTarget.style.background = colors.surface
+            e.currentTarget.style.borderColor = colors.border
+            e.currentTarget.style.boxShadow = "none"
+          }}
+        >
+          <UserPlus size={18} />
+        </button>
         
-       
         {/* Settings Button */}
         <button 
           onClick={onToggleSettings} 

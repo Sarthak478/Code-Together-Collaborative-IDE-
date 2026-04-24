@@ -2,6 +2,7 @@ import { useState } from "react"
 import Landing from "./components/Landing"
 import EditorRoom from "./components/EditorRoom"
 import IDERoom from "./components/IDERoom"
+import RoomWrapper from "./components/RoomWrapper"
 
 const SESSION_KEY = "ls_session"
 
@@ -65,23 +66,41 @@ export default function App() {
   // Route to IDE or Compiler based on roomMode
   if (roomMode === "ide") {
     return (
-      <IDERoom
+      <RoomWrapper
+        roomId={roomId}
+        roomType={roomType}
+        isCreating={isCreating}
+        username={username}
+        roomMode={roomMode}
+        onLeave={onLeave}
+      >
+        <IDERoom
+          roomId={roomId}
+          initialRoomType={roomType}
+          isCreating={isCreating}
+          username={username}
+          onLeave={onLeave}
+        />
+      </RoomWrapper>
+    )
+  }
+
+  return (
+    <RoomWrapper
+      roomId={roomId}
+      roomType={roomType}
+      isCreating={isCreating}
+      username={username}
+      roomMode={roomMode}
+      onLeave={onLeave}
+    >
+      <EditorRoom
         roomId={roomId}
         initialRoomType={roomType}
         isCreating={isCreating}
         username={username}
         onLeave={onLeave}
       />
-    )
-  }
-
-  return (
-    <EditorRoom
-      roomId={roomId}
-      initialRoomType={roomType}
-      isCreating={isCreating}
-      username={username}
-      onLeave={onLeave}
-    />
+    </RoomWrapper>
   )
 }

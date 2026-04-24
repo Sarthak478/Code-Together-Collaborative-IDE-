@@ -12,8 +12,11 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
   /* ── Yjs stable refs ── */
   const [editor] = useState(() => {
     const ydoc = new Y.Doc()
+    const hostToken = localStorage.getItem(`host_${roomId}`) || "";
+    const authUrl = `${WS_URL}?username=${encodeURIComponent(username)}&hostToken=${encodeURIComponent(hostToken)}`;
+
     const provider = new HocuspocusProvider({
-      url: WS_URL,
+      url: authUrl,
       name: roomId,
       document: ydoc,
     })
@@ -352,7 +355,16 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
       type: "system_kick",
       timestamp: Date.now()
     }])
-  }, [kickedUsers, editor.roomMap, editor.chatArray])
+
+    const hostToken = localStorage.getItem(`host_${roomId}`);
+    if (hostToken) {
+      fetch(`${API_URL.replace("1236", "1235")}/room/${roomId}/kick`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hostToken, username: userName })
+      }).catch(console.error);
+    }
+  }, [kickedUsers, editor.roomMap, editor.chatArray, roomId])
 
   /* ── Download code ── */
   const downloadCode = useCallback(async (e) => {

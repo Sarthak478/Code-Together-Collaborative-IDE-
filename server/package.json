@@ -4,8 +4,10 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon index.js",
-    "start": "node index.js"
+    "predev": "node kill-ports.js",
+    "dev": "concurrently \"nodemon index.js\" \"nodemon api.js\"",
+    "prestart": "node kill-ports.js",
+    "start": "concurrently \"node index.js\" \"node api.js\""
   },
   "keywords": [],
   "author": "",
@@ -22,6 +24,7 @@
     "ioredis": "^5.10.0",
     "nanoid": "^5.1.6",
     "node-pty": "^1.1.0",
+    "nodemailer": "^8.0.6",
     "simple-git": "^3.33.0",
     "ws": "^8.20.0",
     "y-redis": "^1.0.3",
@@ -29,6 +32,7 @@
     "yjs": "^13.6.30"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "nodemon": "^3.1.14"
   }
 }

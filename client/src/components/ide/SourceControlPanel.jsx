@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react"
-import { Download, Upload } from "lucide-react";
 import { API_URL } from "../../config"
 import {
   GitBranch,

@@ -116,16 +116,34 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, isHost
     return folderPath
   }, [roomId, refreshPath])
 
-  const deleteEntry = useCallback(async (path) => {
+  const deleteEntry = useCallback(async (path, type) => {
     const parts = path.split("/")
     const parentPath = parts.slice(0, -1).join("/") || "/"
+
+    if (type === "folder") {
+      const clearYjsRecursive = (dirPath) => {
+        const children = tree[dirPath] || []
+        children.forEach(c => {
+          if (c.type === "file") {
+            const ytext = getFileText(c.path)
+            if (ytext.length > 0) ydoc.transact(() => ytext.delete(0, ytext.length))
+          } else {
+            clearYjsRecursive(c.path)
+          }
+        })
+      }
+      clearYjsRecursive(path)
+    } else {
+      const ytext = getFileText(path)
+      if (ytext.length > 0) ydoc.transact(() => ytext.delete(0, ytext.length))
+    }
 
     await fetch(`${API_URL}/fs/delete`, {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ roomId, path })
     })
     refreshPath(parentPath)
-  }, [roomId, refreshPath])
+  }, [roomId, refreshPath, tree, getFileText, ydoc])
 
   const renameEntry = useCallback(async (oldPath, newName) => {
     const parts = oldPath.split("/")

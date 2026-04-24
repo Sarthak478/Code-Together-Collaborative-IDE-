@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { THEMES, FONT_FAMILIES, CURSORS } from "../../constants/editorConfigs"
 import { Section, Field, GridRow } from "../ui/SettingsLayout"
 import { 
@@ -7,14 +8,16 @@ import {
   Type, 
   MousePointer2, 
   Crown, 
-  Settings2,
+  Wrench,
   Trash2,
-  MessageSquare,
+  MessageCircle,
   Users,
   AlertTriangle,
-  GitBranch,
-  Terminal,
-  Play
+  GitFork,
+  TerminalSquare,
+  Rocket,
+  RefreshCw,
+  Check
 } from "lucide-react"
 
 import { API_URL } from "../../config"
@@ -46,16 +49,40 @@ export default function SettingsPanel({
   const activeTheme = roomTheme ?? personalPrefs.theme
   const canChangeRoom = isHost
 
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [initResult, setInitResult] = useState({ type: "", message: "" }); // type: "success" | "error"
+
   const handleInitRepo = async () => {
+    setIsInitializing(true);
+    setInitResult({ type: "", message: "" });
+
     try {
-      await fetch(`${API_URL}/git/init`, {
+      const res = await fetch(`${API_URL}/git/init`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roomId })
+        body: JSON.stringify({ 
+          roomId,
+          authorName: username,
+          authorEmail: personalPrefs.gitEmail || `${username}@codetogether.io`,
+          defaultBranch: "main" 
+        })
       });
-      if (refreshGitStatus) refreshGitStatus();
+
+      const data = await res.json();
+      
+      if (res.ok) {
+        setInitResult({ type: "success", message: "✓ Git Repository Initialized!" });
+        if (refreshGitStatus) refreshGitStatus();
+        // Clear success message after 5 seconds
+        setTimeout(() => setInitResult({ type: "", message: "" }), 5000);
+      } else {
+        setInitResult({ type: "error", message: data.error || "Failed to initialize." });
+      }
     } catch (e) {
       console.error(e);
+      setInitResult({ type: "error", message: "Connection failed. Please check your network." });
+    } finally {
+      setIsInitializing(false);
     }
   }
 
@@ -93,8 +120,8 @@ export default function SettingsPanel({
             {username?.charAt(0).toUpperCase() || "?"}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 800, fontSize: 16, color: textColor }}>{username}</div>
-            <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ fontWeight: 800, fontSize: 16, color: textColor, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "-0.02em" }}>{username}</div>
+            <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2, display: "flex", alignItems: "center", gap: 4, fontFamily: "'Manrope', sans-serif" }}>
               {isHost ? <Crown size={12} color="#f9e2af" /> : <User size={12} />}
               {isHost ? "Room Host" : "Participant"}
             </div>
@@ -115,7 +142,7 @@ export default function SettingsPanel({
         <div className="ide-scroll" style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
           {/* Personal Settings */}
           <div style={{ marginBottom: 24 }}>
-             <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 800, textTransform: "uppercase", opacity: 0.4, letterSpacing: "1px", marginBottom: 16 }}>
+             <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 800, textTransform: "uppercase", opacity: 0.4, letterSpacing: "0.08em", marginBottom: 16, fontFamily: "'Manrope', sans-serif" }}>
                 <User size={14} /> Personal Settings
              </div>
              
@@ -142,11 +169,20 @@ export default function SettingsPanel({
 
                 {/* Git Settings */}
                 <div style={{ marginTop: 8, padding: "16px", background: "rgba(255,255,255,0.02)", borderRadius: 12, border: `1px solid ${borderCol}` }}>
-                   <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 800, textTransform: "uppercase", opacity: 0.6, marginBottom: 12 }}>
-                      <GitBranch size={14} /> Git Configuration
+                   <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 800, textTransform: "uppercase", opacity: 0.6, marginBottom: 12, fontFamily: "'Manrope', sans-serif", letterSpacing: "0.08em" }}>
+                      <GitFork size={14} /> Git Configuration
                    </div>
                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-
+                      <div>
+                        <label style={{ fontSize: 11, opacity: 0.5, display: "block", marginBottom: 4 }}>Author Email</label>
+                        <input 
+                          type="text" 
+                          placeholder="your@email.com"
+                          value={personalPrefs.gitEmail || ""}
+                          onChange={e => updatePersonalPref("gitEmail", e.target.value)}
+                          style={{ width: "100%", background: inputBg, color: textColor, border: `1px solid ${borderCol}`, borderRadius: 8, padding: "8px 12px", fontSize: 12, outline: "none" }}
+                        />
+                      </div>
                       <div style={{ background: "rgba(255,255,255,0.01)", padding: 10, borderRadius: 8, border: `1px solid ${borderCol}`, borderStyle: "dashed" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 800, color: accent, marginBottom: 6 }}>
                           <GithubIcon size={14} color={accent} /> GitHub Integration
@@ -174,16 +210,30 @@ export default function SettingsPanel({
                         {personalPrefs.githubPat && personalPrefs.githubPat.trim() !== "" && roomId && (
                            <button 
                              onClick={handleInitRepo}
+                             disabled={isInitializing}
                              style={{ 
-                               width: "100%", padding: "6px 0", borderRadius: 8, background: accent, 
-                               color: "#1e1e2e", border: "none", fontSize: 10, fontWeight: 800, 
-                               cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                               marginTop: 4
+                               width: "100%", padding: "10px 0", borderRadius: 10, background: isInitializing ? "rgba(255,255,255,0.05)" : accent, 
+                               color: isInitializing ? textColor : "#1e1e2e", border: "none", fontSize: 11, fontWeight: 800, 
+                               cursor: isInitializing ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                               marginTop: 4, transition: "all 0.2s"
                              }}
                            >
-                              <Play size={10} />
-                              Initialize Git Repository
+                              {isInitializing ? <RefreshCw size={14} className="ide-icon-pulse" /> : <Rocket size={12} />}
+                              <span style={{ fontFamily: "'Manrope', sans-serif" }}>{isInitializing ? "Initializing..." : "Initialize Git Repository"}</span>
                            </button>
+                        )}
+
+                        {initResult.message && (
+                           <div style={{ 
+                             marginTop: 12, padding: "10px 14px", borderRadius: 10, 
+                             background: initResult.type === "success" ? "rgba(166, 227, 161, 0.1)" : "rgba(243, 139, 168, 0.1)",
+                             border: `1px solid ${initResult.type === "success" ? "rgba(166, 227, 161, 0.3)" : "rgba(243, 139, 168, 0.3)"}`,
+                             fontSize: 11, color: initResult.type === "success" ? "#a6e3a1" : "#f38ba8",
+                             display: "flex", alignItems: "center", gap: 8, animation: "fadeIn 0.3s ease"
+                           }}>
+                             {initResult.type === "success" ? <Check size={14} /> : <AlertTriangle size={14} />}
+                             <span style={{ fontWeight: 600 }}>{initResult.message}</span>
+                           </div>
                         )}
                         <div style={{ fontSize: 9, opacity: 0.4, marginTop: 6, fontStyle: "italic" }}>
                           Requires <b>'repo'</b> scope. Classic tokens are recommended.
@@ -196,7 +246,7 @@ export default function SettingsPanel({
 
           {/* Room Settings */}
           <div style={{ marginBottom: 24, padding: "20px", background: "rgba(255,255,255,0.02)", borderRadius: 16, border: `1px solid ${borderCol}` }}>
-             <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 800, textTransform: "uppercase", opacity: 0.7, letterSpacing: "1px", marginBottom: 16, color: accent }}>
+             <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 800, textTransform: "uppercase", opacity: 0.7, letterSpacing: "0.08em", marginBottom: 16, color: accent, fontFamily: "'Manrope', sans-serif" }}>
                 <Crown size={14} /> Room Controls
              </div>
 
@@ -235,13 +285,13 @@ export default function SettingsPanel({
           {/* Moderation */}
           {isHost && (
             <div style={{ marginBottom: 24 }}>
-               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 800, textTransform: "uppercase", opacity: 0.4, letterSpacing: "1px", marginBottom: 16 }}>
-                  <Settings2 size={14} /> Moderation
+               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 800, textTransform: "uppercase", opacity: 0.4, letterSpacing: "0.08em", marginBottom: 16, fontFamily: "'Manrope', sans-serif" }}>
+                  <Wrench size={14} /> Moderation
                </div>
                
                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer", padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 10, border: `1px solid ${borderCol}` }}>
-                    <MessageSquare size={14} opacity={0.6} />
+                    <MessageCircle size={14} opacity={0.6} />
                     <span style={{ flex: 1 }}>Enable Chat</span>
                     <input type="checkbox" checked={chatEnabled} onChange={e => onToggleChatEnabled(e.target.checked)} style={{ accentColor: accent }} />
                   </label>
@@ -258,7 +308,7 @@ export default function SettingsPanel({
           {/* Active Users */}
           {isHost && activeUsers.length > 1 && (
             <div style={{ marginBottom: 24 }}>
-               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 800, textTransform: "uppercase", opacity: 0.4, letterSpacing: "1px", marginBottom: 16 }}>
+               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 800, textTransform: "uppercase", opacity: 0.4, letterSpacing: "0.08em", marginBottom: 16, fontFamily: "'Manrope', sans-serif" }}>
                   <Users size={14} /> Manage Participants
                </div>
                
