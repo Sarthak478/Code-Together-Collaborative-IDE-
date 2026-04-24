@@ -13,12 +13,16 @@ import VideoCall from "./editor/VideoCall"
 import SourceControlPanel from "./ide/SourceControlPanel"
 import AIPanel from "./ide/AIPanel"
 import DiffModal from "./ui/DiffModal"
+import AccessControlModal from "./editor/AccessControlModal"
+import InviteModal from "./editor/InviteModal"
 import { useState } from "react"
 
 /* ─── EditorRoom ────────────────────────────────────────────────── */
 export default function EditorRoom({ roomId, initialRoomType, isCreating, username, onLeave }) {
   const room = useEditorRoom({ roomId, initialRoomType, isCreating, username, onLeave })
   const [activeDiff, setActiveDiff] = useState(null)
+  const [accessControlOpen, setAccessControlOpen] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false)
 
   return (
     <div
@@ -30,6 +34,20 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
         cursor: room.personalPrefs.cursor
       }}
     >
+      <AccessControlModal 
+        isOpen={accessControlOpen} 
+        onClose={() => setAccessControlOpen(false)} 
+        roomId={roomId} 
+      />
+
+      <InviteModal 
+        isOpen={inviteOpen} 
+        onClose={() => setInviteOpen(false)} 
+        roomId={roomId} 
+        roomType={room.actualRoomType}
+        isHost={room.isHost}
+        username={username}
+      />
 
       {/* ── Toasts ── */}
       <div style={{ position: "fixed", bottom: 60, right: 20, zIndex: 1000, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
@@ -60,10 +78,12 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
         username={username}
         callActive={room.callActive}
         onToggleCall={() => room.setCallActive(!room.callActive)}
+        onToggleSettings={() => room.setSettingsOpen(true)}
+        onToggleGit={() => room.toggleRightPanel("git")}
+        onToggleAccessControl={() => setAccessControlOpen(!accessControlOpen)}
+        onToggleInvite={() => setInviteOpen(!inviteOpen)}
         chatOpen={room.chatOpen}
         onToggleChat={() => room.setChatOpen(o => !o)}
-        onToggleSettings={() => room.setSettingsOpen(o => !o)}
-        onToggleGit={() => room.toggleRightPanel("git")}
         onLeave={() => room.setExitConfirmOpen(true)}
         headerBg={room.headerBg}
         borderCol={room.borderCol}

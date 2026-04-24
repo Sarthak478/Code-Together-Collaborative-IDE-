@@ -13,6 +13,7 @@ import { simpleGit } from "simple-git";
 import dotenv from "dotenv";
 import rateLimit from "express-rate-limit";
 import axios from "axios";
+import { sendInviteEmail } from "./services/emailService.js";
  
 dotenv.config();
 
@@ -647,6 +648,22 @@ app.delete("/fs/delete", (req, res) => {
   }
 });
 
+app.post("/fs/clear-room", (req, res) => {
+  const { roomId } = req.body;
+  if (!roomId) return res.status(400).json({ error: "roomId is required" });
+
+  const roomDir = join(tmpdir(), `liveshare_room_${roomId}`);
+  try {
+    if (existsSync(roomDir)) {
+      rmSync(roomDir, { recursive: true, force: true });
+    }
+    res.json({ success: true, message: "Room cleared" });
+  } catch (err) {
+    console.error("Clear room error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 app.post("/fs/create", (req, res) => {
   const { roomId, type, path } = req.body;
@@ -661,18 +678,7 @@ app.post("/fs/create", (req, res) => {
   }
 });
 
-app.delete("/fs/delete", (req, res) => {
-  const { roomId, path } = req.body;
-  try {
-    const fullPath = join(tmpdir(), `liveshare_room_${roomId}`, path.replace(/^\//, ""));
-    if (!existsSync(fullPath)) return res.json({ success: true });
-    if (fs.statSync(fullPath).isDirectory()) rmSync(fullPath, { recursive: true, force: true });
-    else unlinkSync(fullPath);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+
 
 app.put("/fs/rename", (req, res) => {
   const { roomId, oldPath, newPath } = req.body;
@@ -708,6 +714,9 @@ app.get("/git/status", async (req, res) => {
   const { roomId } = req.query;
   if (!roomId) return res.status(400).json({ error: "roomId needed" });
   try {
+    const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
+    if (!existsSync(roomCwd)) return res.json({ isRepo: false });
+
     const git = getGit(roomId);
     const isRepo = await git.checkIsRepo();
     if (!isRepo) return res.json({ isRepo: false });
@@ -1008,6 +1017,30 @@ app.get("/git/diff", async (req, res) => {
     res.json({ diff });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+/* -------------------- INVITATION SYSTEM -------------------- */
+app.post("/api/rooms/:roomId/invite", async (req, res) => {
+  const { roomId } = req.params;
+  const { emails, inviter, roomType, isHost } = req.body;
+
+  if (!emails || !Array.isArray(emails) || emails.length === 0) {
+    return res.status(400).json({ error: "At least one email address is required." });
+  }
+
+  // Permission logic: Interview mode requires host status
+  if (roomType === "Interview" && !isHost) {
+    return res.status(403).json({ error: "Only the host can send invitations in Interview mode." });
+  }
+
+  try {
+    const sendPromises = emails.map(email => sendInviteEmail(email, roomId, inviter || "A colleague"));
+    await Promise.all(sendPromises);
+    res.json({ success: true, message: `Invitations sent to ${emails.length} recipient(s).` });
+  } catch (error) {
+    console.error("Invite error:", error);
+    res.status(500).json({ error: "Failed to send invitations. Please check SMTP configuration." });
   }
 });
 

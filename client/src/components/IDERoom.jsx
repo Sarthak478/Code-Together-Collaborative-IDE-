@@ -17,11 +17,14 @@ import AIPanel from "./ide/AIPanel"
 import VideoCall from "./editor/VideoCall"
 import SourceControlPanel from "./ide/SourceControlPanel"
 import DiffModal from "./ui/DiffModal"
+import AccessControlModal from "./editor/AccessControlModal"
+import InviteModal from "./editor/InviteModal"
 import { DoorOpen, AlertCircle, GitFork, MessageCircle, Wand2, Bot, TerminalSquare } from "lucide-react"
-
 
 export default function IDERoom(props) {
   const ide = useIDERoom(props)
+  const [accessControlOpen, setAccessControlOpen] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false)
   
   // Terminal Resize Handle State
   const [isResizingTerminal, setIsResizingTerminal] = useState(false)
@@ -107,6 +110,21 @@ export default function IDERoom(props) {
         fontFamily: "'Manrope', 'Inter', system-ui, sans-serif"
       }}
     >
+      <AccessControlModal 
+        isOpen={accessControlOpen} 
+        onClose={() => setAccessControlOpen(false)} 
+        roomId={ide.roomId} 
+      />
+
+      <InviteModal 
+        isOpen={inviteOpen} 
+        onClose={() => setInviteOpen(false)} 
+        roomId={ide.roomId} 
+        roomType={ide.actualRoomType}
+        isHost={ide.isHost}
+        username={ide.editor.username}
+      />
+
       {/* ── Navbar ── */}
       <Navbar
         roomId={ide.roomId}
@@ -117,6 +135,8 @@ export default function IDERoom(props) {
         onToggleCall={() => ide.setCallActive(!ide.callActive)}
         onToggleSettings={() => ide.setSettingsOpen(true)}
         onToggleGit={() => ide.toggleRightPanel("git")}
+        onToggleAccessControl={() => setAccessControlOpen(!accessControlOpen)}
+        onToggleInvite={() => setInviteOpen(!inviteOpen)}
         onLeave={() => ide.setExitConfirmOpen(true)}
         headerBg={ide.headerBg}
         borderCol={ide.borderCol}

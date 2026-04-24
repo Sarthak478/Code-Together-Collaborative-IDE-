@@ -17,8 +17,11 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     // Persist Yjs document offline in browser 
     const persistence = new IndexeddbPersistence(`liveshare-room-${roomId}`, ydoc)
 
+    const hostToken = localStorage.getItem(`host_${roomId}`) || "";
+    const authUrl = `${WS_URL}?username=${encodeURIComponent(username)}&hostToken=${encodeURIComponent(hostToken)}`;
+
     const provider = new HocuspocusProvider({
-      url: WS_URL,
+      url: authUrl,
       name: roomId,
       document: ydoc,
     })
@@ -44,9 +47,8 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
 
   /* ── Host state & Active Users ── */
   const [activeUsers, setActiveUsers] = useState([])
-  const [hostClientId, setHostClientId] = useState(null)
+  const isHost = !!localStorage.getItem(`host_${roomId}`)
   const [hostName, setHostName] = useState("")
-  const isHost = hostClientId === editor.provider.awareness.clientID
 
   /* ── Room state ── */
   const [actualRoomType, setRoomType] = useState(initialRoomType)
@@ -161,6 +163,18 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     }
   }, [editor])
 
+  useEffect(() => {
+    if (isHost && editor.roomMap) {
+      editor.roomMap.set("host", editor.username)
+      if (!editor.roomMap.get("roomType")) editor.roomMap.set("roomType", initialRoomType)
+      if (editor.roomMap.get("roomMode") !== "ide") editor.roomMap.set("roomMode", "ide")
+      // Start interview timer if not started
+      if (initialRoomType === "interview" && !editor.roomMap.get("interviewStart")) {
+        editor.roomMap.set("interviewStart", Date.now())
+      }
+    }
+  }, [isHost, editor.roomMap, initialRoomType, editor.username])
+
   /* ── Host calc ── */
   const recalcHost = useCallback(() => {
     const states = Array.from(editor.provider.awareness.getStates().entries())
@@ -173,28 +187,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       activeFile: s[1].user.activeFile || null,
       peerId: s[1].user.peerId || null
     })))
-    if (validStates.length === 0) return
-
-    const earliest = validStates.reduce((best, cur) => {
-      const t = cur[1].user.joinTime ?? Infinity
-      const bestT = best[1].user.joinTime ?? Infinity
-      if (t === bestT) return cur[0] < best[0] ? cur : best
-      return t < bestT ? cur : best
-    }, validStates[0])
-
-    setHostClientId(earliest[0])
-    setHostName(earliest[1].user?.name || "")
-
-    if (earliest[0] === editor.provider.awareness.clientID) {
-      editor.roomMap.set("host", earliest[1].user?.name)
-      if (!editor.roomMap.get("roomType")) editor.roomMap.set("roomType", initialRoomType)
-      if (editor.roomMap.get("roomMode") !== "ide") editor.roomMap.set("roomMode", "ide")
-      // Start interview timer if not started
-      if (initialRoomType === "interview" && !editor.roomMap.get("interviewStart")) {
-        editor.roomMap.set("interviewStart", Date.now())
-      }
-    }
-  }, [editor.provider.awareness, editor.roomMap, initialRoomType])
+  }, [editor.provider.awareness])
 
   /* ── Sync Subscriptions ── */
   useEffect(() => {
@@ -240,22 +233,6 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
 
     const onAwarenessChange = () => {
       recalcHost()
-
-      const states = Array.from(provider.awareness.getStates().entries())
-      const myId = provider.awareness.clientID
-      
-      const isDuplicate = states.some(([id, state]) => {
-        if (id === myId) return false
-        if (state.user?.name !== editor.username) return false
-        
-        const otherJoin = state.user?.joinTime ?? Infinity
-        const myJoin = editor.joinTime ?? Infinity
-        return otherJoin < myJoin || (otherJoin === myJoin && id < myId)
-      })
-
-      if (isDuplicate) {
-         onLeave(`⚠️ The username '@${editor.username}' is already taken in this room. Please choose a different name.`)
-      }
     }
 
     provider.awareness.on("change", onAwarenessChange)
@@ -560,7 +537,16 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       id: Date.now().toString() + Math.random(),
       sender: "System", target: "all", text: `@${userName} was removed.`, type: "system_kick", timestamp: Date.now()
     }])
-  }, [kickedUsers, editor])
+
+    const hostToken = localStorage.getItem(`host_${roomId}`);
+    if (hostToken) {
+      fetch(`${API_URL.replace("1236", "1235")}/room/${roomId}/kick`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hostToken, username: userName })
+      }).catch(console.error);
+    }
+  }, [kickedUsers, editor, roomId])
 
   const restrictUser = useCallback((clientId, userName) => {
     if (!restrictedUsers.includes(clientId)) {

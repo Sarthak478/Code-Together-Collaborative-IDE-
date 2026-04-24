@@ -167,7 +167,7 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
       : `Are you sure you want to delete "${itemName}"?`
     
     if (window.confirm(confirmMsg)) {
-      if (fs.deleteEntry) await fs.deleteEntry(path)
+      if (fs.deleteEntry) await fs.deleteEntry(path, type)
     }
   }
 

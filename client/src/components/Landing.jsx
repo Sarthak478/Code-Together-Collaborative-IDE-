@@ -174,6 +174,19 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
 
+  // Handle URL Parameter for Room Invitation
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const roomId = params.get("room")
+    if (roomId) {
+      setJoinId(roomId)
+      setActiveTab("join")
+      // Clear the URL parameter without refreshing
+      const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname
+      window.history.replaceState({ path: newUrl }, "", newUrl)
+    }
+  }, [])
+
   const toggleTheme = useCallback(() => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark')
   }, [])
