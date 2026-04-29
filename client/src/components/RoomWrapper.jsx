@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { API_URL } from "../config";
+import { API_URL, COLLAB_URL } from "../config";
 import { motion } from "framer-motion";
 import { ShieldAlert, Loader2, DoorOpen, ShieldCheck } from "lucide-react";
 
@@ -21,7 +21,7 @@ export default function RoomWrapper({ roomId, roomType, isCreating, username, ro
       const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
       localStorage.setItem(`host_${roomId}`, token);
       
-      fetch(`${API_URL.replace("1236", "1235")}/room/${roomId}/create`, {
+      fetch(`${COLLAB_URL}/room/${roomId}/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hostToken: token, roomType })
@@ -44,7 +44,7 @@ export default function RoomWrapper({ roomId, roomType, isCreating, username, ro
 
     if (hostToken) {
       // Re-register as host to ensure server state is correct (in case of restart)
-      fetch(`${API_URL.replace("1236", "1235")}/room/${roomId}/create`, {
+      fetch(`${COLLAB_URL}/room/${roomId}/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hostToken, roomType })
@@ -70,7 +70,7 @@ export default function RoomWrapper({ roomId, roomType, isCreating, username, ro
     // Joiner Flow: Request access
     let isMounted = true;
     
-    fetch(`${API_URL.replace("1236", "1235")}/room/${roomId}/join-request`, {
+    fetch(`${COLLAB_URL}/room/${roomId}/join-request`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username })
@@ -89,7 +89,7 @@ export default function RoomWrapper({ roomId, roomType, isCreating, username, ro
       if (data.status === "waiting") {
         // Start polling
         const interval = setInterval(() => {
-          fetch(`${API_URL.replace("1236", "1235")}/room/${roomId}/status?username=${encodeURIComponent(username)}`)
+          fetch(`${COLLAB_URL}/room/${roomId}/status?username=${encodeURIComponent(username)}`)
           .then(r => r.json())
           .then(statusData => {
             if (!isMounted) return;

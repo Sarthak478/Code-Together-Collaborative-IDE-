@@ -7,7 +7,7 @@ import { IndexeddbPersistence } from "y-indexeddb"
 import { LANGUAGES, THEMES, FONT_FAMILIES, EXT_TO_LANG } from "../constants/editorConfigs"
 import { loadPersonalPrefs, savePersonalPrefs } from "../utils/helpers"
 import useFileSystem from "./useFileSystem"
-import { WS_URL, API_URL } from "../config"
+import { WS_URL, API_URL, COLLAB_URL } from "../config"
 
 export default function useIDERoom({ roomId, initialRoomType, isCreating, username, onLeave }) {
   /* ── Yjs stable refs ── */
@@ -540,7 +540,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
 
     const hostToken = localStorage.getItem(`host_${roomId}`);
     if (hostToken) {
-      fetch(`${API_URL.replace("1236", "1235")}/room/${roomId}/kick`, {
+      fetch(`${COLLAB_URL}/room/${roomId}/kick`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hostToken, username: userName })

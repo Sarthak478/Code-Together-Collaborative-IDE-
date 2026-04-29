@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ShieldCheck, DoorOpen, Users, Settings, AlertTriangle } from "lucide-react";
-import { API_URL } from "../../config";
+import { API_URL, COLLAB_URL } from "../../config";
 
 export default function AccessControlModal({ isOpen, onClose, roomId }) {
   const [waitingUsers, setWaitingUsers] = useState([]);
@@ -15,7 +15,7 @@ export default function AccessControlModal({ isOpen, onClose, roomId }) {
     if (!isOpen || !hostToken) return;
 
     const fetchWaiting = () => {
-      fetch(`${API_URL.replace("1236", "1235")}/room/${roomId}/waiting?hostToken=${hostToken}`)
+      fetch(`${COLLAB_URL}/room/${roomId}/waiting?hostToken=${hostToken}`)
         .then(r => r.json())
         .then(data => {
           if (data.success) {
@@ -34,7 +34,7 @@ export default function AccessControlModal({ isOpen, onClose, roomId }) {
   }, [isOpen, roomId, hostToken]);
 
   const handleAction = (username, action) => {
-    fetch(`${API_URL.replace("1236", "1235")}/room/${roomId}/${action}`, {
+    fetch(`${COLLAB_URL}/room/${roomId}/${action}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ hostToken, username })
@@ -53,7 +53,7 @@ export default function AccessControlModal({ isOpen, onClose, roomId }) {
     const limit = parseInt(limitInput, 10);
     if (isNaN(limit) || limit < 0) return setError("Invalid limit");
     
-    fetch(`${API_URL.replace("1236", "1235")}/room/${roomId}/limit`, {
+    fetch(`${COLLAB_URL}/room/${roomId}/limit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ hostToken, limit })
@@ -70,7 +70,7 @@ export default function AccessControlModal({ isOpen, onClose, roomId }) {
 
   const handleDestroyRoom = () => {
     if (window.confirm("Are you sure you want to permanently destroy this room? This will kick all users and delete all files. This action cannot be undone.")) {
-      fetch(`${API_URL.replace("1236", "1235")}/room/${roomId}/destroy`, {
+      fetch(`${COLLAB_URL}/room/${roomId}/destroy`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hostToken })

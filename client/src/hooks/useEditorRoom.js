@@ -5,7 +5,7 @@ import { HocuspocusProvider } from "@hocuspocus/provider"
 
 import { LANGUAGES, THEMES, FONT_FAMILIES, CURSORS } from "../constants/editorConfigs"
 import { loadPersonalPrefs, savePersonalPrefs } from "../utils/helpers"
-import { WS_URL, API_URL } from "../config"
+import { WS_URL, API_URL, COLLAB_URL } from "../config"
 
 /* ─── useEditorRoom Hook ────────────────────────────────────────── */
 export default function useEditorRoom({ roomId, initialRoomType, isCreating, username, onLeave }) {
@@ -358,7 +358,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
 
     const hostToken = localStorage.getItem(`host_${roomId}`);
     if (hostToken) {
-      fetch(`${API_URL.replace("1236", "1235")}/room/${roomId}/kick`, {
+      fetch(`${COLLAB_URL}/room/${roomId}/kick`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hostToken, username: userName })

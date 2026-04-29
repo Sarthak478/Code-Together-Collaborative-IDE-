@@ -168,8 +168,9 @@ const server = new Server({
                         }
                     }
                     
+                    const INTERNAL_API_URL = process.env.API_URL || "http://localhost:1236";
                     try {
-                        await fetch("http://localhost:1236/fs/clear-room", {
+                        await fetch(`${INTERNAL_API_URL}/fs/clear-room`, {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ roomId })
@@ -318,8 +319,9 @@ const server = new Server({
                 roomTypes.delete(documentName);
                 roomConnections.delete(documentName);
 
+                const INTERNAL_API_URL = process.env.API_URL || "http://localhost:1236";
                 try {
-                    await fetch("http://localhost:1236/fs/clear-room", {
+                    await fetch(`${INTERNAL_API_URL}/fs/clear-room`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ roomId: documentName })

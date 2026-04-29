@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { X, Send, Mail, Plus, UserPlus, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { API_URL } from "../../config";
 
 export default function InviteModal({ isOpen, onClose, roomId, roomType, isHost, username }) {
   const [emails, setEmails] = useState([""]);
@@ -36,7 +37,7 @@ export default function InviteModal({ isOpen, onClose, roomId, roomType, isHost,
     setStatus(null);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:1236'}/api/rooms/${roomId}/invite`, {
+      const response = await fetch(`${API_URL}/api/rooms/${roomId}/invite`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
