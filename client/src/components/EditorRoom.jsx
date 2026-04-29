@@ -93,7 +93,7 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
       />
 
       {/* ── Toolbar ── */}
-      <div style={{ background: room.toolbarBg }}>
+      <div>
         <Toolbar
           canRun={room.canRun}
           canEdit={room.canEdit}

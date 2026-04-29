@@ -192,4 +192,3 @@ export const sendInviteEmail = async (to, roomId, inviter) => {
         throw err; // Rethrow to let the API handle the response
     }
 };
-

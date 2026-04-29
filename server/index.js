@@ -77,6 +77,7 @@ const hocuspocus = new Server({
         }
 
         if (!approvedUsers.get(documentName).has(username)) throw new Error("Waiting for host approval");
+
         roomConnections.get(documentName).set(username, connection);
     },
 
@@ -115,6 +116,7 @@ const hocuspocus = new Server({
                 console.log(`Room ${documentName} expired.`);
                 activeConnections.delete(documentName);
                 deletionTimers.delete(documentName);
+                
                 approvedUsers.delete(documentName);
                 deniedUsers.delete(documentName);
                 waitingUsers.delete(documentName);
@@ -123,7 +125,6 @@ const hocuspocus = new Server({
                 roomTypes.delete(documentName);
                 roomConnections.delete(documentName);
 
-                // Call internal cleanup (localhost is fine here as it's the same process now)
                 try {
                     await fetch(`http://localhost:${PORT}/fs/clear-room`, {
                         method: "POST",
@@ -137,7 +138,7 @@ const hocuspocus = new Server({
     }
 });
 
-// --- API Routes (Moved from Hocuspocus onRequest to Express) ---
+// --- API Routes ---
 
 app.get("/rooms", (req, res) => {
     res.json(Array.from(activeConnections.keys()));
@@ -199,7 +200,7 @@ app.post("/room/:roomId/:action", (req, res) => {
     } else if (action === "destroy") {
         const conns = roomConnections.get(roomId);
         if (conns) for (const c of conns.values()) c.close(4004, "Destroyed");
-        // ... cleanup state ...
+        
         approvedUsers.delete(roomId); deniedUsers.delete(roomId); waitingUsers.delete(roomId);
         roomHosts.delete(roomId); roomLimits.delete(roomId); roomTypes.delete(roomId);
         roomConnections.delete(roomId); activeConnections.delete(roomId);
