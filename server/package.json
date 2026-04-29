@@ -4,9 +4,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "predev": "node kill-ports.js",
     "dev": "nodemon index.js",
-    "prestart": "node kill-ports.js",
     "start": "node index.js"
   },
   "keywords": [],
