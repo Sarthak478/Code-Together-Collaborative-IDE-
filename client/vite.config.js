@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import monacoEditorPluginModule from 'vite-plugin-monaco-editor'
+import { createRequire } from 'module'
 
-const monacoEditorPlugin = monacoEditorPluginModule.default || monacoEditorPluginModule
+const require = createRequire(import.meta.url)
+const monacoEditorPlugin = require('vite-plugin-monaco-editor')
 
 export default defineConfig({
   plugins: [
