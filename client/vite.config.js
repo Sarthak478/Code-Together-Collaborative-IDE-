@@ -1,14 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import monacoEditorPlugin from 'vite-plugin-monaco-editor-esm'
+import monacoEditorPlugin from 'vite-plugin-monaco-editor'
 
 export default defineConfig({
   plugins: [
     react(),
-    tailwindcss(),
-    monacoEditorPlugin({
-      languageWorkers: ['editorWorkerService', 'typescript', 'json', 'css', 'html']
+    monacoEditorPlugin.default({
+      languageWorkers: ['editorWorkerService', 'typescript', 'json']
     })
   ]
 })
