@@ -7,6 +7,8 @@ import '@codingame/monaco-vscode-javascript-default-extension'
 import '@codingame/monaco-vscode-typescript-basics-default-extension'
 import '@codingame/monaco-vscode-python-default-extension'
 
+import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+
 let initialized = false
 
 export async function initVSCode() {
@@ -16,10 +18,7 @@ export async function initVSCode() {
   // Standard editor environment
   window.MonacoEnvironment = {
     getWorker: function (moduleId, label) {
-      if (label === 'editorWorkerService') {
-        return new Worker(new URL('monaco-editor/esm/vs/editor/editor.worker', import.meta.url), { type: 'module' })
-      }
-      return new Worker(new URL('monaco-editor/esm/vs/editor/editor.worker', import.meta.url), { type: 'module' })
+      return new editorWorker()
     }
   }
 
