@@ -17,7 +17,8 @@ import { sendInviteEmail } from "./services/emailService.js";
  
 dotenv.config();
 
-const app = express();
+export const initAPI = (app, server) => {
+  const wss = new WebSocketServer({ noServer: true });
 
 // Rate Limiting for production safety
 const limiter = rateLimit({
@@ -72,8 +73,8 @@ function sanitizePath(input) {
     .replace(/[<>:"|?*]/g, ""); // Windows invalid chars
 }
 
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+// const server = http.createServer(app);
+// const wss = new WebSocketServer({ server });
 
 /* -------------------- ROOM TRACKING -------------------- */
 
@@ -165,10 +166,10 @@ function ensureWatcher(roomId, roomCwd) {
 
 /* -------------------- WEBSOCKET -------------------- */
 
-wss.on("connection", (ws, req) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
+  wss.on("connection", (ws, req) => {
+    const url = new URL(req.url, `http://${req.headers.host}`);
 
-  if (url.pathname === "/terminal") {
+    if (url.pathname === "/terminal") {
     const roomId = url.searchParams.get("roomId");
     const terminalId = url.searchParams.get("terminalId") || "1";
     if (!roomId) { ws.close(); return; }
@@ -266,53 +267,55 @@ wss.on("connection", (ws, req) => {
     return;
   }
 
-  // STANDARD EXECUTION WEBSOCKET
-  ws.on("message", (msg) => {
-    try {
-      const data = JSON.parse(msg.toString());
+    // Path must be /execution (or / for backward compatibility)
+    if (url.pathname === "/execution" || url.pathname === "/") {
+      ws.on("message", (msg) => {
+        try {
+          const data = JSON.parse(msg.toString());
 
-      if (data.type === "join" && data.roomId) {
-        const cleanRoomId = sanitizePath(data.roomId);
-        if (!roomClients.has(cleanRoomId)) {
-          roomClients.set(cleanRoomId, new Set());
+          if (data.type === "join" && data.roomId) {
+            const cleanRoomId = sanitizePath(data.roomId);
+            if (!roomClients.has(cleanRoomId)) {
+              roomClients.set(cleanRoomId, new Set());
+            }
+
+            // Cancel any pending cleanup if a user joins
+            if (roomCleanupTimers.has(cleanRoomId)) {
+              console.log(`[WS] User joined ${cleanRoomId}. Cancelling pending cleanup.`);
+              clearTimeout(roomCleanupTimers.get(cleanRoomId));
+              roomCleanupTimers.delete(cleanRoomId);
+            }
+
+            roomClients.get(cleanRoomId).add(ws);
+            ws.roomId = cleanRoomId;
+            ws.isTerminal = false;
+
+            const roomCwd = join(tmpdir(), `liveshare_room_${cleanRoomId}`);
+            if (!existsSync(roomCwd)) mkdirSync(roomCwd, { recursive: true });
+            ensureWatcher(cleanRoomId, roomCwd);
+
+            console.log(`[WS] Client joined room: ${cleanRoomId}`);
+          }
+        } catch (e) {
+          console.error("WS message parse error", e);
         }
+      });
 
-        // Cancel any pending cleanup if a user joins
-        if (roomCleanupTimers.has(cleanRoomId)) {
-          console.log(`[WS] User joined ${cleanRoomId}. Cancelling pending cleanup.`);
-          clearTimeout(roomCleanupTimers.get(cleanRoomId));
-          roomCleanupTimers.delete(cleanRoomId);
+      ws.on("close", () => {
+        if (ws.roomId && !ws.isTerminal && roomClients.has(ws.roomId)) {
+          const clients = roomClients.get(ws.roomId);
+          clients.delete(ws);
+
+          // Automatic 60-second cleanup if room is empty
+          if (clients.size === 0) {
+            console.log(`[WS] Room ${ws.roomId} is empty. Scheduling cleanup in 60s...`);
+            const timerId = setTimeout(() => cleanupRoomFolder(ws.roomId), 60000);
+            roomCleanupTimers.set(ws.roomId, timerId);
+          }
         }
-
-        roomClients.get(cleanRoomId).add(ws);
-        ws.roomId = cleanRoomId;
-        ws.isTerminal = false;
-
-        const roomCwd = join(tmpdir(), `liveshare_room_${cleanRoomId}`);
-        if (!existsSync(roomCwd)) mkdirSync(roomCwd, { recursive: true });
-        ensureWatcher(cleanRoomId, roomCwd);
-
-        console.log(`[WS] Client joined room: ${cleanRoomId}`);
-      }
-    } catch (e) {
-      console.error("WS message parse error", e);
+      });
     }
   });
-
-  ws.on("close", () => {
-    if (ws.roomId && !ws.isTerminal && roomClients.has(ws.roomId)) {
-      const clients = roomClients.get(ws.roomId);
-      clients.delete(ws);
-
-      // Automatic 60-second cleanup if room is empty
-      if (clients.size === 0) {
-        console.log(`[WS] Room ${ws.roomId} is empty. Scheduling cleanup in 60s...`);
-        const timerId = setTimeout(() => cleanupRoomFolder(ws.roomId), 60000);
-        roomCleanupTimers.set(ws.roomId, timerId);
-      }
-    }
-  });
-});
 
 
 /* -------------------- BROADCAST -------------------- */
@@ -1068,14 +1071,9 @@ app.post("/api/rooms/:roomId/invite", async (req, res) => {
 
 /* -------------------- TEST ROUTE -------------------- */
 
-app.get("/", (req, res) => {
-  res.send("Execution API running 🚀");
-});
+  app.get("/", (req, res) => {
+    res.send("Execution API running 🚀");
+  });
 
-/* -------------------- SERVER START -------------------- */
-
-const PORT = process.env.PORT || 1236;
-
-server.listen(PORT, () => {
-  console.log(`Execution server running on port ${PORT}`);
-});
+  return wss;
+};

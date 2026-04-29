@@ -239,7 +239,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     recalcHost()
 
     // Execution WS
-    const ws = new WebSocket(`${API_URL.replace("http","ws")}`)
+    const ws = new WebSocket(`${API_URL.replace("http","ws")}/execution`)
     ws.onopen = () => ws.send(JSON.stringify({ type: "join", roomId }))
     ws.onmessage = (event) => {
       try {

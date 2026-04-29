@@ -255,7 +255,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     provider.awareness.on("change", onAwarenessChange)
     recalcHost()
 
-    const ws = new WebSocket(API_URL.replace("http", "ws"))
+    const ws = new WebSocket(`${API_URL.replace("http", "ws")}/execution`)
     ws.onopen = () => ws.send(JSON.stringify({ type: "join", roomId }))
     ws.onmessage = (event) => {
       try {
