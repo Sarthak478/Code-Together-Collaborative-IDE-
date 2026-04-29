@@ -1,10 +1,10 @@
-import { Server } from "@hocuspocus/server";
-import { parse } from "url";
-import express from "express";
-import http from "http";
-import cors from "cors";
-import dotenv from "dotenv";
-import { initAPI } from "./api.js";
+const { Server } = require("@hocuspocus/server");
+const { parse } = require("url");
+const express = require("express");
+const http = require("http");
+const cors = require("cors");
+const dotenv = require("dotenv");
+const { initAPI } = require("./api.js");
 
 dotenv.config();
 
@@ -126,11 +126,8 @@ const hocuspocus = new Server({
                 roomConnections.delete(documentName);
 
                 try {
-                    await fetch(`http://localhost:${PORT}/fs/clear-room`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ roomId: documentName })
-                    });
+                    const axios = require("axios");
+                    await axios.post(`http://localhost:${PORT}/fs/clear-room`, { roomId: documentName });
                 } catch(e) {}
             }, 60000);
             deletionTimers.set(documentName, timeout);

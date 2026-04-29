@@ -1,4 +1,4 @@
-import axios from 'axios';
+const axios = require('axios');
 
 const WANDBOX_MAP = {
   cpp: 'gcc-head',
@@ -17,7 +17,7 @@ const WANDBOX_MAP = {
  * @param {string} code - The code to execute.
  * @returns {Promise<{stdout: string, stderr: string, exitCode: number}>}
  */
-export async function executeRemote(language, code) {
+async function executeRemote(language, code) {
   const compiler = WANDBOX_MAP[language];
   if (!compiler) {
     throw new Error(`Execution for language '${language}' is not supported remotely via Wandbox.`);
@@ -33,7 +33,7 @@ export async function executeRemote(language, code) {
     const data = response.data;
     // Wandbox returns program_message for stdout and compiler_message for stderr (usually)
     // But it also has program_error.
-    
+
     return {
       stdout: data.program_message || "",
       stderr: data.compiler_message || data.program_error || "",
@@ -48,3 +48,5 @@ export async function executeRemote(language, code) {
     };
   }
 }
+
+module.exports = { executeRemote };

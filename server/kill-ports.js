@@ -3,7 +3,7 @@
  * Kills any processes holding ports 1235 and 1236 before starting the server.
  * Works on Windows (PowerShell) and Unix (lsof/kill).
  */
-import { execSync } from "child_process";
+const { execSync } = require("child_process");
 
 const PORTS = [1235, 1236];
 

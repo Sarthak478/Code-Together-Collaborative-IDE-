@@ -1,5 +1,5 @@
-import * as Y from "yjs";
-import { HocuspocusProvider } from "@hocuspocus/provider";
+const Y = require("yjs");
+const { HocuspocusProvider } = require("@hocuspocus/provider");
 
 async function testSync() {
   console.log("Starting Sync test...");

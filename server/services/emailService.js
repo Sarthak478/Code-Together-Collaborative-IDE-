@@ -1,5 +1,5 @@
-import nodemailer from 'nodemailer';
-import dotenv from 'dotenv';
+const nodemailer = require('nodemailer');
+const dotenv = require('dotenv');
 
 dotenv.config();
 
@@ -56,7 +56,7 @@ const getTransporter = () => {
  * @param {string} roomId - Room ID to join
  * @param {string} inviter - Name of the person inviting
  */
-export const sendInviteEmail = async (to, roomId, inviter) => {
+const sendInviteEmail = async (to, roomId, inviter) => {
     try {
         const mailTransporter = getTransporter();
         
@@ -192,3 +192,5 @@ export const sendInviteEmail = async (to, roomId, inviter) => {
         throw err; // Rethrow to let the API handle the response
     }
 };
+
+module.exports = { sendInviteEmail };
