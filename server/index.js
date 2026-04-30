@@ -15,7 +15,8 @@ const {
     denyUser,
     addWaitingUser,
     getWaitingUsers,
-    removeWaitingUser
+    removeWaitingUser,
+    getActiveRooms
 } = require("./services/redisService");
 
 dotenv.config();
@@ -139,8 +140,13 @@ const hocuspocus = new Server({
 
 // --- API Routes ---
 
-app.get("/rooms", (req, res) => {
-    res.json(Array.from(activeConnections.keys()));
+app.get("/rooms", async (req, res) => {
+    try {
+        const rooms = await getActiveRooms();
+        res.json(rooms || []);
+    } catch (err) {
+        res.json(Array.from(activeConnections.keys()));
+    }
 });
 
 app.post("/room/:roomId/create", async (req, res) => {

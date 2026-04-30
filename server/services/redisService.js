@@ -17,7 +17,10 @@ const getRoomMeta = async (roomId) => {
 };
 
 const setRoomMeta = async (roomId, meta) => {
-    await redis.hset(`room:${roomId}`, meta);
+    const pipeline = redis.pipeline();
+    pipeline.hset(`room:${roomId}`, meta);
+    pipeline.sadd('active_rooms', roomId);
+    await pipeline.exec();
 };
 
 const deleteRoom = async (roomId) => {
@@ -26,6 +29,7 @@ const deleteRoom = async (roomId) => {
     pipeline.del(`room:${roomId}:approved`);
     pipeline.del(`room:${roomId}:denied`);
     pipeline.del(`room:${roomId}:waiting`);
+    pipeline.srem('active_rooms', roomId);
     await pipeline.exec();
 };
 
@@ -70,6 +74,10 @@ const removeWaitingUser = async (roomId, username) => {
     await redis.hdel(`room:${roomId}:waiting`, username);
 };
 
+const getActiveRooms = async () => {
+    return await redis.smembers('active_rooms');
+};
+
 module.exports = {
     redis,
     getRoomMeta,
@@ -81,5 +89,6 @@ module.exports = {
     denyUser,
     addWaitingUser,
     getWaitingUsers,
-    removeWaitingUser
+    removeWaitingUser,
+    getActiveRooms
 };
