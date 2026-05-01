@@ -1,27 +1,25 @@
 # Roadmap
 
-## Milestone 1: Core Git Reliability
-- [ ] Phase 1: Push/Pull Fixes and Error UX @/gsd-execute-phase
-- [ ] Phase 2: Email Invite Option @/gsd-plan-phase
+## Milestone 1: Production Deployment & Reliability
 
-### Phase 1: Host Room Access Control - Navbar feature for managing participant access, setting room capacity limits, and denying unauthorized entry
+### [DONE] Phase 1: Domain Migration & Infrastructure
+- [x] Integrate `code-together.me` domain.
+- [x] Consolidate `FRONTEND_URL` and `CLIENT_URL`.
+- [x] Update CORS policies in `index.js` and `api.js`.
 
-**Goal:** [To be planned]
-**Requirements**: TBD
-**Depends on:** Phase 0
-**Plans:** 0 plans
+### [DONE] Phase 2: Production Cleanup
+- [x] Remove test scripts (`test_*.js`).
+- [x] Delete diagnostic utilities and temporary log files.
 
-Plans:
-- [ ] TBD (run /gsd-plan-phase 1 to break down)
+### [IN PROGRESS] Phase 3: Email Invitation System
+- [ ] Configure production SMTP with Resend/SendGrid.
+- [ ] Verify invite link generation in production emails.
 
-### Phase 2: Email Invite Option
-
-**Goal:** Provide an invite option where users can send pre-prompted email invites. In Collaborative Mode, any user can invite. In Interview Mode, only the host can invite. The email will contain formal instructions and a room ID/link that autofills the room space, allowing the invitee to choose a username and enter the room.
-**Requirements:** TBD
-**Depends on:** Phase 1
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (run /gsd-plan-phase 2 to break down)
+### [PENDING] Phase 4: Git Integration Refinement
+- [ ] Fix Push/Pull reliability issues.
+- [ ] Improve Source Control UX and error reporting.
 
 ## Backlog
+- [ ] Real-time cursor presence enhancements.
+- [ ] Multi-file search.
+- [ ] Admin dashboard for room management.

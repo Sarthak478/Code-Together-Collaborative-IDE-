@@ -1,30 +1,32 @@
 ---
 gsd_state_version: "1.0"
 milestone: "v1.0"
-status: "planning"
+status: "executing"
 ---
 
 # State
 
-**Current Phase:** 01
-**Current Phase Name:** Repairing GSD And Ralph Integration
-**Progress:** [░░░░░░░░░░] 0%
-**Status:** Planning
-**Last Activity:** 2026-04-24
+**Current Phase:** 03
+**Current Phase Name:** Email Invitation System Setup
+**Progress:** [▓▓▓▓▓░░░░░] 50%
+**Status:** Awaiting SMTP Credentials
+**Last Activity:** 2026-05-01
 
 ## Decisions Made
 | Phase | Summary | Rationale |
 |-------|---------|-----------|
+| 1 | Use `FRONTEND_URL` as unified variable | Redundancy cleanup and code clarity. |
+| 1 | Keep Render Backend URL | Minimal friction for domain migration. |
+| 2 | Delete all `test_*.js` files | Production hygiene and security. |
 
 ## Blockers
-None
+- **Phase 3**: Waiting for production SMTP API keys/credentials.
 
 ## Accumulated Context
-
-### Roadmap Evolution
-- Phase 1 added: Host Room Access Control — Navbar feature for managing participant access, setting room capacity limits, and denying unauthorized entry
+- Domain `code-together.me` is now the primary entry point.
+- Backend remains at `onrender.com`.
 
 ## Session
-**Last Date:** 2026-04-24
-**Stopped At:** Phase 1 added to roadmap
+**Last Date:** 2026-05-01
+**Stopped At:** Awaiting SMTP credentials for production email setup.
 **Resume File:** .planning/ROADMAP.md

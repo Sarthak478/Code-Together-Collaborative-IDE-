@@ -64,7 +64,7 @@ const sendInviteEmail = async (to, roomId, inviter) => {
             throw new Error('Email service is not configured or failed to initialize.');
         }
 
-        const clientUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
+        const clientUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         const joinLink = `${clientUrl}/?room=${roomId}`;
         
         const htmlContent = `

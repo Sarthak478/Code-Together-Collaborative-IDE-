@@ -32,6 +32,7 @@ const initAPI = (app, server) => {
   const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
   const allowedOrigins = [
     FRONTEND_URL,
+    "https://code-together.me",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     /\.onrender\.com$/,
