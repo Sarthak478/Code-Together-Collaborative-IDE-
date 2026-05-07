@@ -13,9 +13,15 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          monaco: ['@codingame/monaco-vscode-api', 'monaco-editor'],
-          vendor: ['react', 'react-dom', 'framer-motion', 'lucide-react']
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('monaco-editor') || id.includes('@codingame')) {
+              return 'monaco';
+            }
+            if (id.includes('react') || id.includes('framer-motion') || id.includes('lucide-react')) {
+              return 'vendor';
+            }
+          }
         }
       }
     },
