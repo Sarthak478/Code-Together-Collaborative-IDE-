@@ -24,6 +24,7 @@ status: "executing"
 | 4 | Fix Render deployment syntax | Switch `type: static` to `type: web` in render.yaml. |
 | 4 | Add full CSP to render.yaml | Resolve ZAP "Content Security Policy Not Set". |
 | 4 | Add Vite SRI plugin | Fix "Sub Resource Integrity Attribute Missing" risk. |
+| 4 | Add X-Content-Type-Options | Prevent MIME sniffing (ZAP finding). |
 
 ## Blockers
 - **Phase 4**: Need to audit current Git logic for reliability.
