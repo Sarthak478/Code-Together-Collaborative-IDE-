@@ -14,4 +14,4 @@ services:
         value: SAMEORIGIN
       - path: /*
         name: Content-Security-Policy
-        value: "frame-ancestors 'self';"
+        value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://code-together-collaborative-ide.onrender.com wss://code-together-collaborative-ide.onrender.com https://code-together.me wss://code-together.me; img-src 'self' data: blob:; worker-src 'self' blob:; frame-src 'self'; frame-ancestors 'self'; object-src 'none';"
