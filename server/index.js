@@ -26,6 +26,35 @@ const app = express();
 const httpServer = http.createServer(app);
 const PORT = process.env.PORT || 1236;
 
+// CORS must run before redirects so browser preflight requests get the right headers.
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+const allowedOrigins = [
+    FRONTEND_URL,
+    "https://code-together.me",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    /\.onrender\.com$/,
+    /\.netlify\.app$/
+].filter(Boolean);
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        const isAllowed = allowedOrigins.some(pattern => {
+            if (pattern instanceof RegExp) return pattern.test(origin);
+            return pattern === origin;
+        });
+        if (isAllowed) callback(null, true);
+        else callback(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
+};
+
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
+
 // Force HTTPS Redirection (For Port 80 Security)
 app.use((req, res, next) => {
     if (req.header('x-forwarded-proto') !== 'https' && process.env.NODE_ENV === 'production') {
@@ -65,30 +94,6 @@ app.use(helmet({
         preload: true
     },
     referrerPolicy: { policy: "strict-origin-when-cross-origin" }
-}));
-
-// Enable CORS for Express
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
-const allowedOrigins = [
-    FRONTEND_URL,
-    "https://code-together.me",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    /\.onrender\.com$/,
-    /\.netlify\.app$/
-].filter(Boolean);
-
-app.use(cors({
-    origin: (origin, callback) => {
-        if (!origin) return callback(null, true);
-        const isAllowed = allowedOrigins.some(pattern => {
-            if (pattern instanceof RegExp) return pattern.test(origin);
-            return pattern === origin;
-        });
-        if (isAllowed) callback(null, true);
-        else callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true
 }));
 
 app.use(express.json({ limit: "10mb" }));
@@ -309,7 +314,9 @@ httpServer.on("upgrade", (request, socket, head) => {
             apiWss.emit("connection", ws, request);
         });
     } else {
-        hocuspocus.handleUpgrade(request, socket, head);
+        hocuspocus.webSocketServer.handleUpgrade(request, socket, head, (ws) => {
+            hocuspocus.webSocketServer.emit("connection", ws, request);
+        });
     }
 });
 

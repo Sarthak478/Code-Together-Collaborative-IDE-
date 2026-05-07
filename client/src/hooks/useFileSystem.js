@@ -32,6 +32,10 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, isHost
 
   /* ── Tree API Fetching ── */
   const refreshPath = useCallback((path = "/") => {
+    if (!(pendingRefreshes.current instanceof Set)) {
+      pendingRefreshes.current = new Set()
+    }
+
     if (pendingRefreshes.current.has(path)) return
     pendingRefreshes.current.add(path)
     

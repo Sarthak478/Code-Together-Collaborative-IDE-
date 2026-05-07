@@ -11,7 +11,12 @@ export default defineConfig({
     monacoEditorPlugin({
       languageWorkers: ['editorWorkerService', 'typescript', 'json']
     }),
-    sri()
+    sri({
+      skipResources: [
+        'https://fonts.googleapis.com/*',
+        'https://fonts.gstatic.com/*'
+      ]
+    })
   ],
   build: {
     rollupOptions: {
