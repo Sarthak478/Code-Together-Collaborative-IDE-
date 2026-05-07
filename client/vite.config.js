@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import monacoEditorPluginModule from 'vite-plugin-monaco-editor'
+import sri from '@small-tech/vite-plugin-sri'
+
 const monacoEditorPlugin = monacoEditorPluginModule.default || monacoEditorPluginModule;
 
 export default defineConfig({
@@ -8,7 +10,8 @@ export default defineConfig({
     react(),
     monacoEditorPlugin({
       languageWorkers: ['editorWorkerService', 'typescript', 'json']
-    })
+    }),
+    sri()
   ],
   build: {
     rollupOptions: {
