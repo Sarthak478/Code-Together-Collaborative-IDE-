@@ -1,8 +1,9 @@
-import { useState } from "react"
+import { useState, lazy, Suspense } from "react"
 import Landing from "./components/Landing"
-import EditorRoom from "./components/EditorRoom"
-import IDERoom from "./components/IDERoom"
 import RoomWrapper from "./components/RoomWrapper"
+
+const EditorRoom = lazy(() => import("./components/EditorRoom"))
+const IDERoom = lazy(() => import("./components/IDERoom"))
 
 const SESSION_KEY = "ls_session"
 
@@ -64,8 +65,8 @@ export default function App() {
   }
 
   // Route to IDE or Compiler based on roomMode
-  if (roomMode === "ide") {
-    return (
+  return (
+    <Suspense fallback={null}>
       <RoomWrapper
         roomId={roomId}
         roomType={roomType}
@@ -74,33 +75,24 @@ export default function App() {
         roomMode={roomMode}
         onLeave={onLeave}
       >
-        <IDERoom
-          roomId={roomId}
-          initialRoomType={roomType}
-          isCreating={isCreating}
-          username={username}
-          onLeave={onLeave}
-        />
+        {roomMode === "ide" ? (
+          <IDERoom
+            roomId={roomId}
+            initialRoomType={roomType}
+            isCreating={isCreating}
+            username={username}
+            onLeave={onLeave}
+          />
+        ) : (
+          <EditorRoom
+            roomId={roomId}
+            initialRoomType={roomType}
+            isCreating={isCreating}
+            username={username}
+            onLeave={onLeave}
+          />
+        )}
       </RoomWrapper>
-    )
-  }
-
-  return (
-    <RoomWrapper
-      roomId={roomId}
-      roomType={roomType}
-      isCreating={isCreating}
-      username={username}
-      roomMode={roomMode}
-      onLeave={onLeave}
-    >
-      <EditorRoom
-        roomId={roomId}
-        initialRoomType={roomType}
-        isCreating={isCreating}
-        username={username}
-        onLeave={onLeave}
-      />
-    </RoomWrapper>
+    </Suspense>
   )
 }

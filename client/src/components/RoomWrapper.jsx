@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { API_URL, COLLAB_URL } from "../config";
 import { motion } from "framer-motion";
 import { ShieldAlert, Loader2, DoorOpen, ShieldCheck } from "lucide-react";
+import { initVSCode } from "../services/vscode";
 
 export default function RoomWrapper({ roomId, roomType, isCreating, username, roomMode, onLeave, children }) {
   const [status, setStatus] = useState("checking");
@@ -118,6 +119,13 @@ export default function RoomWrapper({ roomId, roomType, isCreating, username, ro
 
     return () => { isMounted = false; };
   }, [roomId, roomType, isCreating, username]);
+
+  // Defer Monaco initialization until approved
+  useEffect(() => {
+    if (status === "approved") {
+      initVSCode();
+    }
+  }, [status]);
 
   if (status === "checking" || status === "waiting") {
     return (

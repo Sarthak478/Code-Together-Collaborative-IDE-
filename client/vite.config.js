@@ -9,5 +9,16 @@ export default defineConfig({
     monacoEditorPlugin({
       languageWorkers: ['editorWorkerService', 'typescript', 'json']
     })
-  ]
+  ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          monaco: ['@codingame/monaco-vscode-api', 'monaco-editor'],
+          vendor: ['react', 'react-dom', 'framer-motion', 'lucide-react']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000
+  }
 })

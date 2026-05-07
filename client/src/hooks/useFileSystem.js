@@ -35,29 +35,30 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, isHost
     if (pendingRefreshes.current.has(path)) return
     pendingRefreshes.current.add(path)
     
-    setTimeout(async () => {
-      pendingRefreshes.current.delete(path)
+    (async () => {
       try {
-      const resp = await fetch(`${API_URL}/tree?roomId=${roomId}&path=${encodeURIComponent(path)}`)
-      if (!resp.ok) return
-      let children = await resp.json()
+        const resp = await fetch(`${API_URL}/tree?roomId=${roomId}&path=${encodeURIComponent(path)}`)
+        if (!resp.ok) return
+        let children = await resp.json()
 
-      children = children.map(c => ({
-        ...c,
-        language: c.type === "file" ? detectLanguage(c.name) : null
-      }))
+        children = children.map(c => ({
+          ...c,
+          language: c.type === "file" ? detectLanguage(c.name) : null
+        }))
 
-      children.sort((a, b) => {
-        if (a.type !== b.type) return a.type === "folder" ? -1 : 1
-        return a.name.localeCompare(b.name)
-      })
+        children.sort((a, b) => {
+          if (a.type !== b.type) return a.type === "folder" ? -1 : 1
+          return a.name.localeCompare(b.name)
+        })
 
-      setTree(prev => ({ ...prev, [path]: children }))
-      setVersion(v => v + 1)
-    } catch (e) {
-      console.error("Failed to fetch tree:", e)
-    }
-    }, 100)
+        setTree(prev => ({ ...prev, [path]: children }))
+        setVersion(v => v + 1)
+      } catch (e) {
+        console.error("Failed to fetch tree:", e)
+      } finally {
+        pendingRefreshes.current.delete(path)
+      }
+    })()
   }, [roomId, detectLanguage])
 
   // Initial load

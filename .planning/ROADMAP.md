@@ -11,9 +11,10 @@
 - [x] Remove test scripts (`test_*.js`).
 - [x] Delete diagnostic utilities and temporary log files.
 
-### [IN PROGRESS] Phase 3: Email Invitation System
-- [ ] Configure production SMTP with Resend/SendGrid.
-- [ ] Verify invite link generation in production emails.
+### [DONE] Phase 3: Email Invitation System & Security
+- [x] Integrate Resend SDK for production email delivery.
+- [x] Implement rate limiting for the invitation endpoint.
+- [x] Fix WebSocket secure connection (WSS) issues for production.
 
 ### [PENDING] Phase 4: Git Integration Refinement
 - [ ] Fix Push/Pull reliability issues.

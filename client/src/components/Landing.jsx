@@ -140,12 +140,6 @@ const getToastStyles = (type) => {
   }
 }
 
-/* ─── Font Injection ──────────────────────────────────────────────── */
-const fontLink = document.createElement('link');
-fontLink.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap';
-fontLink.rel = 'stylesheet';
-document.head.appendChild(fontLink);
-
 /* ─── Landing Page ──────────────────────────────────────────────── */
 export default function Landing({ username, onUsernameChange, onJoin, initialError }) {
   const [joinId, setJoinId] = useState("")

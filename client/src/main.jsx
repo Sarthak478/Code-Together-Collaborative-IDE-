@@ -4,8 +4,6 @@ import App from './App.jsx'
 
 import { initVSCode } from './services/vscode.js'
 
-initVSCode().then(() => {
-  createRoot(document.getElementById('root')).render(
-    <App />
-  )
-})
+createRoot(document.getElementById('root')).render(
+  <App />
+)

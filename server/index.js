@@ -3,6 +3,7 @@ const { parse } = require("url");
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
+const helmet = require("helmet");
 const dotenv = require("dotenv");
 const { initAPI } = require("./api.js");
 const {
@@ -24,6 +25,47 @@ dotenv.config();
 const app = express();
 const httpServer = http.createServer(app);
 const PORT = process.env.PORT || 1236;
+
+// Force HTTPS Redirection (For Port 80 Security)
+app.use((req, res, next) => {
+    if (req.header('x-forwarded-proto') !== 'https' && process.env.NODE_ENV === 'production') {
+        res.redirect(`https://${req.header('host')}${req.url}`);
+    } else {
+        next();
+    }
+});
+
+// Security Middleware (Helmet)
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            "default-src": ["'self'"],
+            "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'", "blob:"],
+            "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            "font-src": ["'self'", "https://fonts.gstatic.com"],
+            "connect-src": [
+                "'self'", 
+                "https://code-together-collaborative-ide.onrender.com", 
+                "wss://code-together-collaborative-ide.onrender.com",
+                "https://code-together.me",
+                "wss://code-together.me",
+                "http://localhost:*",
+                "ws://localhost:*"
+            ],
+            "img-src": ["'self'", "data:", "blob:"],
+            "worker-src": ["'self'", "blob:"],
+            "frame-src": ["'self'"],
+            "frame-ancestors": ["'self'"],
+            "object-src": ["'none'"]
+        }
+    },
+    hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
+    },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" }
+}));
 
 // Enable CORS for Express
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
