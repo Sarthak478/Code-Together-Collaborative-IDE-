@@ -39,7 +39,7 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, isHost
     if (pendingRefreshes.current.has(path)) return
     pendingRefreshes.current.add(path);
     
-    (async () => {
+    const fetchTree = async () => {
       try {
         const resp = await fetch(`${API_URL}/tree?roomId=${roomId}&path=${encodeURIComponent(path)}`)
         if (!resp.ok) return
@@ -62,7 +62,9 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, isHost
       } finally {
         pendingRefreshes.current.delete(path)
       }
-    })()
+    }
+
+    fetchTree()
   }, [roomId, detectLanguage])
 
   // Initial load
