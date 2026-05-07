@@ -255,8 +255,9 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     provider.awareness.on("change", onAwarenessChange)
     recalcHost()
 
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${API_URL.replace(/^https?/, wsProtocol)}/execution`)
+    // Execution WS — replace http→ws / https→wss without double-colon bug
+    const wsBase = API_URL.replace(/^http/, 'ws');
+    const ws = new WebSocket(`${wsBase}/execution`)
     ws.onopen = () => ws.send(JSON.stringify({ type: "join", roomId }))
     ws.onmessage = (event) => {
       try {
