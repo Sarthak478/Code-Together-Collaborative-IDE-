@@ -9,6 +9,46 @@ import { loadPersonalPrefs, savePersonalPrefs } from "../utils/helpers"
 import useFileSystem from "./useFileSystem"
 import { WS_URL, API_URL, COLLAB_URL } from "../config"
 
+const LOCAL_AGENT_TRIGGERS = [
+  "import tensorflow",
+  "from tensorflow",
+  "import torch",
+  "from torch",
+  "import transformers",
+  "from transformers",
+  "import sklearn",
+  "from sklearn",
+  "import cv2",
+  "from cv2",
+  "import llama_cpp",
+  "from llama_cpp",
+  "import keras",
+  "from keras",
+]
+
+const hasLocalComputeTrigger = (language, code) => {
+  if (language !== "python") return false
+  const normalized = code.toLowerCase()
+  return LOCAL_AGENT_TRIGGERS.some(trigger => normalized.includes(trigger))
+}
+
+const getLocalAgentLaunchUrl = (roomId) => {
+  const params = new URLSearchParams({
+    room: roomId,
+    server: API_URL,
+  })
+  return `liveshare://connect?${params.toString()}`
+}
+
+const getLocalAgentFallbackText = (roomId) => [
+  "If the one-click Local Agent link does not open, use one of these:",
+  "",
+  `Python/pipx: pipx run liveshare-agent connect --room ${roomId} --server ${API_URL}`,
+  `Python module: python -m liveshare_agent connect --room ${roomId} --server ${API_URL}`,
+  `Node/npm: npx liveshare-agent connect --room ${roomId} --server ${API_URL}`,
+  `Docker: docker run --rm -it liveshare/agent connect --room ${roomId} --server ${API_URL}`,
+].join("\n")
+
 export default function useIDERoom({ roomId, initialRoomType, isCreating, username, onLeave }) {
   /* ── Yjs stable refs ── */
   const [editor] = useState(() => {
@@ -416,19 +456,27 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     const code = activeYText?.toString() || ""
     if (!code.trim()) { addToast("⚠️ Cannot run an empty file."); return }
 
-    // Intercept Heavy ML Workloads
-    if (activeLanguage === "python" && (code.includes("import tensorflow") || code.includes("from tensorflow"))) {
-      const proceed = window.confirm(
-        "⚠️ Heavy Compute Detected!\n\n" +
-        "It looks like you are importing TensorFlow. Running machine learning models on our cloud CPUs may crash the room and terminate your session.\n\n" +
-        "INSTRUCTIONS FOR LOCAL GPU:\n" +
-        `1. Open your computer's terminal (not this web terminal).\n` +
-        `2. Run this command: npx liveshare-agent connect --room ${roomId}\n` +
-        "3. Your web IDE will now use your local hardware!\n\n" +
-        "(Note: Local Agent is currently in Beta)\n\n" +
-        "Are you absolutely sure you want to run this code on the cloud?"
+    // Intercept heavy local workloads before sending them to the cloud terminal.
+    if (hasLocalComputeTrigger(activeLanguage, code)) {
+      const fallbackText = getLocalAgentFallbackText(roomId)
+      const openLocal = window.confirm(
+        "Heavy local compute detected.\n\n" +
+        "This file imports ML/CV libraries that can overload the cloud runner. " +
+        "Use your own system through the Local Agent instead.\n\n" +
+        "Press OK to open the Local Agent connector on this computer.\n" +
+        "Press Cancel to continue running on the cloud.\n\n" +
+        fallbackText
       )
-      if (!proceed) return
+
+      if (openLocal) {
+        try {
+          await navigator.clipboard?.writeText(fallbackText)
+          addToast("Local Agent fallback commands copied.")
+        } catch (_) {}
+
+        window.location.href = getLocalAgentLaunchUrl(roomId)
+        return
+      }
     }
 
     try {
