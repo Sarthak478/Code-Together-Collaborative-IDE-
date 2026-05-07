@@ -1,67 +1,25 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const dotenv = require('dotenv');
 
 dotenv.config();
 
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+
 const isConfigured = () => {
-    return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
-};
-
-// Create a delayed transporter to avoid crashing if config is missing
-let transporter = null;
-
-const getTransporter = () => {
-    if (transporter) return transporter;
-
-    if (!isConfigured()) {
-        console.warn('⚠️ [EMAIL SERVICE] SMTP credentials missing in .env. Email invitations will not be sent.');
-        return null;
-    }
-
-    try {
-        transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST,
-            port: parseInt(process.env.SMTP_PORT || '587'),
-            secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
-            auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS
-            },
-            // For production reliability
-            pool: true,
-            maxConnections: 5,
-            maxMessages: 100
-        });
-        
-        // Verify connection silently in the background
-        transporter.verify((error) => {
-            if (error) {
-                console.error('❌ [EMAIL SERVICE] SMTP Verification Failed:', error.message);
-                transporter = null; // Reset to try again next time or fail gracefully
-            } else {
-                console.log('✅ [EMAIL SERVICE] SMTP Connection Established');
-            }
-        });
-
-        return transporter;
-    } catch (err) {
-        console.error('❌ [EMAIL SERVICE] Failed to create transporter:', err.message);
-        return null;
-    }
+    return !!process.env.RESEND_API_KEY;
 };
 
 /**
- * Sends an invitation email to a recipient
+ * Sends an invitation email to a recipient using Resend SDK
  * @param {string} to - Recipient email
  * @param {string} roomId - Room ID to join
  * @param {string} inviter - Name of the person inviting
  */
 const sendInviteEmail = async (to, roomId, inviter) => {
     try {
-        const mailTransporter = getTransporter();
-        
-        if (!mailTransporter) {
-            throw new Error('Email service is not configured or failed to initialize.');
+        if (!resend || !process.env.RESEND_API_KEY) {
+            console.error('❌ [EMAIL SERVICE] RESEND_API_KEY missing or client not initialized.');
+            throw new Error('Email service is not configured. Please add RESEND_API_KEY to your environment.');
         }
 
         const clientUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -179,17 +137,25 @@ const sendInviteEmail = async (to, roomId, inviter) => {
         </html>
         `;
 
-        const fromEmail = process.env.SMTP_FROM || '"CodeTogether" <noreply@codetogether.app>';
+        const fromEmail = process.env.EMAIL_FROM || 'CodeTogether <onboarding@resend.dev>';
 
-        return await mailTransporter.sendMail({
+        const { data, error } = await resend.emails.send({
             from: fromEmail,
             to,
             subject: `[Invitation] Establish Link with ${inviter}`,
             html: htmlContent
         });
+
+        if (error) {
+            console.error('❌ [EMAIL SERVICE:RESEND_ERROR]', error);
+            throw new Error(error.message);
+        }
+
+        console.log('✅ [EMAIL SERVICE] Email sent via Resend:', data.id);
+        return data;
     } catch (err) {
         console.error('❌ [EMAIL SERVICE:ERROR]', err.message);
-        throw err; // Rethrow to let the API handle the response
+        throw err;
     }
 };
 

@@ -27,6 +27,14 @@ const initAPI = (app, server) => {
     message: { error: "Too many requests from this IP, please try again after 15 minutes" }
   });
 
+  const inviteLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 10, // 10 invites per hour
+    message: { error: "Invitation limit reached. Please try again in an hour." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   app.use(limiter);
 
   const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
@@ -1044,7 +1052,7 @@ const initAPI = (app, server) => {
   });
 
   /* -------------------- INVITATION SYSTEM -------------------- */
-  app.post("/api/rooms/:roomId/invite", async (req, res) => {
+  app.post("/api/rooms/:roomId/invite", inviteLimiter, async (req, res) => {
     const { roomId } = req.params;
     const { emails, inviter, roomType, isHost } = req.body;
 
@@ -1063,7 +1071,7 @@ const initAPI = (app, server) => {
       res.json({ success: true, message: `Invitations sent to ${emails.length} recipient(s).` });
     } catch (error) {
       console.error("Invite error:", error);
-      res.status(500).json({ error: "Failed to send invitations. Please check SMTP configuration." });
+      res.status(500).json({ error: error.message || "Failed to send invitations. Please check your email configuration." });
     }
   });
 
