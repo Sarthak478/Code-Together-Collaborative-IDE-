@@ -37,7 +37,7 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, isHost
     }
 
     if (pendingRefreshes.current.has(path)) return
-    pendingRefreshes.current.add(path)
+    pendingRefreshes.current.add(path);
     
     (async () => {
       try {
