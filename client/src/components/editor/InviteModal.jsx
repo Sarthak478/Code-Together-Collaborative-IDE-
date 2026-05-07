@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { X, Send, Mail, Plus, UserPlus, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { API_URL } from "../../config";
 
-export default function InviteModal({ isOpen, onClose, roomId, roomType, isHost, username }) {
+export default function InviteModal({ isOpen, onClose, roomId, roomType, roomMode, isHost, username }) {
   const [emails, setEmails] = useState([""]);
   const [isSending, setIsSending] = useState(false);
   const [status, setStatus] = useState(null); // 'success' | 'error'
@@ -43,6 +43,7 @@ export default function InviteModal({ isOpen, onClose, roomId, roomType, isHost,
         body: JSON.stringify({
           emails: validEmails,
           inviter: username,
+          roomMode,
           roomType,
           isHost
         })

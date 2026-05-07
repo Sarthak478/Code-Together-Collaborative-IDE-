@@ -45,6 +45,7 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
         onClose={() => setInviteOpen(false)} 
         roomId={roomId} 
         roomType={room.actualRoomType}
+        roomMode="compiler"
         isHost={room.isHost}
         username={username}
       />

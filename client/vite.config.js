@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import monacoEditorPluginModule from 'vite-plugin-monaco-editor'
-import sri from '@small-tech/vite-plugin-sri'
+import sri from 'vite-plugin-sri-gen'
 
 const monacoEditorPlugin = monacoEditorPluginModule.default || monacoEditorPluginModule;
 

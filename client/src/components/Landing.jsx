@@ -151,6 +151,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
   const [activeTab, setActiveTab] = useState("create")
   const [isValidating, setIsValidating] = useState(false)
   const [roomExists, setRoomExists] = useState(null)
+  const [inviteDetails, setInviteDetails] = useState(null)
   const [theme, setTheme] = useState(() => {
     const savedTheme = localStorage.getItem('theme')
     if (savedTheme && (savedTheme === 'dark' || savedTheme === 'light')) {
@@ -173,6 +174,15 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
     const params = new URLSearchParams(window.location.search)
     const roomId = params.get("room")
     if (roomId) {
+      const roomType = params.get("type")
+      const roomMode = params.get("mode")
+      const validTypes = ["collaborative", "interview", "broadcast"]
+      const validModes = ["compiler", "ide"]
+      setInviteDetails({
+        roomId,
+        roomType: validTypes.includes(roomType) ? roomType : "collaborative",
+        roomMode: validModes.includes(roomMode) ? roomMode : "ide"
+      })
       setJoinId(roomId)
       setActiveTab("join")
       // Clear the URL parameter without refreshing
@@ -282,7 +292,13 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
         return
       }
       
-      onJoin(id, "collaborative", false, "ide")
+      const inviteMatches = inviteDetails?.roomId === id
+      onJoin(
+        id,
+        inviteMatches ? inviteDetails.roomType : "collaborative",
+        false,
+        inviteMatches ? inviteDetails.roomMode : "ide"
+      )
     } catch(e) {
       console.error(e)
       addToast("⚠️ Unable to connect to sanctuary servers.", "error")
@@ -678,7 +694,13 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
                 </label>
                 <div style={{ position: "relative" }}>
                   <input
-                    ref={joinInputRef} disabled={isJoining} value={joinId} onChange={e => setJoinId(e.target.value)}
+                    ref={joinInputRef} disabled={isJoining} value={joinId} onChange={e => {
+                      const nextValue = e.target.value
+                      setJoinId(nextValue)
+                      if (inviteDetails && nextValue.trim().replace(/^#/, '') !== inviteDetails.roomId) {
+                        setInviteDetails(null)
+                      }
+                    }}
                     onKeyDown={e => { if (e.key === "Enter" && joinId.trim() && !isJoining && roomExists) handleJoin() }}
                     placeholder="e.g. quantum-fox-99"
                     style={{

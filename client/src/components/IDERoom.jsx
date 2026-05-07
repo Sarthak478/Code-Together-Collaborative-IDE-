@@ -121,6 +121,7 @@ export default function IDERoom(props) {
         onClose={() => setInviteOpen(false)} 
         roomId={ide.roomId} 
         roomType={ide.actualRoomType}
+        roomMode="ide"
         isHost={ide.isHost}
         username={ide.editor.username}
       />

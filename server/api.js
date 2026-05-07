@@ -1054,7 +1054,7 @@ const initAPI = (app, server) => {
   /* -------------------- INVITATION SYSTEM -------------------- */
   app.post("/api/rooms/:roomId/invite", inviteLimiter, async (req, res) => {
     const { roomId } = req.params;
-    const { emails, inviter, roomType, isHost } = req.body;
+    const { emails, inviter, roomType, roomMode, isHost } = req.body;
 
     if (!emails || !Array.isArray(emails) || emails.length === 0) {
       return res.status(400).json({ error: "At least one email address is required." });
@@ -1066,7 +1066,7 @@ const initAPI = (app, server) => {
     }
 
     try {
-      const sendPromises = emails.map(email => sendInviteEmail(email, roomId, inviter || "A colleague"));
+      const sendPromises = emails.map(email => sendInviteEmail(email, roomId, inviter || "A colleague", { roomType, roomMode, isHost }));
       await Promise.all(sendPromises);
       res.json({ success: true, message: `Invitations sent to ${emails.length} recipient(s).` });
     } catch (error) {

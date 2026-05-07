@@ -15,7 +15,7 @@ const isConfigured = () => {
  * @param {string} roomId - Room ID to join
  * @param {string} inviter - Name of the person inviting
  */
-const sendInviteEmail = async (to, roomId, inviter) => {
+const sendInviteEmail = async (to, roomId, inviter, options = {}) => {
     try {
         if (!resend || !process.env.RESEND_API_KEY) {
             console.error('❌ [EMAIL SERVICE] RESEND_API_KEY missing or client not initialized.');
@@ -23,7 +23,10 @@ const sendInviteEmail = async (to, roomId, inviter) => {
         }
 
         const clientUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const joinLink = `${clientUrl}/?room=${roomId}`;
+        const joinParams = new URLSearchParams({ room: roomId });
+        if (options.roomType) joinParams.set("type", options.roomType);
+        if (options.roomMode) joinParams.set("mode", options.roomMode);
+        const joinLink = `${clientUrl}/?${joinParams.toString()}`;
         
         const htmlContent = `
         <!DOCTYPE html>
