@@ -179,6 +179,7 @@ export default function SourceControlPanel({
   const handlePush = async () => {
     if (!hasPat) {
       setSyncError("GitHub PAT not configured")
+      if (onOpenSettings) onOpenSettings()
       return
     }
 
@@ -217,6 +218,7 @@ export default function SourceControlPanel({
   const handlePull = async () => {
     if (!hasPat) {
       setSyncError("GitHub PAT not configured")
+      if (onOpenSettings) onOpenSettings()
       return
     }
 
@@ -662,6 +664,22 @@ export default function SourceControlPanel({
                 style={{ width: "100%", justifyContent: "center", fontSize: 11, padding: "8px 0", background: "transparent", border: `1px solid ${accent}`, color: accent }}
               >
                 Connect Repository
+              </button>
+            </>
+          ) : !hasPat ? (
+            <>
+              <p style={{ fontSize: 10, opacity: 0.5, margin: "0 0 12px 0", lineHeight: 1.4 }}>
+                Repository connected. Add a GitHub PAT in Settings to enable push and pull.
+              </p>
+              <button
+                onClick={() => {
+                  setSyncError("")
+                  if (onOpenSettings) onOpenSettings()
+                }}
+                className="ide-btn-premium"
+                style={{ width: "100%", justifyContent: "center", fontSize: 11, padding: "8px 0", background: accent, border: "none", color: "#1e1e2e" }}
+              >
+                <Settings size={14} /> Configure GitHub PAT
               </button>
             </>
           ) : (
