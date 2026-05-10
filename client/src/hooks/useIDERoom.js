@@ -462,6 +462,13 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     const code = activeYText?.toString() || ""
     if (!code.trim()) { addToast("⚠️ Cannot run an empty file."); return }
 
+    if (activeLanguage === "html" || activeLanguage === "markdown") {
+      setPreviewOpen(true)
+      setTerminalOpen(false)
+      addToast(`${activeFileEntry.name} opened in preview.`)
+      return
+    }
+
     // Intercept heavy local workloads before sending them to the cloud terminal.
     if (hasLocalComputeTrigger(activeLanguage, code)) {
       const fallbackText = getLocalAgentFallbackText(roomId)

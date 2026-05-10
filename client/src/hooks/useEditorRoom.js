@@ -422,6 +422,12 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     const code = editor.ytext.toString()
     if (!code.trim()) { setOutput("(empty code)"); return }
 
+    if (language === "html" || language === "markdown") {
+      setPreviewOpen(true)
+      setOutput("")
+      return
+    }
+
     try {
       const res = await fetch(`${API_URL}/run`, {
         method: "POST",

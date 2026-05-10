@@ -83,7 +83,7 @@ export default function Toolbar({
           ) : (
             <Rocket size={16} fill={canRun ? "#fff" : "transparent"} />
           )}
-          <span style={{ fontFamily: "'Manrope', sans-serif", letterSpacing: "0.02em" }}>{runner ? "Running..." : "Run Engine"}</span>
+          <span style={{ fontFamily: "'Manrope', sans-serif", letterSpacing: "0.02em" }}>{runner ? "Running..." : language === "html" || language === "markdown" ? "Open Preview" : "Run Engine"}</span>
         </button>
 
         {/* Download Button */}

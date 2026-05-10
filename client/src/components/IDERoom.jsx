@@ -178,7 +178,7 @@ export default function IDERoom(props) {
               "⏳ Queued"
             ) : (
               <>
-                <span>▶</span> Run in Terminal
+                <span>▶</span> {ide.activeLanguage === "html" || ide.activeLanguage === "markdown" ? "Open Preview" : "Run in Terminal"}
               </>
             )}
           </button>
