@@ -13,9 +13,10 @@ import {
   FileJson,
   FileType,
   FileType2,
+  FileCode,
   Terminal as TerminalIcon,
   Image as ImageIcon,
-  Settings,
+  Settings as SettingsIcon,
   Database,
   Shield,
   Layout,
@@ -26,7 +27,8 @@ import {
   X,
   Check,
   Download,
-  Upload
+  Upload,
+  Eye
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
