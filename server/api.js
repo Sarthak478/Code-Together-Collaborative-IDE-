@@ -1049,7 +1049,6 @@ const initAPI = (app, server) => {
             sort: "updated",
             per_page: 100,
             page,
-            type: "all",
             affiliation: "owner,collaborator,organization_member"
           },
           headers
