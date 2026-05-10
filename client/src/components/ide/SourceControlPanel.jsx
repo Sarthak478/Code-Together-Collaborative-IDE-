@@ -183,6 +183,13 @@ export default function SourceControlPanel({
       return
     }
 
+    // Require commit message when there are uncommitted changes
+    const hasUncommittedChanges = gitStatus && (gitStatus.modified.length > 0 || gitStatus.not_added.length > 0 || gitStatus.deleted.length > 0 || gitStatus.staged.length > 0)
+    if (hasUncommittedChanges && !commitMessage.trim()) {
+      setSyncError("Please enter a commit message before pushing. All changes will be committed automatically.")
+      return
+    }
+
     setIsSyncing(true)
     setSyncError("")
     setSyncSuccess("")
@@ -194,7 +201,8 @@ export default function SourceControlPanel({
         body: JSON.stringify({
           roomId,
           pat: githubPat,
-          username: username
+          username: username,
+          commitMessage: commitMessage.trim() || undefined
         })
       })
 
@@ -205,6 +213,7 @@ export default function SourceControlPanel({
       }
 
       setSyncSuccess("✓ Successfully pushed to GitHub")
+      setCommitMessage("")
       setTimeout(() => setSyncSuccess(""), 3000)
       onRefresh()
     } catch (e) {

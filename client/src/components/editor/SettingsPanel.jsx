@@ -17,7 +17,8 @@ import {
   TerminalSquare,
   Rocket,
   RefreshCw,
-  Check
+  Check,
+  Shield
 } from "lucide-react"
 
 import { API_URL } from "../../config"
@@ -85,6 +86,8 @@ export default function SettingsPanel({
       setIsInitializing(false);
     }
   }
+
+  const hasPat = personalPrefs.githubPat && personalPrefs.githubPat.trim() !== ""
 
   return (
     <>
@@ -184,30 +187,82 @@ export default function SettingsPanel({
                         />
                       </div>
                       <div style={{ background: "rgba(255,255,255,0.01)", padding: 10, borderRadius: 8, border: `1px solid ${borderCol}`, borderStyle: "dashed" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 800, color: accent, marginBottom: 6 }}>
-                          <GithubIcon size={14} color={accent} /> GitHub Integration
-                        </div>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-                          <label style={{ fontSize: 10, opacity: 0.5 }}>Personal Access Token (PAT)</label>
-                          <a 
-                            href="https://github.com/settings/tokens" 
-                            target="_blank" 
-                            rel="noreferrer"
-                            style={{ color: accent, fontSize: 10, textDecoration: "none", fontWeight: 700 }}
-                            onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
-                            onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
-                          >
-                            Generate New Token
-                          </a>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 800, color: accent, marginBottom: 6 }}>
+                            <GithubIcon size={14} color={accent} /> GitHub Integration
+                          </div>
+                          {!hasPat && (
+                            <a 
+                              href="https://github.com/settings/tokens" 
+                              target="_blank" 
+                              rel="noreferrer"
+                              style={{ color: accent, fontSize: 10, textDecoration: "none", fontWeight: 700 }}
+                              onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
+                              onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+                            >
+                              Generate New Token
+                            </a>
+                          )}
                         </div>
-                        <input 
-                          type="password" 
-                          placeholder="ghp_xxxxxxxxxxxx"
-                          value={personalPrefs.githubPat || ""}
-                          onChange={e => updatePersonalPref("githubPat", e.target.value)}
-                          style={{ width: "100%", background: "rgba(0,0,0,0.3)", color: textColor, border: `1px solid ${borderCol}`, borderRadius: 8, padding: "8px 12px", fontSize: 11, outline: "none", boxSizing: "border-box", marginBottom: 6 }}
-                        />
-                        {personalPrefs.githubPat && personalPrefs.githubPat.trim() !== "" && roomId && (
+                        <div style={{ fontSize: 10, opacity: 0.5, marginBottom: 8 }}>Personal Access Token (PAT)</div>
+
+                        {hasPat ? (
+                          /* PAT is configured — show locked state with Disconnect */
+                          <div>
+                            <div style={{
+                              display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
+                              background: "rgba(166, 227, 161, 0.06)", border: "1px solid rgba(166, 227, 161, 0.2)",
+                              borderRadius: 10, marginBottom: 8
+                            }}>
+                              <div style={{
+                                width: 8, height: 8, borderRadius: "50%", background: "#a6e3a1",
+                                boxShadow: "0 0 8px rgba(166, 227, 161, 0.6)", flexShrink: 0
+                              }} />
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 11, fontWeight: 800, color: "#a6e3a1" }}>PAT Configured</div>
+                                <div style={{ fontSize: 9, opacity: 0.5, marginTop: 2 }}>
+                                  {personalPrefs.githubPat.startsWith("github_pat_") ? "Fine-grained" : "Classic"} token ending in •••{personalPrefs.githubPat.slice(-4)}
+                                </div>
+                              </div>
+                              <Shield size={14} color="#a6e3a1" opacity={0.6} />
+                            </div>
+                            <button
+                              onClick={() => {
+                                if (window.confirm("Disconnect GitHub PAT? You will need to re-enter it to push/pull.")) {
+                                  updatePersonalPref("githubPat", "")
+                                }
+                              }}
+                              style={{
+                                width: "100%", padding: "8px 0", borderRadius: 8,
+                                background: "rgba(243, 139, 168, 0.08)", border: "1px solid rgba(243, 139, 168, 0.25)",
+                                color: "#f38ba8", fontSize: 11, fontWeight: 700,
+                                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                                transition: "all 0.2s"
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.background = "rgba(243, 139, 168, 0.15)"
+                                e.currentTarget.style.borderColor = "rgba(243, 139, 168, 0.4)"
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.background = "rgba(243, 139, 168, 0.08)"
+                                e.currentTarget.style.borderColor = "rgba(243, 139, 168, 0.25)"
+                              }}
+                            >
+                              <Trash2 size={12} /> Disconnect PAT
+                            </button>
+                          </div>
+                        ) : (
+                          /* PAT not configured — show input */
+                          <input 
+                            type="password" 
+                            placeholder="ghp_xxxxxxxxxxxx"
+                            value={personalPrefs.githubPat || ""}
+                            onChange={e => updatePersonalPref("githubPat", e.target.value)}
+                            style={{ width: "100%", background: "rgba(0,0,0,0.3)", color: textColor, border: `1px solid ${borderCol}`, borderRadius: 8, padding: "8px 12px", fontSize: 11, outline: "none", boxSizing: "border-box", marginBottom: 6 }}
+                          />
+                        )}
+
+                        {hasPat && roomId && (
                            <button 
                              onClick={handleInitRepo}
                              disabled={isInitializing}

@@ -955,7 +955,7 @@ const initAPI = (app, server) => {
   });
 
   app.post("/git/push", async (req, res) => {
-    const { roomId, pat, username } = req.body;
+    const { roomId, pat, username, commitMessage } = req.body;
     const token = normalizePat(pat);
 
     if (!token) {
@@ -969,6 +969,24 @@ const initAPI = (app, server) => {
       const status = await git.status();
       const currentBranch = status.current;
 
+      // If a commit message was provided, auto-stage all changes and commit first
+      if (commitMessage && commitMessage.trim()) {
+        const hasChanges = status.modified.length > 0 || status.not_added.length > 0 || status.deleted.length > 0 || status.staged.length > 0;
+        if (hasChanges) {
+          await git.add(".");
+          const authorName = username || "CodeTogether User";
+          await git.addConfig("user.name", authorName);
+          await git.commit(commitMessage.trim());
+        }
+      }
+
+      // Verify there are commits to push
+      try {
+        await git.log();
+      } catch (logErr) {
+        return res.status(400).json({ error: "No commits found. Please commit your changes before pushing." });
+      }
+
       // Get remote URL
       let remoteUrl;
       try {
@@ -980,17 +998,26 @@ const initAPI = (app, server) => {
 
       const authUrl = buildAuthenticatedGitHubUrl(remoteUrl, token, username);
 
-      // Set upstream if not set
+      // Temporarily swap origin to authenticated URL, push, then restore
       try {
-        await git.push(["-u", authUrl, currentBranch]);
+        await git.removeRemote("origin");
+        await git.addRemote("origin", authUrl);
+        await git.push(["-u", "origin", currentBranch]);
       } catch (pushErr) {
-        // If first push fails, try force with lease
-        if (pushErr.message.includes("rejected") || pushErr.message.includes("failed to push")) {
+        if (pushErr.message.includes("rejected") || pushErr.message.includes("failed to push") || pushErr.message.includes("non-fast-forward")) {
           return res.status(400).json({
             error: "Push rejected. The remote contains work you don't have locally. Try pulling first."
           });
         }
         throw pushErr;
+      } finally {
+        // Always restore the clean (non-authenticated) remote URL
+        try {
+          await git.removeRemote("origin");
+          await git.addRemote("origin", remoteUrl);
+        } catch (_restoreErr) {
+          console.warn("[git/push] Failed to restore clean remote URL:", _restoreErr.message);
+        }
       }
 
       res.json({ success: true, message: `Pushed to ${currentBranch}` });
@@ -1026,8 +1053,20 @@ const initAPI = (app, server) => {
 
       const authUrl = buildAuthenticatedGitHubUrl(remoteUrl, token, username);
 
-      // Pull changes
-      await git.pull(authUrl, currentBranch, { "--no-rebase": null, "--allow-unrelated-histories": null });
+      // Temporarily swap origin to authenticated URL, pull, then restore
+      try {
+        await git.removeRemote("origin");
+        await git.addRemote("origin", authUrl);
+        await git.pull("origin", currentBranch, { "--no-rebase": null, "--allow-unrelated-histories": null });
+      } finally {
+        // Always restore the clean (non-authenticated) remote URL
+        try {
+          await git.removeRemote("origin");
+          await git.addRemote("origin", remoteUrl);
+        } catch (_restoreErr) {
+          console.warn("[git/pull] Failed to restore clean remote URL:", _restoreErr.message);
+        }
+      }
 
       res.json({ success: true, message: `Pulled from ${currentBranch}` });
     } catch (err) {
