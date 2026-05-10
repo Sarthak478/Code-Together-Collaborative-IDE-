@@ -116,7 +116,13 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
   /* ── Personal UI refs ── */
   const [personalPrefs, setPersonalPrefs] = useState(() => {
     const p = loadPersonalPrefs()
-    return { theme: p.theme || "dark", fontSize: p.fontSize || 14, fontFamily: p.fontFamily || "monospace", cursor: p.cursor || "text" }
+    return {
+      ...p,
+      theme: p.theme || "dark",
+      fontSize: p.fontSize || 14,
+      fontFamily: p.fontFamily || "monospace",
+      cursor: p.cursor || "text"
+    }
   })
   const updatePersonalPref = useCallback((key, value) => {
     setPersonalPrefs(prev => { const next = { ...prev, [key]: value }; savePersonalPrefs(next); return next })
