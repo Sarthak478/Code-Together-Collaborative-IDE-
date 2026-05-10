@@ -384,12 +384,15 @@ export default function SourceControlPanel({
                         key={repo.name}
                         onClick={() => {
                           setRepoUrl(repo.url)
+                          handleSetupRemote(repo.url)
                         }}
                         style={{
                           padding: "10px 12px", borderBottom: `1px solid ${borderCol}`, fontSize: 12,
-                          cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
+                          cursor: isSettingUpRepo ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 10,
                           background: repoUrl === repo.url ? `${accent}15` : "transparent",
-                          transition: "background 0.2s"
+                          transition: "background 0.2s",
+                          opacity: isSettingUpRepo ? 0.65 : 1,
+                          pointerEvents: isSettingUpRepo ? "none" : "auto"
                         }}
                       >
                         <Package size={14} color={repoUrl === repo.url ? accent : textColor} opacity={repoUrl === repo.url ? 1 : 0.6} />
@@ -405,7 +408,7 @@ export default function SourceControlPanel({
                 )}
 
                 <div style={{ fontSize: 10, opacity: 0.4, marginTop: 10 }}>
-                  Select a repository to link this workspace, then click Connect.
+                  Click a repository to connect it instantly, or use the Connect button after selecting one.
                 </div>
                 {repoFetchWarning && (
                   <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(249,226,175,0.08)", border: "1px solid rgba(249,226,175,0.2)", color: "#f9e2af", fontSize: 10, lineHeight: 1.5, marginTop: 10 }}>
