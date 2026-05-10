@@ -24,7 +24,9 @@ import {
   Zap,
   Link,
   X,
-  Check
+  Check,
+  Download,
+  Upload
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
