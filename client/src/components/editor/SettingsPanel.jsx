@@ -236,7 +236,7 @@ export default function SettingsPanel({
                            </div>
                         )}
                         <div style={{ fontSize: 9, opacity: 0.4, marginTop: 6, fontStyle: "italic" }}>
-                          Requires <b>'repo'</b> scope. Classic tokens are recommended.
+                          Classic PATs need <b>'repo'</b>. Fine-grained PATs need repository access, <b>Metadata read</b>, and <b>Contents read/write</b>.
                         </div>
                       </div>
                    </div>

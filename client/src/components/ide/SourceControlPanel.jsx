@@ -48,13 +48,15 @@ export default function SourceControlPanel({
   const [syncSuccess, setSyncSuccess] = useState("")
 
   const [userRepos, setUserRepos] = useState([])
+  const [repoFetchWarning, setRepoFetchWarning] = useState("")
   const [isFetchingRepos, setIsFetchingRepos] = useState(false)
   const [isEditingBranch, setIsEditingBranch] = useState(false)
   const [newBranchName, setNewBranchName] = useState("")
 
   const { accent, textColor, borderCol, inputBg, panelBg } = themeData
 
-  const hasPat = !!(personalPrefs?.githubPat?.trim())
+  const githubPat = personalPrefs?.githubPat?.trim() || ""
+  const hasPat = !!githubPat
 
   const handleInit = async () => {
     if (!hasPat) {
@@ -81,17 +83,28 @@ export default function SourceControlPanel({
   const fetchUserRepos = async () => {
     if (!hasPat) return
     setIsFetchingRepos(true)
+    setSyncError("")
+    setRepoFetchWarning("")
     try {
       const res = await fetch(`${API_URL}/git/user-repos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pat: personalPrefs.githubPat })
+        body: JSON.stringify({ pat: githubPat })
       })
-      if (res.ok) {
-        const data = await res.json()
-        setUserRepos(data)
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        setUserRepos([])
+        throw new Error(data.error || "Failed to fetch repositories")
       }
-    } catch (e) { console.error(e) }
+
+      const repos = Array.isArray(data) ? data : data.repos || []
+      setUserRepos(repos)
+      setRepoFetchWarning(data.warning || "")
+    } catch (e) {
+      console.error(e)
+      setSyncError(e.message || "Failed to fetch repositories")
+    }
     finally { setIsFetchingRepos(false) }
   }
 
@@ -117,8 +130,9 @@ export default function SourceControlPanel({
     } catch (e) { console.error(e) }
   }
 
-  const handleSetupRemote = async () => {
-    if (!repoUrl.trim()) return
+  const handleSetupRemote = async (selectedUrl) => {
+    const nextRepoUrl = (typeof selectedUrl === "string" ? selectedUrl : repoUrl).trim()
+    if (!nextRepoUrl) return
 
     setIsSettingUpRepo(true)
     setSyncError("")
@@ -130,7 +144,7 @@ export default function SourceControlPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           roomId,
-          remoteUrl: repoUrl.trim()
+          remoteUrl: nextRepoUrl
         })
       })
 
@@ -173,7 +187,7 @@ export default function SourceControlPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           roomId,
-          pat: personalPrefs.githubPat,
+          pat: githubPat,
           username: username
         })
       })
@@ -211,7 +225,7 @@ export default function SourceControlPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           roomId,
-          pat: personalPrefs.githubPat,
+          pat: githubPat,
           username: username
         })
       })
@@ -370,7 +384,6 @@ export default function SourceControlPanel({
                         key={repo.name}
                         onClick={() => {
                           setRepoUrl(repo.url)
-                          handleSetupRemote() // Trigger it immediately on click? Or let them confirm? Let's just select
                         }}
                         style={{
                           padding: "10px 12px", borderBottom: `1px solid ${borderCol}`, fontSize: 12,
@@ -387,13 +400,18 @@ export default function SourceControlPanel({
                   </div>
                 ) : (
                   <div style={{ padding: 16, textAlign: "center", opacity: 0.5, fontSize: 12, border: `1px solid ${borderCol}`, borderRadius: 10 }}>
-                    No repositories found. Ensure your PAT has "repo" scope.
+                    No repositories were returned for this token.
                   </div>
                 )}
 
                 <div style={{ fontSize: 10, opacity: 0.4, marginTop: 10 }}>
-                  We've fetched your repositories using your PAT. Select one to link this workspace.
+                  Select a repository to link this workspace, then click Connect.
                 </div>
+                {repoFetchWarning && (
+                  <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(249,226,175,0.08)", border: "1px solid rgba(249,226,175,0.2)", color: "#f9e2af", fontSize: 10, lineHeight: 1.5, marginTop: 10 }}>
+                    {repoFetchWarning}
+                  </div>
+                )}
               </div>
 
               {syncError && (
@@ -483,7 +501,7 @@ export default function SourceControlPanel({
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, color: "#6495ED", fontWeight: 700 }}>
             <ExternalLink size={12} /> PAT Permissions Required
           </div>
-          For seamless work, ensure your GitHub Personal Access Token has the <b>'repo'</b> scope (Full control of private repositories) and <b>'workflow'</b> scopes enabled.
+          Classic PATs need the <b>'repo'</b> scope. Fine-grained PATs need repository access plus <b>Metadata read</b> and <b>Contents read/write</b>.
         </div>
       </div>
 

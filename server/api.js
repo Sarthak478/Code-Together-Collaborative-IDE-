@@ -741,6 +741,74 @@ const initAPI = (app, server) => {
     return simpleGit(roomCwd);
   };
 
+  const normalizePat = (pat) => (typeof pat === "string" ? pat.trim() : "");
+
+  const redactSecret = (value, secret) => {
+    const text = value instanceof Error ? value.message : String(value || "");
+    const token = normalizePat(secret);
+    return token ? text.split(token).join("[redacted]") : text;
+  };
+
+  const isFineGrainedPat = (pat) => pat.startsWith("github_pat_");
+
+  const getGithubAuthHeaders = (pat) => {
+    const token = normalizePat(pat);
+    const headers = {
+      "Authorization": isFineGrainedPat(token) ? `Bearer ${token}` : `token ${token}`,
+      "Accept": "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "LiveShare-CodeTogether"
+    };
+
+    return headers;
+  };
+
+  const buildAuthenticatedGitHubUrl = (remoteUrl, pat, username = "x-access-token") => {
+    const token = normalizePat(pat);
+    let cleanRemote = String(remoteUrl || "").trim();
+
+    if (cleanRemote.startsWith("git@github.com:")) {
+      cleanRemote = `https://github.com/${cleanRemote.slice("git@github.com:".length)}`;
+    }
+
+    const url = new URL(cleanRemote);
+    if (url.hostname !== "github.com") {
+      throw new Error("Only github.com remotes are supported for PAT sync.");
+    }
+
+    url.username = String(username || "x-access-token");
+    url.password = token;
+    return url.toString();
+  };
+
+  const simplifyGithubApiError = (err, token) => {
+    const status = err.response?.status;
+    const message = err.response?.data?.message || err.message || "Failed to fetch repositories";
+    const oauthScopes = err.response?.headers?.["x-oauth-scopes"] || "";
+
+    if (status === 401 || /bad credentials/i.test(message)) {
+      return "Invalid GitHub token. Check that the PAT was copied completely and has no extra spaces.";
+    }
+
+    if (status === 403) {
+      if (/saml|sso/i.test(message)) {
+        return "This token needs GitHub organization SSO authorization before repositories can be listed.";
+      }
+
+      if (!isFineGrainedPat(token) && oauthScopes && !oauthScopes.split(",").map(s => s.trim()).includes("repo")) {
+        return "This classic GitHub token is missing the 'repo' scope.";
+      }
+
+      return "GitHub denied repository access for this token. For fine-grained PATs, select the repositories and grant Metadata read plus Contents read/write.";
+    }
+
+    if (status === 404) {
+      return "GitHub could not find repositories available to this token.";
+    }
+
+    return message;
+  };
+
   app.get("/git/status", async (req, res) => {
     const { roomId } = req.query;
     if (!roomId) return res.status(400).json({ error: "roomId needed" });
@@ -775,28 +843,29 @@ const initAPI = (app, server) => {
   });
 
   /* -------------------- ERROR MAPPING HELPER -------------------- */
-  const simplifyGitError = (err) => {
-    const msg = err.message || String(err);
+  const simplifyGitError = (err, secret) => {
+    const msg = redactSecret(err.message || String(err), secret);
+    const lower = msg.toLowerCase();
 
-    if (msg.includes("Authentication failed") || msg.includes("Invalid username or password")) {
+    if (lower.includes("authentication failed") || lower.includes("invalid username or password")) {
       return "Your GitHub Token (PAT) is invalid or expired. Please check your settings.";
     }
-    if (msg.includes("permission denied") || msg.includes("403")) {
-      return "Permission denied. Ensure your token has 'repo' scope enabled.";
+    if (lower.includes("write access to repository not granted") || lower.includes("permission to") || lower.includes("permission denied") || lower.includes("403")) {
+      return "GitHub denied repository access. Classic PATs need the 'repo' scope; fine-grained PATs must include this repository with Contents read/write permission.";
     }
-    if (msg.includes("remote: Repository not found")) {
-      return "GitHub repository not found. Please check the URL.";
+    if (lower.includes("remote: repository not found")) {
+      return "GitHub repository not found, or this token does not have access to it. Check the remote URL and token repository access.";
     }
-    if (msg.includes("couldn't find remote ref")) {
+    if (lower.includes("couldn't find remote ref")) {
       return "Branch not found on GitHub. Try pushing your code first.";
     }
-    if (msg.includes("rejected") || msg.includes("non-fast-forward")) {
+    if (lower.includes("rejected") || lower.includes("non-fast-forward")) {
       return "Sync blocked. Someone else has changed these files—try pulling changes first.";
     }
-    if (msg.includes("CONFLICT") || msg.includes("Automatic merge failed")) {
+    if (msg.includes("CONFLICT") || lower.includes("automatic merge failed")) {
       return "Merge conflict! You'll need to manually resolve differences in the files.";
     }
-    if (msg.includes("already exists") && msg.includes("remote origin")) {
+    if (lower.includes("already exists") && lower.includes("remote origin")) {
       return "Remote already exists. We've updated it to your new URL.";
     }
 
@@ -881,9 +950,10 @@ const initAPI = (app, server) => {
 
   app.post("/git/push", async (req, res) => {
     const { roomId, pat, username } = req.body;
+    const token = normalizePat(pat);
 
-    if (!pat || !username) {
-      return res.status(400).json({ error: "GitHub PAT and username required" });
+    if (!token) {
+      return res.status(400).json({ error: "GitHub PAT required" });
     }
 
     try {
@@ -902,8 +972,7 @@ const initAPI = (app, server) => {
         return res.status(400).json({ error: "No remote repository configured. Please connect to a GitHub repository first." });
       }
 
-      // Create authenticated URL
-      const authUrl = remoteUrl.replace("https://github.com/", `https://${username}:${pat}@github.com/`);
+      const authUrl = buildAuthenticatedGitHubUrl(remoteUrl, token, username);
 
       // Set upstream if not set
       try {
@@ -920,16 +989,17 @@ const initAPI = (app, server) => {
 
       res.json({ success: true, message: `Pushed to ${currentBranch}` });
     } catch (err) {
-      console.error("Push error:", err);
-      res.status(500).json({ error: simplifyGitError(err) });
+      console.error("Push error:", redactSecret(err, token));
+      res.status(500).json({ error: simplifyGitError(err, token) });
     }
   });
 
   app.post("/git/pull", async (req, res) => {
     const { roomId, pat, username } = req.body;
+    const token = normalizePat(pat);
 
-    if (!pat || !username) {
-      return res.status(400).json({ error: "GitHub PAT and username required" });
+    if (!token) {
+      return res.status(400).json({ error: "GitHub PAT required" });
     }
 
     try {
@@ -948,66 +1018,69 @@ const initAPI = (app, server) => {
         return res.status(400).json({ error: "No remote repository configured. Please connect to a GitHub repository first." });
       }
 
-      // Create authenticated URL
-      const authUrl = remoteUrl.replace("https://github.com/", `https://${username}:${pat}@github.com/`);
+      const authUrl = buildAuthenticatedGitHubUrl(remoteUrl, token, username);
 
       // Pull changes
       await git.pull(authUrl, currentBranch, { "--no-rebase": null, "--allow-unrelated-histories": null });
 
       res.json({ success: true, message: `Pulled from ${currentBranch}` });
     } catch (err) {
-      console.error("Pull error:", err);
-      res.status(500).json({ error: simplifyGitError(err) });
+      console.error("Pull error:", redactSecret(err, token));
+      res.status(500).json({ error: simplifyGitError(err, token) });
     }
   });
 
   app.post("/git/user-repos", async (req, res) => {
-    const { pat } = req.body;
-    if (!pat) return res.status(400).json({ error: "PAT required" });
+    const token = normalizePat(req.body.pat);
+    if (!token) return res.status(400).json({ error: "PAT required" });
 
     try {
-      // Intelligent Token Detection
-      const isFineGrained = pat.startsWith("github_pat_");
-      const authHeader = isFineGrained ? `Bearer ${pat}` : `token ${pat}`;
+      const headers = getGithubAuthHeaders(token);
+      const tokenType = isFineGrainedPat(token) ? "fine-grained" : "classic";
+      const repos = [];
+      let page = 1;
+      let lastResponse = null;
 
-      const headers = {
-        "Authorization": authHeader,
-        "Accept": "application/vnd.github.v3+json",
-      };
+      console.log(`[GitHub API] Fetching repos using ${tokenType} token prefix.`);
 
-      // Fine-grained tokens perform better with the specific API version header
-      if (isFineGrained) {
-        headers["X-GitHub-Api-Version"] = "2022-11-28";
+      do {
+        lastResponse = await axios.get("https://api.github.com/user/repos", {
+          params: {
+            sort: "updated",
+            per_page: 100,
+            page,
+            type: "all",
+            affiliation: "owner,collaborator,organization_member"
+          },
+          headers
+        });
+
+        repos.push(...lastResponse.data);
+        page += 1;
+      } while (lastResponse.data.length === 100 && page <= 10);
+
+      const oauthScopes = lastResponse?.headers?.["x-oauth-scopes"] || "";
+      const hasClassicRepoScope = oauthScopes.split(",").map(s => s.trim()).includes("repo");
+      let warning = "";
+
+      if (repos.length === 0) {
+        warning = isFineGrainedPat(token)
+          ? "No repositories were returned. For fine-grained PATs, make sure repository access is set to All repositories or the specific repos you want to use."
+          : "No repositories were returned for this token.";
+        console.warn(`[GitHub API] Success but 0 repos found for ${tokenType} token.`);
+      } else if (!isFineGrainedPat(token) && oauthScopes && !hasClassicRepoScope) {
+        warning = "Repositories were fetched, but this classic token does not advertise the 'repo' scope. Private repo push/pull may fail.";
       }
 
-      console.log(`[GitHub API] Fetching repos using ${isFineGrained ? "Fine-grained" : "Classic"} token prefix.`);
-
-      const response = await axios.get("https://api.github.com/user/repos", {
-        params: {
-          sort: "updated",
-          per_page: 100,
-          type: "all",
-          affiliation: "owner,collaborator,organization_member"
-        },
-        headers
+      res.json({
+        repos: repos.map(r => ({ name: r.full_name, url: r.clone_url, private: r.private })),
+        tokenType,
+        warning
       });
-
-      if (response.data.length === 0) {
-        // Diagnostic log for empty results
-        console.warn(`[GitHub API] Success but 0 repos found. Token identity: ${pat.substring(0, 10)}...`);
-      }
-
-      res.json(response.data.map(r => ({ name: r.full_name, url: r.clone_url })));
     } catch (err) {
       const errorData = err.response?.data || {};
       console.error("Fetch repos error:", errorData.message || err.message);
-
-      // Provide a more descriptive error if we can
-      const friendlyError = errorData.message?.includes("Bad credentials")
-        ? "Invalid GitHub token. Please check your token and try again."
-        : (errorData.message || "Failed to fetch repositories");
-
-      res.status(err.response?.status || 500).json({ error: friendlyError });
+      res.status(err.response?.status || 500).json({ error: simplifyGithubApiError(err, token) });
     }
   });
 
