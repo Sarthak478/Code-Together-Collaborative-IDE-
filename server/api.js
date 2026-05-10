@@ -1053,20 +1053,8 @@ const initAPI = (app, server) => {
 
       const authUrl = buildAuthenticatedGitHubUrl(remoteUrl, token, username);
 
-      // Temporarily swap origin to authenticated URL, pull, then restore
-      try {
-        await git.removeRemote("origin");
-        await git.addRemote("origin", authUrl);
-        await git.pull("origin", currentBranch, { "--no-rebase": null, "--allow-unrelated-histories": null });
-      } finally {
-        // Always restore the clean (non-authenticated) remote URL
-        try {
-          await git.removeRemote("origin");
-          await git.addRemote("origin", remoteUrl);
-        } catch (_restoreErr) {
-          console.warn("[git/pull] Failed to restore clean remote URL:", _restoreErr.message);
-        }
-      }
+      // Pull changes
+      await git.pull(authUrl, currentBranch, { "--no-rebase": null, "--allow-unrelated-histories": null });
 
       res.json({ success: true, message: `Pulled from ${currentBranch}` });
     } catch (err) {
