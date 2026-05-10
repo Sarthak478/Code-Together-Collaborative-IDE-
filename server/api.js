@@ -934,7 +934,12 @@ const initAPI = (app, server) => {
   });
 
   app.post("/git/remote", async (req, res) => {
-    const { roomId, remoteUrl } = req.body;
+    const { roomId } = req.body;
+    const remoteUrl = typeof req.body.remoteUrl === "string" ? req.body.remoteUrl.trim() : "";
+    if (!roomId || !remoteUrl) {
+      return res.status(400).json({ error: "roomId and remoteUrl required" });
+    }
+
     try {
       const git = getGit(roomId);
       const remotes = await git.getRemotes();
@@ -942,9 +947,10 @@ const initAPI = (app, server) => {
         await git.removeRemote("origin");
       }
       await git.addRemote("origin", remoteUrl);
-      res.json({ success: true });
+      const savedRemoteUrl = (await git.remote(["get-url", "origin"])).trim();
+      res.json({ success: true, remoteUrl: savedRemoteUrl });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: simplifyGitError(err) });
     }
   });
 

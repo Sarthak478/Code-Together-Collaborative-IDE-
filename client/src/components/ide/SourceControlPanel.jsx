@@ -153,9 +153,12 @@ export default function SourceControlPanel({
         throw new Error(error.error || "Failed to set up remote")
       }
 
+      const data = await remoteRes.json()
       setShowRepoSetup(false)
       setRepoUrl("")
-      onRefresh()
+      setSyncSuccess(`Connected to ${data.remoteUrl || nextRepoUrl}`)
+      setTimeout(() => setSyncSuccess(""), 3000)
+      await onRefresh?.()
     } catch (e) {
       console.error(e)
       setSyncError(e.message)
@@ -380,16 +383,20 @@ export default function SourceControlPanel({
                 ) : userRepos.length > 0 ? (
                   <div style={{ maxHeight: 200, overflowY: "auto", borderRadius: 10, border: `1px solid ${borderCol}`, background: inputBg }} className="ide-scroll">
                     {userRepos.map(repo => (
-                      <div
+                      <button
+                        type="button"
                         key={repo.name}
                         onClick={() => {
                           setRepoUrl(repo.url)
                           handleSetupRemote(repo.url)
                         }}
                         style={{
-                          padding: "10px 12px", borderBottom: `1px solid ${borderCol}`, fontSize: 12,
+                          width: "100%", padding: "10px 12px", border: "none", borderBottom: `1px solid ${borderCol}`, fontSize: 12,
                           cursor: isSettingUpRepo ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 10,
                           background: repoUrl === repo.url ? `${accent}15` : "transparent",
+                          color: textColor,
+                          textAlign: "left",
+                          fontFamily: "inherit",
                           transition: "background 0.2s",
                           opacity: isSettingUpRepo ? 0.65 : 1,
                           pointerEvents: isSettingUpRepo ? "none" : "auto"
@@ -398,7 +405,7 @@ export default function SourceControlPanel({
                         <Package size={14} color={repoUrl === repo.url ? accent : textColor} opacity={repoUrl === repo.url ? 1 : 0.6} />
                         <span style={{ flex: 1, fontWeight: repoUrl === repo.url ? 700 : 400 }}>{repo.name}</span>
                         {repoUrl === repo.url && <Check size={14} color={accent} />}
-                      </div>
+                      </button>
                     ))}
                   </div>
                 ) : (
