@@ -28,7 +28,7 @@ import {
   Check,
   Download,
   Upload,
-  Eye
+  Eye as EyeIcon
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -64,7 +64,6 @@ export default function SourceControlPanel({
 
   const handleInit = async () => {
     if (!hasPat) {
-      // No PAT configured — send user to Settings to set it first
       if (onOpenSettings) onOpenSettings()
       return
     }
@@ -78,7 +77,6 @@ export default function SourceControlPanel({
         setSyncSuccess("✓ Git Repository Initialized")
         setTimeout(() => setSyncSuccess(""), 3000)
         onRefresh()
-        // After init, show repo setup
         setShowRepoSetup(true)
       }
     } catch (e) { console.error(e) }
@@ -142,7 +140,6 @@ export default function SourceControlPanel({
     setSyncError("")
 
     try {
-      // Set up remote
       const remoteRes = await fetch(`${API_URL}/git/remote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -171,7 +168,6 @@ export default function SourceControlPanel({
     }
   }
 
-  // Fetch repos when setup modal opens
   useEffect(() => {
     if (showRepoSetup && userRepos.length === 0) {
       fetchUserRepos()
@@ -185,8 +181,16 @@ export default function SourceControlPanel({
       return
     }
 
-    // Require commit message when there are uncommitted changes
     const hasUncommittedChanges = gitStatus && (gitStatus.modified.length > 0 || gitStatus.not_added.length > 0 || gitStatus.deleted.length > 0 || gitStatus.staged.length > 0)
+    const isAhead = gitStatus && gitStatus.ahead > 0
+    const hasNoTracking = gitStatus && !gitStatus.tracking
+
+    if (!hasUncommittedChanges && !isAhead && !hasNoTracking) {
+      setSyncError("Nothing to push. Your branch is up to date.")
+      setTimeout(() => setSyncError(""), 3000)
+      return
+    }
+
     if (hasUncommittedChanges && !commitMessage.trim()) {
       setSyncError("Please enter a commit message before pushing. All changes will be committed automatically.")
       return
@@ -325,7 +329,7 @@ export default function SourceControlPanel({
           </div>
           {!hasPat && (
             <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(249,226,175,0.08)", border: "1px solid rgba(249,226,175,0.2)", fontSize: 12, color: "#f9e2af", display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
-              <Settings size={14} />
+              <SettingsIcon size={14} />
               <span>GitHub PAT not configured</span>
             </div>
           )}
@@ -352,7 +356,6 @@ export default function SourceControlPanel({
         </button>
       </div>
 
-      {/* Repository Setup Modal */}
       <AnimatePresence>
         {showRepoSetup && (
           <>
@@ -532,7 +535,6 @@ export default function SourceControlPanel({
 
       <div className="ide-scroll" style={{ flex: 1, overflowY: "auto", padding: "0 16px 16px" }}>
 
-        {/* Branch Info */}
         <div style={{ marginBottom: 20, padding: "8px 12px", background: "rgba(255,255,255,0.01)", borderRadius: 10, border: `1px solid ${borderCol}`, display: "flex", alignItems: "center", gap: 10 }}>
           <GitBranch size={14} color={accent} />
 
@@ -582,7 +584,6 @@ export default function SourceControlPanel({
           )}
         </div>
 
-        {/* Sync Status Messages */}
         {syncSuccess && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -613,7 +614,6 @@ export default function SourceControlPanel({
           </motion.div>
         )}
 
-        {/* Staged Changes */}
         {gitStatus.staged.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 10, fontWeight: 800, opacity: 0.4, textTransform: "uppercase", marginBottom: 10, display: "flex", justifyContent: "space-between" }}>
@@ -625,7 +625,7 @@ export default function SourceControlPanel({
                 path={path}
                 type="staged"
                 onAction={() => handleUnstageFile(path)}
-                onViewDiff={() => props && props.onViewDiff ? props.onViewDiff(path.replace("modified ", "").replace("deleted ", ""), "true") : undefined}
+                onViewDiff={() => undefined}
                 accent={accent}
                 textColor={textColor}
               />
@@ -633,7 +633,6 @@ export default function SourceControlPanel({
           </div>
         )}
 
-        {/* Changes */}
         <div style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 10, fontWeight: 800, opacity: 0.4, textTransform: "uppercase", marginBottom: 10, display: "flex", justifyContent: "space-between" }}>
             <span>Changes ({changesCount})</span>
@@ -645,7 +644,7 @@ export default function SourceControlPanel({
               path={path}
               type="modified"
               onAction={() => handleStageFile(path)}
-              onViewDiff={() => props && props.onViewDiff ? props.onViewDiff(path.replace("modified ", "").replace("deleted ", ""), "false") : undefined}
+              onViewDiff={() => undefined}
               accent={accent}
               textColor={textColor}
             />
@@ -658,7 +657,6 @@ export default function SourceControlPanel({
           )}
         </div>
 
-        {/* Remote Sync Controls */}
         <div style={{ marginTop: "auto", padding: 12, borderRadius: 12, background: "rgba(255,255,255,0.02)", border: `1px solid ${borderCol}` }}>
           <div style={{ fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
             <Zap size={14} color={accent} /> GitHub Sync
@@ -690,7 +688,7 @@ export default function SourceControlPanel({
                 className="ide-btn-premium"
                 style={{ width: "100%", justifyContent: "center", fontSize: 11, padding: "8px 0", background: accent, border: "none", color: "#1e1e2e" }}
               >
-                <Settings size={14} /> Configure GitHub PAT
+                <SettingsIcon size={14} /> Configure GitHub PAT
               </button>
             </>
           ) : (
@@ -778,7 +776,7 @@ function GitFileItem({ path, type, onAction, onViewDiff, accent, textColor }) {
           <>
             {onViewDiff && (
               <button onClick={() => onViewDiff(displayPath)} title="View Diff" style={{ background: "transparent", border: "none", cursor: "pointer", color: textColor, opacity: 0.6, padding: 4 }}>
-                <Eye size={14} />
+                <EyeIcon size={14} />
               </button>
             )}
             <button onClick={() => onAction(displayPath)} style={{ background: "transparent", border: "none", cursor: "pointer", color: accent, padding: 4 }}>
