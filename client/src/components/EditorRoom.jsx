@@ -1,7 +1,7 @@
 import Editor from "@monaco-editor/react"
 import useEditorRoom from "../hooks/useEditorRoom"
 import { API_URL } from "../config"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion as Motion, AnimatePresence } from "framer-motion"
 import { MessageCircle, Wand2, AlertCircle, DoorOpen } from "lucide-react"
 
 import Navbar from "./editor/Navbar"
@@ -51,7 +51,7 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
       <div style={{ position: "fixed", bottom: 60, right: 20, zIndex: 1000, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
         <AnimatePresence>
           {room.toasts.map(toast => (
-            <motion.div
+            <Motion.div
               key={toast.id}
               initial={{ opacity: 0, x: 50, scale: 0.9 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
@@ -63,7 +63,7 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
               }}
             >
               {toast.text}
-            </motion.div>
+            </Motion.div>
           ))}
         </AnimatePresence>
       </div>
@@ -184,7 +184,7 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
         {/* Right Panel (Chat, Git, AI) */}
         <AnimatePresence initial={false}>
           {room.rightPanel && (
-            <motion.div
+            <Motion.div
               initial={{ width: 0, opacity: 0 }}
               animate={{ width: 320, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
@@ -232,7 +232,7 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
                   />
                 )}
               </div>
-            </motion.div>
+            </Motion.div>
           )}
         </AnimatePresence>
       </div>
@@ -274,7 +274,7 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
           background: "rgba(0,0,0,0.6)", zIndex: 3000, display: "flex", 
           alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)"
         }}>
-          <motion.div 
+          <Motion.div 
             initial={{ scale: 0.95, opacity: 0, y: 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             style={{
@@ -321,7 +321,7 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
                 Yes, Exit Room
               </button>
             </div>
-          </motion.div>
+          </Motion.div>
         </div>
       )}
 
@@ -372,7 +372,7 @@ function PanelToggleButton({ icon, active, onClick, accent, count, title }) {
         {icon}
       </button>
       {active && (
-        <motion.div 
+        <Motion.div 
           layoutId="active-panel-indicator"
           style={{ 
             position: "absolute", left: -12, top: "50%", transform: "translateY(-50%)", 

@@ -16,7 +16,7 @@
 - [x] Implement rate limiting for the invitation endpoint.
 - [x] Fix WebSocket secure connection (WSS) issues for production.
 
-### [DONE] Phase 4.1: CI/CD Pipeline Hardening
+### [PENDING] Phase 4.1: CI/CD Pipeline Hardening
 - [x] Resolve all `no-unused-vars` linting errors across client components and hooks.
 - [x] Correct `react-hooks/exhaustive-deps` warnings in all custom hooks and high-impact components.
 - [x] Fix `react-hooks/set-state-in-effect` issues in `RoomWrapper` and `ChatPanel`.

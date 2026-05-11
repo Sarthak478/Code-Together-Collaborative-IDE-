@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { generateRoomId } from "../utils/helpers"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion as Motion, AnimatePresence } from "framer-motion"
 import { COLLAB_URL } from "../config"
 
 /* ─── Theme Configuration (Neon Luminary) ────────────────────────────── */
@@ -285,7 +285,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
       {/* Floating Orbs */}
       <div style={{ position: "absolute", width: "100%", height: "100%", overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
         {[...Array(15)].map((_, i) => (
-          <motion.div
+          <Motion.div
             key={i}
             initial={{ opacity: 0, scale: 0 }}
             animate={{ 
@@ -313,7 +313,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
       </div>
 
       {/* Theme Toggle Button */}
-      <motion.button
+      <Motion.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={toggleTheme}
@@ -341,7 +341,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
         }}
       >
         {theme === 'dark' ? '☀️ LIGHT' : '🌙 DARK'}
-      </motion.button>
+      </Motion.button>
 
       {/* Toast Notifications */}
       <div style={{ 
@@ -360,7 +360,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
       }} role="region" aria-live="polite" aria-label="Notifications">
         <AnimatePresence>
           {toasts.map(t => (
-            <motion.div
+            <Motion.div
               key={t.id}
               initial={{ opacity: 0, y: -50, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -380,14 +380,14 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
               }}
             >
               {t.text}
-            </motion.div>
+            </Motion.div>
           ))}
         </AnimatePresence>
       </div>
 
       {/* Left Column: Hero & Policies */}
       <div style={{ flex: "1 1 50%", maxWidth: "600px", zIndex: 1, paddingRight: "40px", paddingTop: "20px", paddingBottom: "40px" }}>
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: "easeOut" }}>
+        <Motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: "easeOut" }}>
           <h1 style={{ 
             fontFamily: "'Space Grotesk', sans-serif", 
             fontSize: "clamp(3rem, 5vw, 4.5rem)", 
@@ -413,10 +413,10 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
           }}>
             The hyper-fused, high-performance real-time environment built for modern engineering teams. Experience zero-latency sync in an ethereal digital void.
           </p>
-        </motion.div>
+        </Motion.div>
 
         {/* The Zero-Data Sanctuary Policy Banner */}
-        <motion.div 
+        <Motion.div 
           initial={{ opacity: 0, x: -30 }} 
           animate={{ opacity: 1, x: 0 }} 
           transition={{ duration: 0.8, delay: 0.2 }}
@@ -458,11 +458,11 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
               </p>
             </div>
           </div>
-        </motion.div>
+        </Motion.div>
       </div>
 
       {/* Right Column: Interaction Card */}
-      <motion.div
+      <Motion.div
         initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
         animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
         transition={{ duration: 0.7, delay: 0.1, ease: "easeOut" }}
@@ -489,7 +489,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
           }}>
             Operator Identity
           </label>
-          <motion.div
+          <Motion.div
             whileFocus={{ scale: 1.01 }}
             style={{ 
               display: "flex", alignItems: "center", gap: "12px", padding: "14px 18px", 
@@ -508,7 +508,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
                 fontWeight: 600, outline: "none", fontSize: "15px", fontFamily: "'Inter', sans-serif",
               }} 
             />
-          </motion.div>
+          </Motion.div>
         </div>
 
         {/* Tab Navigation */}
@@ -539,7 +539,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
 
         <AnimatePresence mode="wait">
           {activeTab === "create" ? (
-            <motion.div key="create" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.3 }}>
+            <Motion.div key="create" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.3 }}>
               
               {/* Environment Mode Selection */}
               <div style={{ marginBottom: "24px" }}>
@@ -548,7 +548,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
                 </label>
                 <div style={{ display: "flex", gap: "12px" }}>
                   {Object.entries(roomModes).map(([key, mode]) => (
-                    <motion.div
+                    <Motion.div
                       key={key} whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} onClick={() => setRoomMode(key)}
                       style={{
                         flex: 1, padding: "16px", borderRadius: "14px", cursor: "pointer", textAlign: "center",
@@ -560,7 +560,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
                       <div style={{ fontSize: "24px", marginBottom: "8px", filter: roomMode === key ? `drop-shadow(0 0 8px ${mode.color})` : 'none' }}>{mode.icon}</div>
                       <div style={{ fontWeight: 700, fontSize: "14px", color: roomMode === key ? mode.color : currentTheme.textPrimary, fontFamily: "'Space Grotesk', sans-serif" }}>{mode.title}</div>
                       <div style={{ fontSize: "11px", color: currentTheme.textSecondary, marginTop: "4px" }}>{mode.description}</div>
-                    </motion.div>
+                    </Motion.div>
                   ))}
                 </div>
               </div>
@@ -572,7 +572,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
                 </label>
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                   {Object.entries(roomTypes).map(([key, type]) => (
-                    <motion.div
+                    <Motion.div
                       key={key} whileHover={{ x: 4 }} whileTap={{ scale: 0.98 }} onClick={() => setCreateType(key)}
                       style={{
                         padding: "14px 18px", borderRadius: "12px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -589,12 +589,12 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
                           <div style={{ fontSize: "11px", color: currentTheme.textSecondary, marginTop: "2px" }}>{type.description}</div>
                         </div>
                       </div>
-                    </motion.div>
+                    </Motion.div>
                   ))}
                 </div>
               </div>
 
-              <motion.button
+              <Motion.button
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => handleCreate(createType)} disabled={isCreating}
                 style={{
                   width: "100%", padding: "16px", background: currentTheme.gradient, color: currentTheme.buttonText,
@@ -604,10 +604,10 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
                 }}
               >
                 {isCreating ? "Initializing Link..." : "Ignite Session"}
-              </motion.button>
-            </motion.div>
+              </Motion.button>
+            </Motion.div>
           ) : (
-            <motion.div key="join" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
+            <Motion.div key="join" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
               
               <div style={{ marginBottom: "32px", marginTop: "20px" }}>
                 <label style={{ display: "block", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 700, color: currentTheme.accent, marginBottom: "12px", fontFamily: "'Space Grotesk', sans-serif" }}>
@@ -642,18 +642,18 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
                   </div>
                 </div>
                 {roomExists === false && joinId.trim() && (
-                  <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: 10, fontSize: 13, color: currentTheme.error, fontWeight: 500 }}>
+                  <Motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: 10, fontSize: 13, color: currentTheme.error, fontWeight: 500 }}>
                     Vector trace failed. Room does not exist.
-                  </motion.div>
+                  </Motion.div>
                 )}
                 {roomExists === true && (
-                  <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: 10, fontSize: 13, color: currentTheme.success, fontWeight: 500 }}>
+                  <Motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: 10, fontSize: 13, color: currentTheme.success, fontWeight: 500 }}>
                     Signal acquired. Ready to bridge.
-                  </motion.div>
+                  </Motion.div>
                 )}
               </div>
 
-              <motion.button
+              <Motion.button
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} disabled={!joinId.trim() || isJoining || !roomExists} onClick={handleJoin}
                 style={{
                   width: "100%", padding: "16px",
@@ -667,8 +667,8 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
                 }}
               >
                 {isJoining ? "Bridging Connection..." : "Establish Link"}
-              </motion.button>
-            </motion.div>
+              </Motion.button>
+            </Motion.div>
           )}
         </AnimatePresence>
 
@@ -677,7 +677,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
           input::placeholder { color: ${currentTheme.placeholder}; opacity: 0.6; }
           * { box-sizing: border-box; }
         `}</style>
-      </motion.div>
+      </Motion.div>
     </div>
   )
 }

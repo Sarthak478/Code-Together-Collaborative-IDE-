@@ -656,7 +656,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     return true
   })
 
-  return {
+  return useMemo(() => ({
     editor, onEditorMount, monacoTheme, monacoOptions, fs,
     // Files & Tabs
     openFiles, activeFile, activeFileEntry, activeLanguage, activeYText,
@@ -695,5 +695,32 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     onLeave, updatePersonalPref, pushRoomUI, clearRoomUI,
     onToggleChatEnabled, onToggleShowUsers, onSetRoomTheme,
     setOutput, addToast, gitStatus, isGitLoading, refreshGitStatus
-  }
+  }), [
+    editor, onEditorMount, monacoTheme, monacoOptions, fs,
+    openFiles, activeFile, activeFileEntry, activeLanguage, activeYText,
+    openFile, closeFile,
+    terminalOpen, terminalHeight,
+    rightPanel, toggleRightPanel,
+    previewOpen,
+    roomId, actualRoomType, output, runner,
+    isHost, canEdit, canRun, canChangeRoom,
+    activeTheme, activeFontSize, activeFontFamily, isDark,
+    bg, headerBg, toolbarBg, textColor, panelBg, borderCol, inputBg, accent,
+    personalPrefs, roomTheme, roomFont,
+    interviewTime,
+    isSyncingFile,
+    isPersistenceSynced,
+    settingsOpen,
+    exitConfirmOpen,
+    callActive,
+    peerId,
+    toasts,
+    activeUsers, visibleActiveUsersList, hostName, restrictedUsers,
+    chatEnabled, showUsersList, visibleChatMsgs,
+    chatInput, chatTarget,
+    runCode, syncFilesToTerminal, downloadCode, saveCode, sendChat, kickUser, restrictUser, unrestrictUser,
+    onLeave, updatePersonalPref, pushRoomUI, clearRoomUI,
+    onToggleChatEnabled, onToggleShowUsers, onSetRoomTheme,
+    gitStatus, isGitLoading, refreshGitStatus, addToast
+  ])
 }

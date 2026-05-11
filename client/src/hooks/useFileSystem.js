@@ -1,7 +1,7 @@
-import { useCallback, useState, useEffect, useRef } from "react"
+import { useCallback, useState, useEffect, useRef, useMemo } from "react"
 import { EXT_TO_LANG } from "../constants/editorConfigs"
 import { API_URL } from "../config"
-const IGNORE_PATTERNS = ["node_modules", ".git", "__pycache__", ".venv", ".pytest_cache", ".next", ".DS_Store"]
+const IGNORE_PATTERNS = ["node_modules", ".git", "__pycache__", ".venv", ".pytest_cache", ".next", ".DS_Store"]
 
 export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHost) {
   const [tree, setTree] = useState({}) // Maps parentPath -> Array of children
@@ -181,8 +181,6 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHos
 
   const [importProgress, setImportProgress] = useState(null) // { current, total, fileName }
 
-
-
   const isPathIgnored = useCallback((path) => {
     return IGNORE_PATTERNS.some(p => path.includes(`/${p}/`) || path.startsWith(`${p}/`))
   }, [])
@@ -303,7 +301,7 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHos
     return Object.values(tree).flat().filter(e => e.type === "file")
   }, [tree])
 
-  return {
+  return useMemo(() => ({
     tree,
     version,
     getChildren,
@@ -321,5 +319,23 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHos
     getExt,
     importFiles,
     importProgress,
-  }
+  }), [
+    tree,
+    version,
+    getChildren,
+    getFileText,
+    getFileContent,
+    fetchFileContentToYjs,
+    saveFileToDisk,
+    refreshPath,
+    getAllFiles,
+    createFile,
+    createFolder,
+    deleteEntry,
+    renameEntry,
+    detectLanguage,
+    getExt,
+    importFiles,
+    importProgress,
+  ])
 }
