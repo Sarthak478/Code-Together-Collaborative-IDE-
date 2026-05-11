@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { } from "react"
 import { 
   Rocket, 
   ArrowDownToLine, 
@@ -12,7 +12,7 @@ import {
 
 export default function Toolbar({
   canRun,
-  canEdit,
+
   canChangeLanguage,
   language,
   onRunCode,
@@ -21,13 +21,13 @@ export default function Toolbar({
   visibleActiveUsersList,
   isHost,
   runner,
-  onKickUser,
+
   editorAwarenessClientID,
   textColor,
   borderCol,
   inputBg,
   accent,
-  roomId,
+
   actualRoomType,
   interviewTime,
   previewOpen,

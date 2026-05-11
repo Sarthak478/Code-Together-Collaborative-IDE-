@@ -1,5 +1,5 @@
 import { MessageSquare, Send, Users, ShieldCheck } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 /* ─── ChatPanel Component ───────────────────────────────────────── */
 export default function ChatPanel({
@@ -28,22 +28,19 @@ export default function ChatPanel({
   } = themeData;
 
   const messagesEndRef = useRef(null);
-  const [hasInitialScroll, setHasInitialScroll] = useState(false);
+  const hasInitialScroll = useRef(false);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      if (!hasInitialScroll.current) {
+        messagesEndRef.current.scrollIntoView();
+        hasInitialScroll.current = true;
+      } else {
+        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
     }
   }, [messages]);
-
-  // Ensure initial scroll happens after mount
-  useEffect(() => {
-    if (!hasInitialScroll && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView();
-      setHasInitialScroll(true);
-    }
-  }, [hasInitialScroll, messages]);
 
   const handleSendMessage = (e) => {
     e.preventDefault();

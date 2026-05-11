@@ -301,7 +301,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
           console.log(`[IDE Room] Received fs:changed for path ${data.path}. Refreshing parent ${data.parentPath}`)
           fs.refreshPath(data.parentPath)
         }
-      } catch (_) { }
+      } catch (_err) { /* ignored */ }
     }
 
 
@@ -321,7 +321,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       provider.awareness.off("change", recalcHost)
       ws.close()
     }
-  }, [editor, recalcHost, roomId, onLeave, username, fs.refreshPath])
+  }, [editor, recalcHost, roomId, onLeave, username, fs, isHost])
 
 
   /* ── Broadcast Active File ── */
@@ -351,10 +351,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   }, [chatMessages, rightPanel, editor.username, addToast])
 
   /* ── Open file in tab ── */
-  const onSelectFile = useCallback((path) => {
-    setActiveFile(path)
-    if (fs.fetchFileContentToYjs) fs.fetchFileContentToYjs(path)
-  }, [fs])
+
 
   const openFile = useCallback(async (path) => {
     if (!path) return
@@ -402,7 +399,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
 
   const bindingRef = useRef(null)
 
-  const onEditorMount = useCallback((monacoEditor, monaco) => {
+  const onEditorMount = useCallback((monacoEditor, _monaco) => {
     if (!activeFile || !editor.provider.awareness || !activeYText) return
 
     if (bindingRef.current) {
@@ -485,7 +482,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
         try {
           await navigator.clipboard?.writeText(fallbackText)
           addToast("Local Agent fallback commands copied.")
-        } catch (_) {}
+        } catch (_err) { /* ignored */ }
 
         window.location.href = getLocalAgentLaunchUrl(roomId)
         return
@@ -516,7 +513,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       if (!data.success) {
         addToast(data.error || "❌ Failed to inject command into terminal.")
       }
-    } catch (_) {
+    } catch (_err) {
       addToast("❌ Error: Could not reach the execution server.")
     }
   }, [canRun, activeFile, activeFileEntry, activeYText, roomId, activeLanguage, editor, fs, addToast])
@@ -535,7 +532,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomId, files: allFiles })
       })
-    } catch (_) {
+    } catch (_err) {
       console.error("Failed to silently sync files to terminal")
     }
   }, [fs, roomId])
@@ -547,7 +544,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     try {
       await fs.saveFileToDisk(activeFile)
       addToast(`✅ Saved ${activeFile.split("/").pop()} to disk`)
-    } catch (_) {
+    } catch (_err) {
       addToast("❌ Failed to save to disk")
     }
   }, [activeFile, fs, addToast])
@@ -580,7 +577,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     } catch (err) {
       if (err.name !== 'AbortError') console.error("Save failed", err)
     }
-  }, [activeFile, activeFileEntry, activeYText, fs, addToast])
+  }, [activeFile, activeFileEntry, activeYText, addToast])
 
   /* ── Chat actions ── */
   const sendChat = useCallback((e) => {

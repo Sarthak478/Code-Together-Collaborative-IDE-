@@ -10,9 +10,7 @@ import OutputPanel from "./editor/OutputPanel"
 import ChatPanel from "./editor/ChatPanel"
 import SettingsPanel from "./editor/SettingsPanel"
 import VideoCall from "./editor/VideoCall"
-import SourceControlPanel from "./ide/SourceControlPanel"
 import AIPanel from "./ide/AIPanel"
-import DiffModal from "./ui/DiffModal"
 import AccessControlModal from "./editor/AccessControlModal"
 import InviteModal from "./editor/InviteModal"
 import { useState } from "react"
@@ -20,7 +18,6 @@ import { useState } from "react"
 /* ─── EditorRoom ────────────────────────────────────────────────── */
 export default function EditorRoom({ roomId, initialRoomType, isCreating, username, onLeave }) {
   const room = useEditorRoom({ roomId, initialRoomType, isCreating, username, onLeave })
-  const [activeDiff, setActiveDiff] = useState(null)
   const [accessControlOpen, setAccessControlOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
 

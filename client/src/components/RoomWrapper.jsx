@@ -4,17 +4,11 @@ import { motion } from "framer-motion";
 import { ShieldAlert, Loader2, DoorOpen, ShieldCheck } from "lucide-react";
 import { initVSCode } from "../services/vscode";
 
-export default function RoomWrapper({ roomId, roomType, isCreating, username, roomMode, onLeave, children }) {
-  const [status, setStatus] = useState("checking");
+export default function RoomWrapper({ roomId, roomType, isCreating, username, onLeave, children }) {
+  const [status, setStatus] = useState(() => roomType === "broadcast" ? "approved" : "checking");
   const [errorMsg, setErrorMsg] = useState("");
-
   useEffect(() => {
-    // If broadcast room, skip authentication checks
-    if (roomType === "broadcast") {
-      setStatus("approved");
-      return;
-    }
-
+    let isMounted = true;
     const hostToken = localStorage.getItem(`host_${roomId}`);
 
     if (isCreating) {
@@ -69,7 +63,6 @@ export default function RoomWrapper({ roomId, roomType, isCreating, username, ro
     }
 
     // Joiner Flow: Request access
-    let isMounted = true;
     
     fetch(`${COLLAB_URL}/room/${roomId}/join-request`, {
       method: "POST",

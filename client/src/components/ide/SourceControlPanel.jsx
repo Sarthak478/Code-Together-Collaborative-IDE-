@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { API_URL } from "../../config"
 import {
   GitBranch,
@@ -82,7 +82,7 @@ export default function SourceControlPanel({
     } catch (e) { console.error(e) }
   }
 
-  const fetchUserRepos = async () => {
+  const fetchUserRepos = useCallback(async () => {
     if (!hasPat) return
     setIsFetchingRepos(true)
     setSyncError("")
@@ -108,7 +108,7 @@ export default function SourceControlPanel({
       setSyncError(e.message || "Failed to fetch repositories")
     }
     finally { setIsFetchingRepos(false) }
-  }
+  }, [hasPat, githubPat])
 
   const handleBranchAction = async (action, name) => {
     try {
@@ -172,7 +172,7 @@ export default function SourceControlPanel({
     if (showRepoSetup && userRepos.length === 0) {
       fetchUserRepos()
     }
-  }, [showRepoSetup])
+  }, [showRepoSetup, fetchUserRepos, userRepos.length])
 
   const handlePush = async () => {
     if (!hasPat) {
@@ -529,7 +529,7 @@ export default function SourceControlPanel({
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, color: "#6495ED", fontWeight: 700 }}>
             <ExternalLink size={12} /> PAT Permissions Required
           </div>
-          Classic PATs need the <b>'repo'</b> scope. Fine-grained PATs need repository access plus <b>Metadata read</b> and <b>Contents read/write</b>.
+          Classic PATs need the <b>&apos;repo&apos;</b> scope. Fine-grained PATs need repository access plus <b>Metadata read</b> and <b>Contents read/write</b>.
         </div>
       </div>
 

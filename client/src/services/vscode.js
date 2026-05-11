@@ -17,7 +17,7 @@ export async function initVSCode() {
 
   // Standard editor environment
   window.MonacoEnvironment = {
-    getWorker: function (moduleId, label) {
+    getWorker: function (_moduleId, _label) {
       return new editorWorker()
     }
   }

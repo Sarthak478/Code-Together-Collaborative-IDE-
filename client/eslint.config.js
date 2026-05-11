@@ -2,6 +2,7 @@ import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
+import react from 'eslint-plugin-react'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
@@ -13,6 +14,9 @@ export default defineConfig([
       reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
     ],
+    plugins: {
+      react,
+    },
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
@@ -23,10 +27,21 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]' }],
+      ...react.configs.recommended.rules,
+      ...react.configs['jsx-runtime'].rules,
+      'no-unused-vars': ['error', { 
+        varsIgnorePattern: '^[A-Z_]', 
+        argsIgnorePattern: '^_', 
+        caughtErrorsIgnorePattern: '^_' 
+      }],
       'react-hooks/exhaustive-deps': 'warn',
       'react-hooks/set-state-in-effect': 'warn',
-      'no-empty': 'warn',
+      'react/prop-types': 'off', // Turn off prop-types as it's not a TS project
     },
+    settings: {
+      react: {
+        version: '18.2'
+      }
+    }
   },
 ])

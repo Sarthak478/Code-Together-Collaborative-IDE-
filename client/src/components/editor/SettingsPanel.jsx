@@ -34,12 +34,10 @@ export default function SettingsPanel({
   onClose, personalPrefs, updatePersonalPref,
   roomTheme, roomFont, onSetRoomTheme,
   chatEnabled, onToggleChatEnabled, showUsersList, onToggleShowUsers,
-  pushRoomUI, clearRoomUI, isHost, activeUsers, hostName, kickUser,
+  pushRoomUI, clearRoomUI, isHost, activeUsers, kickUser,
   themeData = {}, username, clientID, roomId, refreshGitStatus
 }) {
   const { 
-    bg = "#1e1e2e", 
-    headerBg = "rgba(0,0,0,0.2)", 
     textColor = "#cdd6f4", 
     borderCol = "rgba(255,255,255,0.1)", 
     accent = "#89b4fa", 
@@ -47,7 +45,7 @@ export default function SettingsPanel({
     isDark = true, 
     panelBg = "#181825" 
   } = themeData
-  const activeTheme = roomTheme ?? personalPrefs.theme
+
   const canChangeRoom = isHost
 
   const [isInitializing, setIsInitializing] = useState(false);
@@ -291,7 +289,7 @@ export default function SettingsPanel({
                            </div>
                         )}
                         <div style={{ fontSize: 9, opacity: 0.4, marginTop: 6, fontStyle: "italic" }}>
-                          Classic PATs need <b>'repo'</b>. Fine-grained PATs need repository access, <b>Metadata read</b>, and <b>Contents read/write</b>.
+                          Classic PATs need <b>&apos;repo&apos;</b>. Fine-grained PATs need repository access, <b>Metadata read</b>, and <b>Contents read/write</b>.
                         </div>
                       </div>
                    </div>

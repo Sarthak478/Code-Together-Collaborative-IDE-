@@ -63,7 +63,7 @@ export default function InviteModal({ isOpen, onClose, roomId, roomType, roomMod
         setStatus("error");
         setMessage(data.error || "Failed to send invitations.");
       }
-    } catch (error) {
+    } catch (_error) {
       setStatus("error");
       setMessage("Connection error. Please try again later.");
     } finally {

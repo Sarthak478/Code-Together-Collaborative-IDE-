@@ -17,11 +17,10 @@ import {
 export default function Navbar({
   roomId, actualRoomType, isHost, username,
   callActive, onToggleCall,
-  onToggleSettings, onLeave, onToggleGit, onToggleAccessControl, onToggleInvite,
-  headerBg, borderCol, textColor, accent,
-  gitStatus
+  onToggleSettings, onLeave, onToggleAccessControl, onToggleInvite,
+  borderCol, textColor, accent
 }) {
-  const hasChanges = (gitStatus?.modified?.length || 0) + (gitStatus?.not_added?.length || 0) > 0
+
 
   // Function to calculate color luminance
   const getLuminance = (hex) => {

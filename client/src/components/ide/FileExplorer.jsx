@@ -27,7 +27,7 @@ import {
   Globe
 } from "lucide-react"
 
-export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canEdit, textColor, borderCol, inputBg, panelBg, accent, isDark, headerBg }) {
+export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canEdit, textColor, borderCol, inputBg, panelBg, accent, isDark }) {
   const [searchTerm, setSearchTerm] = useState("")
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [creatingIn, setCreatingIn] = useState(null) // parentPath where we're creating
@@ -158,7 +158,7 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
   }, [allFiles, searchTerm])
 
   // Root children for tree view
-  const rootChildren = useMemo(() => fs.getChildren("/"), [fs, fs.version])
+  const rootChildren = useMemo(() => fs.getChildren("/"), [fs])
 
   const handleDelete = async (path, type) => {
     const itemName = path.split("/").pop()
@@ -276,7 +276,7 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
             }}>
               <div style={{ fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
                 <FolderUp size={14} color={accent} />
-                Import "{pendingFolderImport.rootName}"?
+                Import &quot;{pendingFolderImport.rootName}&quot;?
               </div>
               <div style={{ fontSize: 11, opacity: 0.7, lineHeight: 1.5 }}>
                 This will <strong>replace all existing files</strong> with {pendingFolderImport.count.toLocaleString()} files from this folder.
@@ -686,7 +686,7 @@ function FileItem({ file, isActive, onClick, textColor, accent, depth, canEdit, 
 }
 
 /* ── Import Overlay ── */
-function ImportOverlay({ progress, accent, textColor, panelBg, borderCol }) {
+function ImportOverlay({ progress, accent, textColor, borderCol }) {
   if (!progress) return null
   const percent = Math.round((progress.current / progress.total) * 100)
   

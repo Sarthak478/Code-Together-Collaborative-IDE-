@@ -31,7 +31,7 @@ export function useMarketplace(roomMap) {
       const res = await fetch(`https://open-vsx.org/api/-/search?query=${encodeURIComponent(query)}&size=10`)
       const data = await res.json()
       setResults(data.extensions || [])
-    } catch (err) {
+    } catch (_err) {
       setError("Failed to fetch extensions from Open VSX")
     } finally {
       setLoading(false)

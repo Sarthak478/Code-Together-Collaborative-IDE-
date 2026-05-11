@@ -14,7 +14,7 @@ export default function DiffModal({
 }) {
   const [diff, setDiff] = useState("")
   const [isLoading, setIsLoading] = useState(true)
-  const { accent, textColor, borderCol, panelBg, isDark, inputBg } = themeData
+  const { accent, textColor, borderCol, panelBg, isDark } = themeData
 
   useEffect(() => {
     async function getDiff() {

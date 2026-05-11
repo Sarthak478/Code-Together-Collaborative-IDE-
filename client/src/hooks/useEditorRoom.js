@@ -200,11 +200,9 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
 
   /* ── Sync Subscriptions ── */
   useEffect(() => {
-    const { provider, ytext, roomMap, chatArray } = editor
+    const { provider, roomMap, chatArray } = editor
 
     provider.on("synced", () => {
-      const states = Array.from(provider.awareness.getStates().entries())
-
     })
 
     const onRoomChange = () => {
@@ -274,7 +272,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
           setRunner(null)
           setOutput(data.output || "(no output)")
         }
-      } catch (_e) { }
+      } catch (_e) { /* ignore */ }
     }
 
     // 🕒 Shared Interview Timer Update
@@ -472,7 +470,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
   /* ── Monaco Setup ── */
   const bindingRef = useRef(null)
 
-  const onEditorMount = useCallback((monacoEditor, monaco) => {
+  const onEditorMount = useCallback((monacoEditor, _monaco) => {
     if (!editor.ytext || !editor.provider.awareness) return
 
     if (bindingRef.current) {

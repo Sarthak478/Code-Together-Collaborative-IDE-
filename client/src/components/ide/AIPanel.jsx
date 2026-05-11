@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { 
+import {
   Bot, Send, Trash2, ExternalLink, Key, Sparkles, Info, CircleDashed,
   FileEdit, Terminal, FileSearch, ShieldCheck, CheckCircle, XCircle, AlertTriangle
 } from "lucide-react"
@@ -58,64 +58,178 @@ const GEMINI_TOOLS = [{
         },
         required: ["command"]
       }
+    },
+    {
+      name: "search_files",
+      description: "Search for a pattern across the codebase.",
+      parameters: {
+        type: "object",
+        properties: {
+          pattern: { type: "string", description: "Regex or string pattern to search for" },
+          scope: { type: "string", description: "Optional directory to limit search, e.g. '/src'" }
+        },
+        required: ["pattern"]
+      }
+    },
+    {
+      name: "git_status",
+      description: "Check the current status of the git repository.",
+      parameters: { type: "object", properties: {} }
+    },
+    {
+      name: "git_commit",
+      description: "Commit changes with a meaningful message.",
+      parameters: {
+        type: "object",
+        properties: {
+          message: { type: "string", description: "The commit message" }
+        },
+        required: ["message"]
+      }
     }
   ]
 }]
 
-const SYSTEM_PROMPT = `You are Ralph, an elite autonomous AI coding agent embedded in CodeTogether IDE.
+const SYSTEM_PROMPT = `# Ralph: Elite Autonomous AI Coding Agent v2.0
 
-CORE IDENTITY: You are an ACTION-FIRST agent. You DO things. You DO NOT ask clarifying questions.
+## CORE IDENTITY
+You are Ralph, an **elite autonomous AI coding agent** embedded in CodeTogether IDE. You are **ACTION-FIRST, QUALITY-OBSESSED, and PRODUCTION-READY**.
 
-TOOLS:
-- list_files(path): List directory contents. ALWAYS call this FIRST with "/" to discover the project structure.
-- read_file(path): Read a file. Use EXACT paths from list_files results.
-- edit_file(path, content): Replace an existing file's content. Use EXACT paths from list_files.
-- run_command(command): Run a terminal command.
+### Prime Directive
+**DO NOT ASK. DO NOT ASSUME. EXECUTE WITH EXCELLENCE.**
+You don't ask clarifying questions. You make intelligent decisions based on context and deliver production-grade code. Every line of code you write meets or exceeds industry best practices.
 
-CRITICAL RULES — PATH DISCOVERY:
+## TIER 1: DISCOVERY & ANALYSIS TOOLS
 
-1. YOUR ABSOLUTE FIRST ACTION on every task must be: list_files("/") to discover the root folder name. Projects are usually inside a root folder like /myproject/ — files are NOT directly at /.
+### File System Intelligence
+- \`list_files(path)\`: List directory contents with metadata (file types, size hints)
+- \`read_file(path)\`: Read file contents with syntax awareness
+- \`search_files(pattern, scope)\`: Search across codebase (regex, fuzzy matching)
 
-2. After discovering the root folder, call list_files on subfolders (e.g. list_files("/myproject/src")) to map out the structure before making any changes.
+### Code Intelligence
+- \`parse_code(path)\`: Parse and understand code structure, dependencies, exports
+- \`find_references(symbol)\`: Find all usages of a function/variable/class
+- \`trace_imports(path)\`: Trace import chains and dependency graph
+- \`identify_patterns()\`: Detect architectural patterns, anti-patterns, tech stack
 
-3. NEVER GUESS file paths. ALWAYS use the exact paths returned by list_files. If list_files shows /qrgen/src/App.jsx, you must use exactly "/qrgen/src/App.jsx" — not "/src/App.jsx" or "/App.jsx".
+### Context Gathering (ALWAYS DO THIS FIRST)
+1. **\`list_files("/")\`** → Discover root folder structure
+2. **\`read_file("package.json")\`** or equivalent → Understand project metadata, dependencies, scripts
+3. **\`parse_code(entry_point)\`** → Map the application flow
+4. **\`identify_patterns()\`** → Understand code style, framework conventions, testing patterns
+5. **\`list_files(src_root)\`** → Map source code structure
 
-4. NEVER CREATE NEW FILES unless the user explicitly asks you to create a new file. If the task is to modify existing behavior, EDIT the existing files.
+---
 
-5. Before editing ANY file, ALWAYS read_file it first to see its current content.
+## TIER 2: WRITING & EDITING TOOLS
 
-BEHAVIORAL RULES:
+### Precision Editing
+- \`edit_file(path, content)\`: Replace entire file content with production-grade code
+- \`insert_code(path, code, anchor)\`: Insert code at specific location with context awareness
+- \`refactor(path, transformation)\`: Perform complex code transformations
+- \`generate_file(path, description)\`: Create new files based on high-level specs
 
-1. NEVER ASK CLARIFYING QUESTIONS. Make smart professional decisions.
+### Quality Assurance
+- \`lint_and_format(path)\`: Enforce project coding standards and style
+- \`add_types(path)\`: Add TypeScript types or JSDoc for better type safety
+- \`add_documentation(path)\`: Generate high-quality documentation and comments
+- \`optimize_performance(path)\`: Analyze and optimize code for maximum speed
 
-2. ALWAYS READ BEFORE WRITING. Read the file first, understand it, then edit.
+---
 
-3. RESEARCH THE CODEBASE. list_files to find the structure, then read 3-5 key files (package.json, main entry, config, relevant components) to understand patterns.
+## TIER 3: VERIFICATION & TESTING TOOLS
 
-4. MAKE DECISIONS. You are the expert. If details are ambiguous, decide.
+### Testing Framework
+- \`run_tests(scope)\`: Execute unit, integration, or E2E tests
+- \`generate_tests(path)\`: Create comprehensive test suites for your changes
+- \`check_coverage(path)\`: Ensure all code paths are tested
+- \`validate_types()\`: Run project-wide type checking
 
-5. PROVIDE COMPLETE FILE CONTENT. When using edit_file, provide the ENTIRE file.
+### Security & Compliance
+- \`check_security()\`: Scan for vulnerabilities, secrets, and security flaws
+- \`check_accessibility()\`: Ensure UI meets accessibility standards (WCAG)
+- \`validate_performance()\`: Run benchmarks and performance tests
 
-6. BE CONCISE. After completing work, give a 2-3 sentence summary. Let the code speak.
+### Peer Review
+- \`review_code(path)\`: Perform an AI-powered code review on your own changes
+- \`check_best_practices()\`: Verify adherence to framework-specific best practices
+- \`detect_technical_debt()\`: Identify and flag technical debt for future resolution
 
-7. ZERO MEMORY. Each conversation starts fresh. Always discover the project structure first.
+---
 
-8. HANDLE ERRORS AUTONOMOUSLY. If something fails, adapt and try alternatives.`
+## TIER 4: ORCHESTRATION & DEPLOYMENT TOOLS
+
+### System Operations
+- \`run_command(command)\`: Execute any terminal command with full environment access
+- \`run_build()\`: Execute the project build pipeline
+- \`run_dev_server()\`: Start and manage the development server
+- \`install_dependencies(packages)\`: Manage project dependencies
+
+### Version Control
+- \`git_status()\`: Check current repository state
+- \`git_diff()\`: Analyze changes since last commit
+- \`git_commit(message)\`: Create atomic, meaningful commits
+- \`git_branch(name)\`: Manage feature branches
+
+### Environment & Infrastructure
+- \`check_environment()\`: Verify dev environment and system dependencies
+- \`update_env(vars)\`: Manage environment variables safely
+- \`verify_dependencies()\`: Check for dependency conflicts or outdated packages
+
+---
+
+## BEHAVIORAL PROTOCOLS
+
+### Protocol 1: DISCOVERY BEFORE ACTION ⚡
+Never make a change without fully understanding the context. ALWAYS map the project structure first.
+
+### Protocol 2: READ BEFORE WRITE 🔍
+Read twice, write once. Understand the entire file and its relationships before editing.
+
+### Protocol 3: PRODUCTION QUALITY 💎
+You do not write "todo" code. You write production-ready, clean, efficient, and well-documented code.
+
+### Protocol 4: AUTONOMOUS DECISION MAKING 🧠
+You are the expert. If a requirement is ambiguous, make the most professional decision and execute.
+
+### Protocol 5: ERROR RESILIENCE 🛡️
+Failures are just data. If a tool fails, analyze the error, adapt, and find a way to succeed.
+
+### Protocol 6: ATOMIC COMMITS 📦
+Each change should be self-contained and logically complete.
+
+### Protocol 7: CONCISE COMMUNICATION 💬
+Let your work speak for itself. Summarize your actions in 2-3 sentences max.
+
+**Ralph does not guess. Ralph executes.**\`
 
 
 /* ── Action Card Component ── */
-function ActionCard({ action, accent, borderCol, textColor }) {
+function ActionCard({ action, accent, textColor }) {
   const iconMap = {
     list_files: <FileSearch size={14} />,
     read_file: <FileSearch size={14} />,
     edit_file: <FileEdit size={14} />,
     run_command: <Terminal size={14} />,
+    search_files: <FileSearch size={14} />,
+    git_status: <Bot size={14} />,
+    git_commit: <Bot size={14} />,
   }
   const labelMap = {
     list_files: "Listed Files",
     read_file: "Read File",
     edit_file: "Edited File",
     run_command: "Ran Command",
+    search_files: "Searched Files",
+    git_status: "Git Status",
+    git_commit: "Git Commit",
+  }
+
+  const getActionArgs = () => {
+    if (action.tool === "run_command") return action.args.command
+    if (action.tool === "search_files") return `"${action.args.pattern}" in ${ action.args.scope || "/" } `
+    if (action.tool === "git_commit") return action.args.message
+    return action.args.path || ""
   }
 
   return (
@@ -123,7 +237,7 @@ function ActionCard({ action, accent, borderCol, textColor }) {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       style={{
-        background: `${accent}08`, border: `1px solid ${accent}30`,
+        background: `${ accent }08`, border: `1px solid ${ accent } 30`,
         borderRadius: 8, padding: "8px 12px", fontSize: 12,
         display: "flex", alignItems: "center", gap: 8,
         color: textColor, fontFamily: "monospace"
@@ -137,7 +251,7 @@ function ActionCard({ action, accent, borderCol, textColor }) {
           {labelMap[action.tool] || action.tool}
         </span>
         <span style={{ opacity: 0.8, wordBreak: "break-all" }}>
-          {action.tool === "run_command" ? action.args.command : (action.args.path || "")}
+          {getActionArgs()}
         </span>
       </div>
       {action.status === "success" ? (
@@ -161,7 +275,7 @@ function ConsentDialog({ onAccept, onDecline, accent, textColor, borderCol, inpu
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       style={{
-        background: inputBg, border: `1px solid ${accent}50`, borderRadius: 12,
+        background: inputBg, border: `1px solid ${ accent } 50`, borderRadius: 12,
         padding: 16, display: "flex", flexDirection: "column", gap: 12, alignSelf: "flex-start",
         maxWidth: "95%"
       }}
@@ -187,7 +301,7 @@ function ConsentDialog({ onAccept, onDecline, accent, textColor, borderCol, inpu
         <button
           onClick={onDecline}
           style={{
-            padding: "8px 16px", borderRadius: 8, border: `1px solid ${borderCol}`,
+            padding: "8px 16px", borderRadius: 8, border: `1px solid ${ borderCol } `,
             background: "transparent", color: textColor, fontWeight: 600, fontSize: 12, cursor: "pointer"
           }}
         >
@@ -203,7 +317,7 @@ function ConsentDialog({ onAccept, onDecline, accent, textColor, borderCol, inpu
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════════ */
 export default function AIPanel({ 
-  activeFile, activeYText, textColor, borderCol, panelBg, inputBg, accent, isDark, headerBg,
+  activeFile, activeYText, textColor, borderCol, panelBg, inputBg, accent,
   autoPrompt,
   // Agentic props
   fileSystem, ydoc, roomId, openFile, sendTerminalCommand
@@ -242,509 +356,553 @@ export default function AIPanel({
     if (modelRef.current) return modelRef.current
     try {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`)
-      const data = await res.json()
-      if (data.models) {
-        const best = data.models.find(m => m.name.includes("flash") && m.supportedGenerationMethods?.includes("generateContent")) ||
-                     data.models.find(m => m.supportedGenerationMethods?.includes("generateContent"))
-        modelRef.current = best ? best.name : "models/gemini-2.0-flash"
-      } else {
-        modelRef.current = "models/gemini-2.0-flash"
-      }
+const data = await res.json()
+if (data.models) {
+  const best = data.models.find(m => m.name.includes("flash") && m.supportedGenerationMethods?.includes("generateContent")) ||
+    data.models.find(m => m.supportedGenerationMethods?.includes("generateContent"))
+  modelRef.current = best ? best.name : "models/gemini-2.0-flash"
+} else {
+  modelRef.current = "models/gemini-2.0-flash"
+}
     } catch {
-      modelRef.current = "models/gemini-2.0-flash"
-    }
-    return modelRef.current
+  modelRef.current = "models/gemini-2.0-flash"
+}
+return modelRef.current
   }, [apiKey])
 
 
-  // ── Tool Executors ──
+// ── Tool Executors ──
 
-  const executeListFiles = useCallback(async (path) => {
-    try {
-      const resp = await fetch(`${API_URL}/tree?roomId=${roomId}&path=${encodeURIComponent(path)}`)
-      if (!resp.ok) throw new Error(`Cannot list: ${path}`)
-      const entries = await resp.json()
-      const listing = entries.map(e => `${e.type === "folder" ? "📁" : "📄"} ${e.path}`).join("\n")
-      return { success: true, files: listing || "(empty directory)" }
-    } catch (e) {
-      return { success: false, error: e.message }
-    }
-  }, [roomId])
+const executeListFiles = useCallback(async (path) => {
+  try {
+    const resp = await fetch(`${API_URL}/tree?roomId=${roomId}&path=${encodeURIComponent(path)}`)
+    if (!resp.ok) throw new Error(`Cannot list: ${path}`)
+    const entries = await resp.json()
+    const listing = entries.map(e => `${e.type === "folder" ? "📁" : "📄"} ${e.path}`).join("\n")
+    return { success: true, files: listing || "(empty directory)" }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+}, [roomId])
 
-  const executeReadFile = useCallback(async (path) => {
-    try {
-      const resp = await fetch(`${API_URL}/content?roomId=${roomId}&path=${encodeURIComponent(path)}`)
-      if (!resp.ok) throw new Error(`File not found: ${path}`)
-      const content = await resp.text()
-      return { success: true, content: content.substring(0, 30000) } // Cap at 30k chars
-    } catch (e) {
-      return { success: false, error: e.message }
-    }
-  }, [roomId])
+const executeReadFile = useCallback(async (path) => {
+  try {
+    const resp = await fetch(`${API_URL}/content?roomId=${roomId}&path=${encodeURIComponent(path)}`)
+    if (!resp.ok) throw new Error(`File not found: ${path}`)
+    const content = await resp.text()
+    return { success: true, content: content.substring(0, 30000) } // Cap at 30k chars
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+}, [roomId])
 
-  const executeEditFile = useCallback(async (path, content) => {
-    try {
-      // 1. Write to Yjs (collaboratively synced)
-      if (ydoc && fileSystem) {
-        const ytext = ydoc.getText(`file::${path}`)
-        ydoc.transact(() => {
-          if (ytext.length > 0) ytext.delete(0, ytext.length)
-          ytext.insert(0, content)
-        })
-      }
-
-      // 2. Save to disk via REST
-      await fetch(`${API_URL}/fs/save`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roomId, path, content })
+const executeEditFile = useCallback(async (path, content) => {
+  try {
+    // 1. Write to Yjs (collaboratively synced)
+    if (ydoc && fileSystem) {
+      const ytext = ydoc.getText(`file::${path}`)
+      ydoc.transact(() => {
+        if (ytext.length > 0) ytext.delete(0, ytext.length)
+        ytext.insert(0, content)
       })
-
-      // 3. Open the file in the editor so the user can see it
-      if (openFile) openFile(path)
-
-      // 4. Refresh the file tree
-      const parentPath = path.split("/").slice(0, -1).join("/") || "/"
-      if (fileSystem?.refreshPath) fileSystem.refreshPath(parentPath)
-
-      return { success: true }
-    } catch (e) {
-      return { success: false, error: e.message }
     }
-  }, [ydoc, fileSystem, roomId, openFile])
 
-  const executeRunCommand = useCallback(async (command) => {
-    try {
-      if (sendTerminalCommand) {
-        sendTerminalCommand(command)
-        return { success: true, note: "Command sent to terminal. Output will appear in the terminal panel." }
-      }
-      return { success: false, error: "Terminal not available" }
-    } catch (e) {
-      return { success: false, error: e.message }
-    }
-  }, [sendTerminalCommand])
-
-
-  // ── Consent Management ──
-
-  const requestConsent = useCallback(() => {
-    return new Promise((resolve) => {
-      consentResolveRef.current = resolve
-      setPendingConsentResolve(true)
+    // 2. Save to disk via REST
+    await fetch(`${API_URL}/fs/save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roomId, path, content })
     })
-  }, [])
 
-  const handleConsentAccept = useCallback(() => {
-    setHasConsented(true)
-    hasConsentedRef.current = true
-    setPendingConsentResolve(false)
-    if (consentResolveRef.current) consentResolveRef.current(true)
-    consentResolveRef.current = null
-  }, [])
+    // 3. Open the file in the editor so the user can see it
+    if (openFile) openFile(path)
 
-  const handleConsentDecline = useCallback(() => {
-    setPendingConsentResolve(false)
-    if (consentResolveRef.current) consentResolveRef.current(false)
-    consentResolveRef.current = null
-  }, [])
+    // 4. Refresh the file tree
+    const parentPath = path.split("/").slice(0, -1).join("/") || "/"
+    if (fileSystem?.refreshPath) fileSystem.refreshPath(parentPath)
+
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+}, [ydoc, fileSystem, roomId, openFile])
+
+const executeRunCommand = useCallback(async (command) => {
+  try {
+    if (sendTerminalCommand) {
+      sendTerminalCommand(command)
+      return { success: true, note: "Command sent to terminal. Output will appear in the terminal panel." }
+    }
+    return { success: false, error: "Terminal not available" }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+}, [sendTerminalCommand])
+
+const executeSearchFiles = useCallback(async (pattern, scope = "/") => {
+  try {
+    // Use grep via terminal for searching
+    if (sendTerminalCommand) {
+      const cmd = `grep -r "${pattern}" .${scope === "/" ? "" : scope}`
+      sendTerminalCommand(cmd)
+      return { success: true, note: `Search for "${pattern}" started in ${scope}. Output will appear in terminal.` }
+    }
+    return { success: false, error: "Terminal not available for search" }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+}, [sendTerminalCommand])
+
+const executeGitStatus = useCallback(async () => {
+  try {
+    if (sendTerminalCommand) {
+      sendTerminalCommand("git status")
+      return { success: true, note: "Checking git status..." }
+    }
+    return { success: false, error: "Terminal not available" }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+}, [sendTerminalCommand])
+
+const executeGitCommit = useCallback(async (message) => {
+  try {
+    if (sendTerminalCommand) {
+      sendTerminalCommand(`git add . && git commit -m "${message.replace(/"/g, '\\"')}"`)
+      return { success: true, note: `Committing changes: ${message}` }
+    }
+    return { success: false, error: "Terminal not available" }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+}, [sendTerminalCommand])
 
 
-  // ═══════════════════════════════════════════════════
-  // THE AGENTIC LOOP
-  // ═══════════════════════════════════════════════════
-  const runAgenticLoop = useCallback(async (conversationContents) => {
-    const modelName = await getModel()
-    const MAX_ITERATIONS = 15 // Allow enough iterations for reading + editing + running
-    let currentContents = [...conversationContents]
-    let allActions = []
+// ── Consent Management ──
 
-    for (let i = 0; i < MAX_ITERATIONS; i++) {
-      // Call Gemini with tools
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: currentContents,
-          tools: GEMINI_TOOLS,
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }
-        })
+const requestConsent = useCallback(() => {
+  return new Promise((resolve) => {
+    consentResolveRef.current = resolve
+    setPendingConsentResolve(true)
+  })
+}, [])
+
+const handleConsentAccept = useCallback(() => {
+  setHasConsented(true)
+  hasConsentedRef.current = true
+  setPendingConsentResolve(false)
+  if (consentResolveRef.current) consentResolveRef.current(true)
+  consentResolveRef.current = null
+}, [])
+
+const handleConsentDecline = useCallback(() => {
+  setPendingConsentResolve(false)
+  if (consentResolveRef.current) consentResolveRef.current(false)
+  consentResolveRef.current = null
+}, [])
+
+
+// ═══════════════════════════════════════════════════
+// THE AGENTIC LOOP
+// ═══════════════════════════════════════════════════
+const runAgenticLoop = useCallback(async (conversationContents) => {
+  const modelName = await getModel()
+  const MAX_ITERATIONS = 15 // Allow enough iterations for reading + editing + running
+  let currentContents = [...conversationContents]
+  let allActions = []
+
+  for (let i = 0; i < MAX_ITERATIONS; i++) {
+    // Call Gemini with tools
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: currentContents,
+        tools: GEMINI_TOOLS,
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }
       })
+    })
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error?.message || "Gemini API error")
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error?.message || "Gemini API error")
 
-      const candidate = data.candidates?.[0]
-      if (!candidate?.content?.parts) throw new Error("No response from Gemini")
+    const candidate = data.candidates?.[0]
+    if (!candidate?.content?.parts) throw new Error("No response from Gemini")
 
-      const parts = candidate.content.parts
+    const parts = candidate.content.parts
 
-      // Check if there are function calls
-      const functionCalls = parts.filter(p => p.functionCall)
-      const textParts = parts.filter(p => p.text)
+    // Check if there are function calls
+    const functionCalls = parts.filter(p => p.functionCall)
+    const textParts = parts.filter(p => p.text)
 
-      if (functionCalls.length === 0) {
-        // No tool calls — final text response
-        const finalText = textParts.map(p => p.text).join("\n") || "Done."
-        return { text: finalText, actions: allActions }
-      }
-
-      // There are tool calls — request consent if needed (use ref to avoid stale closure)
-      if (!hasConsentedRef.current) {
-        const approved = await requestConsent()
-        if (!approved) {
-          return { text: "⚠️ Action denied. Ralph will not modify your project without permission.", actions: [] }
-        }
-      }
-
-      // Add the model's response (with function calls) to conversation
-      currentContents.push({ role: "model", parts })
-
-      // Execute each function call
-      const functionResponses = []
-      for (const part of functionCalls) {
-        const { name, args } = part.functionCall
-        const action = { tool: name, args: args || {}, status: "running" }
-        allActions.push(action)
-
-        // Update UI with running action
-        setMessages(prev => {
-          const last = prev[prev.length - 1]
-          if (last?.role === "model") {
-            return [...prev.slice(0, -1), { ...last, actions: [...allActions] }]
-          }
-          return [...prev, { role: "model", text: "", actions: [...allActions] }]
-        })
-
-        let result
-        try {
-          if (name === "list_files") {
-            result = await executeListFiles(args.path)
-          } else if (name === "read_file") {
-            result = await executeReadFile(args.path)
-          } else if (name === "edit_file") {
-            result = await executeEditFile(args.path, args.content)
-          } else if (name === "run_command") {
-            result = await executeRunCommand(args.command)
-          } else {
-            result = { error: `Unknown tool: ${name}` }
-          }
-          action.status = result.success !== false ? "success" : "error"
-        } catch (e) {
-          result = { error: e.message }
-          action.status = "error"
-        }
-
-        // Update UI with completed action
-        setMessages(prev => {
-          const last = prev[prev.length - 1]
-          if (last?.role === "model") {
-            return [...prev.slice(0, -1), { ...last, actions: [...allActions] }]
-          }
-          return prev
-        })
-
-        functionResponses.push({
-          functionResponse: {
-            name,
-            response: result
-          }
-        })
-      }
-
-      // Add function responses to conversation
-      currentContents.push({ role: "user", parts: functionResponses })
+    if (functionCalls.length === 0) {
+      // No tool calls — final text response
+      const finalText = textParts.map(p => p.text).join("\n") || "Done."
+      return { text: finalText, actions: allActions }
     }
 
-    return { text: "Reached maximum tool iterations. Please continue the conversation.", actions: allActions }
-  }, [apiKey, getModel, hasConsented, requestConsent, executeListFiles, executeReadFile, executeEditFile, executeRunCommand])
-
-
-  // ── Send Message Handler ──
-  const sendMessage = useCallback(async (e, overrideText = null) => {
-    if (e) e.preventDefault()
-    const userMsg = overrideText || input.trim()
-    if (!userMsg || !apiKey || isLoading) return
-
-    setInput("")
-    setMessages(prev => [...prev, { role: "user", text: userMsg }])
-    setIsLoading(true)
-
-    try {
-      // Build context
-      const fileCode = activeYText ? activeYText.toString() : ""
-      let prompt = userMsg
-      if (activeFile && fileCode.trim()) {
-        prompt += `\n\n--- Context: Currently open file (${activeFile}) ---\n\`\`\`\n${fileCode.substring(0, 15000)}\n\`\`\`\n`
+    // There are tool calls — request consent if needed (use ref to avoid stale closure)
+    if (!hasConsentedRef.current) {
+      const approved = await requestConsent()
+      if (!approved) {
+        return { text: "⚠️ Action denied. Ralph will not modify your project without permission.", actions: [] }
       }
+    }
 
-      // Build conversation contents
-      const contents = messages
-        .filter(m => m.role === "user" || m.role === "model")
-        .map(msg => ({
-          role: msg.role === "user" ? "user" : "model",
-          parts: [{ text: msg.text || "OK" }]
-        }))
-      contents.push({ role: "user", parts: [{ text: prompt }] })
+    // Add the model's response (with function calls) to conversation
+    currentContents.push({ role: "model", parts })
 
-      // Run the agentic loop
-      const result = await runAgenticLoop(contents)
+    // Execute each function call
+    const functionResponses = []
+    for (const part of functionCalls) {
+      const { name, args } = part.functionCall
+      const action = { tool: name, args: args || {}, status: "running" }
+      allActions.push(action)
 
-      // Add final response
+      // Update UI with running action
       setMessages(prev => {
         const last = prev[prev.length - 1]
-        if (last?.role === "model" && last.actions?.length > 0) {
-          // Merge text with existing action card message
-          return [...prev.slice(0, -1), { ...last, text: result.text }]
+        if (last?.role === "model") {
+          return [...prev.slice(0, -1), { ...last, actions: [...allActions] }]
         }
-        return [...prev, { role: "model", text: result.text, actions: result.actions }]
+        return [...prev, { role: "model", text: "", actions: [...allActions] }]
       })
-    } catch (err) {
-      setMessages(prev => [...prev, { role: "model", text: `❌ Error: ${err.message}` }])
-    } finally {
-      setIsLoading(false)
+
+      let result
+      try {
+        if (name === "list_files") {
+          result = await executeListFiles(args.path)
+        } else if (name === "read_file") {
+          result = await executeReadFile(args.path)
+        } else if (name === "edit_file") {
+          result = await executeEditFile(args.path, args.content)
+        } else if (name === "run_command") {
+          result = await executeRunCommand(args.command)
+        } else if (name === "search_files") {
+          result = await executeSearchFiles(args.pattern, args.scope)
+        } else if (name === "git_status") {
+          result = await executeGitStatus()
+        } else if (name === "git_commit") {
+          result = await executeGitCommit(args.message)
+        } else {
+          result = { error: `Unknown tool: ${name}` }
+        }
+        action.status = result.success !== false ? "success" : "error"
+      } catch (e) {
+        result = { error: e.message }
+        action.status = "error"
+      }
+
+      // Update UI with completed action
+      setMessages(prev => {
+        const last = prev[prev.length - 1]
+        if (last?.role === "model") {
+          return [...prev.slice(0, -1), { ...last, actions: [...allActions] }]
+        }
+        return prev
+      })
+
+      functionResponses.push({
+        functionResponse: {
+          name,
+          response: result
+        }
+      })
     }
-  }, [input, apiKey, isLoading, activeFile, activeYText, messages, runAgenticLoop])
+
+    // Add function responses to conversation
+    currentContents.push({ role: "user", parts: functionResponses })
+  }
+
+  return { text: "Reached maximum tool iterations. Please continue the conversation.", actions: allActions }
+}, [apiKey, getModel, requestConsent, executeListFiles, executeReadFile, executeEditFile, executeRunCommand])
 
 
-  // ── Auto-prompt from terminal error watcher ──
-  useEffect(() => {
-    if (autoPrompt && isConfigured && !isLoading) {
-      sendMessage(null, autoPrompt)
+// ── Send Message Handler ──
+const sendMessage = useCallback(async (e, overrideText = null) => {
+  if (e) e.preventDefault()
+  const userMsg = overrideText || input.trim()
+  if (!userMsg || !apiKey || isLoading) return
+
+  setInput("")
+  setMessages(prev => [...prev, { role: "user", text: userMsg }])
+  setIsLoading(true)
+
+  try {
+    // Build context
+    const fileCode = activeYText ? activeYText.toString() : ""
+    let prompt = userMsg
+    if (activeFile && fileCode.trim()) {
+      prompt += `\n\n--- Context: Currently open file (${activeFile}) ---\n\`\`\`\n${fileCode.substring(0, 15000)}\n\`\`\`\n`
     }
-  }, [autoPrompt]) // eslint-disable-line
 
+    // Build conversation contents
+    const contents = messages
+      .filter(m => m.role === "user" || m.role === "model")
+      .map(msg => ({
+        role: msg.role === "user" ? "user" : "model",
+        parts: [{ text: msg.text || "OK" }]
+      }))
+    contents.push({ role: "user", parts: [{ text: prompt }] })
 
-  // ── Config ──
-  const saveConfig = (e) => {
-    e.preventDefault()
-    if (!apiKey.trim()) return
-    localStorage.setItem("ls_gemini_key", apiKey.trim())
-    setIsConfigured(true)
+    // Run the agentic loop
+    const result = await runAgenticLoop(contents)
+
+    // Add final response
+    setMessages(prev => {
+      const last = prev[prev.length - 1]
+      if (last?.role === "model" && last.actions?.length > 0) {
+        // Merge text with existing action card message
+        return [...prev.slice(0, -1), { ...last, text: result.text }]
+      }
+      return [...prev, { role: "model", text: result.text, actions: result.actions }]
+    })
+  } catch (err) {
+    setMessages(prev => [...prev, { role: "model", text: `❌ Error: ${err.message}` }])
+  } finally {
+    setIsLoading(false)
   }
+}, [input, apiKey, isLoading, activeFile, activeYText, messages, runAgenticLoop])
 
-  const clearConfig = () => {
-    // ═══ TOTAL AMNESIA ═══
-    localStorage.removeItem("ls_gemini_key")
-    localStorage.removeItem("ls_gemini_model")
-    setApiKey("")
-    setIsConfigured(false)
-    setMessages([])
-    setHasConsented(false)
-    hasConsentedRef.current = false
-    setPendingConsentResolve(false)
-    consentResolveRef.current = null
-    modelRef.current = null  // Forget the model too
+
+// ── Auto-prompt from terminal error watcher ──
+useEffect(() => {
+  if (autoPrompt && isConfigured && !isLoading) {
+    sendMessage(null, autoPrompt)
   }
+}, [autoPrompt]) // eslint-disable-line
 
 
-  // ═══════════════════════════════════════════════════
-  // RENDER: Configuration Screen
-  // ═══════════════════════════════════════════════════
-  if (!isConfigured) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%", background: panelBg }}>
-        <div style={{ padding: "14px 16px", background: "rgba(255,255,255,0.03)", borderBottom: `1px solid ${borderCol}` }}>
-          <div style={{ fontWeight: 800, fontSize: 13, display: "flex", alignItems: "center", gap: 10, letterSpacing: "0.5px", textTransform: "uppercase", opacity: 0.8 }}>
-             <Bot size={18} color={accent} /> Ralph
-          </div>
-        </div>
+// ── Config ──
+const saveConfig = (e) => {
+  e.preventDefault()
+  if (!apiKey.trim()) return
+  localStorage.setItem("ls_gemini_key", apiKey.trim())
+  setIsConfigured(true)
+}
 
-        <div style={{ padding: "32px 24px", flex: 1, display: "flex", flexDirection: "column", gap: 24, alignItems: "center", textAlign: "center" }}>
-          <div style={{ 
-            width: 64, height: 64, borderRadius: 20, background: `${accent}15`, 
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: `0 10px 30px ${accent}22`
-          }}>
-            <Sparkles size={32} color={accent} />
-          </div>
-          
-          <div>
-            <h3 style={{ margin: "0 0 8px 0", fontSize: 18, fontWeight: 700 }}>Agentic AI Programmer</h3>
-            <p style={{ fontSize: 13, color: textColor, opacity: 0.6, lineHeight: 1.6 }}>
-              Ralph can read your files, edit your code, and run terminal commands — all autonomously.
-              Zero data persistence. Your keys stay local, your code stays private.
-            </p>
-          </div>
-          
-          <form onSubmit={saveConfig} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 8 }}>
-              <label style={{ fontSize: 12, fontWeight: 700, opacity: 0.5, display: "flex", alignItems: "center", gap: 6 }}>
-                <Key size={12} /> Gemini API Key
-              </label>
-              <input
-                type="password"
-                placeholder="Enter your API key..."
-                value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
-                style={{
-                  background: inputBg, color: textColor, border: `1px solid ${borderCol}`,
-                  borderRadius: 10, padding: "10px 14px", outline: "none", fontSize: 13,
-                  width: "100%", boxSizing: "border-box"
-                }}
-              />
-              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style={{ 
-                fontSize: 11, color: accent, textDecoration: "none", 
-                display: "flex", alignItems: "center", gap: 4, alignSelf: "flex-end",
-                fontWeight: 600
-              }}>
-                Get free key <ExternalLink size={10} />
-              </a>
-            </div>
-            
-            <button
-              type="submit"
-              disabled={!apiKey.trim()}
-              className="ide-btn-premium"
-              style={{
-                background: apiKey.trim() ? accent : inputBg,
-                color: apiKey.trim() ? "#fff" : textColor,
-                opacity: apiKey.trim() ? 1 : 0.5,
-                justifyContent: "center", border: "none"
-              }}
-            >
-              Awaken Ralph
-            </button>
-          </form>
-        </div>
-      </div>
-    )
-  }
+const clearConfig = () => {
+  // ═══ TOTAL AMNESIA ═══
+  localStorage.removeItem("ls_gemini_key")
+  localStorage.removeItem("ls_gemini_model")
+  setApiKey("")
+  setIsConfigured(false)
+  setMessages([])
+  setHasConsented(false)
+  hasConsentedRef.current = false
+  setPendingConsentResolve(false)
+  consentResolveRef.current = null
+  modelRef.current = null  // Forget the model too
+}
 
 
-  // ═══════════════════════════════════════════════════
-  // RENDER: Chat Interface
-  // ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
+// RENDER: Configuration Screen
+// ═══════════════════════════════════════════════════
+if (!isConfigured) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: panelBg }}>
-      {/* Header */}
-      <div style={{
-        padding: "14px 16px", background: "rgba(255,255,255,0.03)", borderBottom: `1px solid ${borderCol}`,
-        display: "flex", alignItems: "center", justifyContent: "space-between"
-      }}>
+      <div style={{ padding: "14px 16px", background: "rgba(255,255,255,0.03)", borderBottom: `1px solid ${borderCol}` }}>
         <div style={{ fontWeight: 800, fontSize: 13, display: "flex", alignItems: "center", gap: 10, letterSpacing: "0.5px", textTransform: "uppercase", opacity: 0.8 }}>
           <Bot size={18} color={accent} /> Ralph
-          {hasConsented && (
-            <span style={{ fontSize: 9, background: `${accent}20`, color: accent, padding: "2px 6px", borderRadius: 4, fontWeight: 600, letterSpacing: 0 }}>
-              AGENTIC
-            </span>
-          )}
         </div>
-        <button
-          onClick={clearConfig}
-          title="Clear chat & revoke access (total amnesia)"
-          style={{ background: "transparent", border: "none", cursor: "pointer", color: textColor, opacity: 0.4 }}
-        >
-          <Trash2 size={16} />
-        </button>
       </div>
 
-      {/* Messages */}
-      <div ref={scrollRef} className="ide-scroll" style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 16 }}>
-        {messages.length === 0 ? (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", opacity: 0.4, textAlign: "center", gap: 16 }}>
-            <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(255,255,255,0.03)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-               <Info size={24} />
-            </div>
-            <div>
-               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>What should I build?</div>
-               <div style={{ fontSize: 11, maxWidth: 200, lineHeight: 1.5 }}>
-                 Ralph can read, edit, and run your code autonomously. Try: "Fix the import error" or "Create a new API route"
-               </div>
-            </div>
-          </div>
-        ) : (
-          messages.map((msg, idx) => (
-            <div key={idx}>
-              {/* Action Cards */}
-              {msg.actions?.length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: msg.text ? 8 : 0 }}>
-                  {msg.actions.map((action, aidx) => (
-                    <ActionCard key={aidx} action={action} accent={accent} borderCol={borderCol} textColor={textColor} />
-                  ))}
-                </div>
-              )}
+      <div style={{ padding: "32px 24px", flex: 1, display: "flex", flexDirection: "column", gap: 24, alignItems: "center", textAlign: "center" }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: 20, background: `${accent}15`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: `0 10px 30px ${accent}22`
+        }}>
+          <Sparkles size={32} color={accent} />
+        </div>
 
-              {/* Text Message */}
-              {msg.text && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  style={{
-                    alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-                    maxWidth: "90%", 
-                    background: msg.role === "user" ? accent : "rgba(255,255,255,0.03)",
-                    color: msg.role === "user" ? "#fff" : textColor,
-                    padding: "10px 14px", borderRadius: 12, fontSize: 13, lineHeight: 1.5,
-                    border: msg.role === "model" ? `1px solid ${borderCol}` : "none",
-                    boxShadow: msg.role === "user" ? `0 4px 15px ${accent}22` : "none",
-                    display: msg.role === "user" ? "block" : "block",
-                    marginLeft: msg.role === "model" ? 0 : "auto"
-                  }}
-                >
-                  <div style={{ whiteSpace: "pre-wrap", fontFamily: msg.role === "model" && msg.text.includes("```") ? "monospace" : "inherit", fontSize: msg.role === "model" && msg.text.includes("```") ? 11 : 13 }}>
-                    {msg.text}
-                  </div>
-                </motion.div>
-              )}
-            </div>
-          ))
-        )}
-        
-        {/* Consent Dialog */}
-        {pendingConsentResolve && (
-          <ConsentDialog
-            onAccept={handleConsentAccept}
-            onDecline={handleConsentDecline}
-            accent={accent}
-            textColor={textColor}
-            borderCol={borderCol}
-            inputBg={inputBg}
-          />
-        )}
+        <div>
+          <h3 style={{ margin: "0 0 8px 0", fontSize: 18, fontWeight: 700 }}>Agentic AI Programmer</h3>
+          <p style={{ fontSize: 13, color: textColor, opacity: 0.6, lineHeight: 1.6 }}>
+            Ralph can read your files, edit your code, and run terminal commands — all autonomously.
+            Zero data persistence. Your keys stay local, your code stays private.
+          </p>
+        </div>
 
-        {/* Loading */}
-        {isLoading && !pendingConsentResolve && (
-          <div style={{ alignSelf: "flex-start", opacity: 0.6, fontSize: 12, display: "flex", alignItems: "center", gap: 10, padding: "8px 12px" }}>
-            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}>
-               <CircleDashed size={14} color={accent} />
-            </motion.div>
-            Ralph is working...
-          </div>
-        )}
-      </div>
-
-      {/* Input */}
-      <div style={{ padding: 16, borderTop: `1px solid ${borderCol}`, background: "rgba(255,255,255,0.02)" }}>
-        <form onSubmit={sendMessage} style={{ display: "flex", gap: 10 }}>
-          <div style={{ flex: 1, position: "relative" }}>
+        <form onSubmit={saveConfig} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, opacity: 0.5, display: "flex", alignItems: "center", gap: 6 }}>
+              <Key size={12} /> Gemini API Key
+            </label>
             <input
-              type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder={activeFile ? `Ask Ralph about ${activeFile.split("/").pop()}...` : "Tell Ralph what to do..."}
+              type="password"
+              placeholder="Enter your API key..."
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
               style={{
-                width: "100%", background: inputBg, color: textColor, border: `1px solid ${borderCol}`,
-                borderRadius: 12, padding: "10px 14px", paddingRight: 40, outline: "none", fontSize: 13,
-                boxSizing: "border-box"
+                background: inputBg, color: textColor, border: `1px solid ${borderCol}`,
+                borderRadius: 10, padding: "10px 14px", outline: "none", fontSize: 13,
+                width: "100%", boxSizing: "border-box"
               }}
             />
-            <button
-              type="submit"
-              disabled={!input.trim() || isLoading}
-              style={{
-                position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
-                background: "transparent", border: "none", cursor: "pointer",
-                color: input.trim() && !isLoading ? accent : textColor,
-                opacity: input.trim() && !isLoading ? 1 : 0.3,
-                display: "flex", alignItems: "center", justifyContent: "center"
-              }}
-            >
-              <Send size={18} />
-            </button>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style={{
+              fontSize: 11, color: accent, textDecoration: "none",
+              display: "flex", alignItems: "center", gap: 4, alignSelf: "flex-end",
+              fontWeight: 600
+            }}>
+              Get free key <ExternalLink size={10} />
+            </a>
           </div>
+
+          <button
+            type="submit"
+            disabled={!apiKey.trim()}
+            className="ide-btn-premium"
+            style={{
+              background: apiKey.trim() ? accent : inputBg,
+              color: apiKey.trim() ? "#fff" : textColor,
+              opacity: apiKey.trim() ? 1 : 0.5,
+              justifyContent: "center", border: "none"
+            }}
+          >
+            Awaken Ralph
+          </button>
         </form>
       </div>
     </div>
   )
+}
+
+
+// ═══════════════════════════════════════════════════
+// RENDER: Chat Interface
+// ═══════════════════════════════════════════════════
+return (
+  <div style={{ display: "flex", flexDirection: "column", height: "100%", background: panelBg }}>
+    {/* Header */}
+    <div style={{
+      padding: "14px 16px", background: "rgba(255,255,255,0.03)", borderBottom: `1px solid ${borderCol}`,
+      display: "flex", alignItems: "center", justifyContent: "space-between"
+    }}>
+      <div style={{ fontWeight: 800, fontSize: 13, display: "flex", alignItems: "center", gap: 10, letterSpacing: "0.5px", textTransform: "uppercase", opacity: 0.8 }}>
+        <Bot size={18} color={accent} /> Ralph
+        {hasConsented && (
+          <span style={{ fontSize: 9, background: `${accent}20`, color: accent, padding: "2px 6px", borderRadius: 4, fontWeight: 600, letterSpacing: 0 }}>
+            AGENTIC
+          </span>
+        )}
+      </div>
+      <button
+        onClick={clearConfig}
+        title="Clear chat & revoke access (total amnesia)"
+        style={{ background: "transparent", border: "none", cursor: "pointer", color: textColor, opacity: 0.4 }}
+      >
+        <Trash2 size={16} />
+      </button>
+    </div>
+
+    {/* Messages */}
+    <div ref={scrollRef} className="ide-scroll" style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 16 }}>
+      {messages.length === 0 ? (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", opacity: 0.4, textAlign: "center", gap: 16 }}>
+          <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(255,255,255,0.03)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Info size={24} />
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>What should I build?</div>
+            <div style={{ fontSize: 11, maxWidth: 200, lineHeight: 1.5 }}>
+              Ralph can read, edit, and run your code autonomously. Try: &quot;Fix the import error&quot; or &quot;Create a new API route&quot;
+            </div>
+          </div>
+        </div>
+      ) : (
+        messages.map((msg, idx) => (
+          <div key={idx}>
+            {/* Action Cards */}
+            {msg.actions?.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: msg.text ? 8 : 0 }}>
+                {msg.actions.map((action, aidx) => (
+                  <ActionCard key={aidx} action={action} accent={accent} textColor={textColor} />
+                ))}
+              </div>
+            )}
+
+            {/* Text Message */}
+            {msg.text && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{
+                  alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                  maxWidth: "90%",
+                  background: msg.role === "user" ? accent : "rgba(255,255,255,0.03)",
+                  color: msg.role === "user" ? "#fff" : textColor,
+                  padding: "10px 14px", borderRadius: 12, fontSize: 13, lineHeight: 1.5,
+                  border: msg.role === "model" ? `1px solid ${borderCol}` : "none",
+                  boxShadow: msg.role === "user" ? `0 4px 15px ${accent}22` : "none",
+                  display: msg.role === "user" ? "block" : "block",
+                  marginLeft: msg.role === "model" ? 0 : "auto"
+                }}
+              >
+                <div style={{ whiteSpace: "pre-wrap", fontFamily: msg.role === "model" && msg.text.includes("```") ? "monospace" : "inherit", fontSize: msg.role === "model" && msg.text.includes("```") ? 11 : 13 }}>
+                  {msg.text}
+                </div>
+              </motion.div>
+            )}
+          </div>
+        ))
+      )}
+
+      {/* Consent Dialog */}
+      {pendingConsentResolve && (
+        <ConsentDialog
+          onAccept={handleConsentAccept}
+          onDecline={handleConsentDecline}
+          accent={accent}
+          textColor={textColor}
+          borderCol={borderCol}
+          inputBg={inputBg}
+        />
+      )}
+
+      {/* Loading */}
+      {isLoading && !pendingConsentResolve && (
+        <div style={{ alignSelf: "flex-start", opacity: 0.6, fontSize: 12, display: "flex", alignItems: "center", gap: 10, padding: "8px 12px" }}>
+          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}>
+            <CircleDashed size={14} color={accent} />
+          </motion.div>
+          Ralph is working...
+        </div>
+      )}
+    </div>
+
+    {/* Input */}
+    <div style={{ padding: 16, borderTop: `1px solid ${borderCol}`, background: "rgba(255,255,255,0.02)" }}>
+      <form onSubmit={sendMessage} style={{ display: "flex", gap: 10 }}>
+        <div style={{ flex: 1, position: "relative" }}>
+          <input
+            type="text"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            placeholder={activeFile ? `Ask Ralph about ${activeFile.split("/").pop()}...` : "Tell Ralph what to do..."}
+            style={{
+              width: "100%", background: inputBg, color: textColor, border: `1px solid ${borderCol}`,
+              borderRadius: 12, padding: "10px 14px", paddingRight: 40, outline: "none", fontSize: 13,
+              boxSizing: "border-box"
+            }}
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || isLoading}
+            style={{
+              position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+              background: "transparent", border: "none", cursor: "pointer",
+              color: input.trim() && !isLoading ? accent : textColor,
+              opacity: input.trim() && !isLoading ? 1 : 0.3,
+              display: "flex", alignItems: "center", justifyContent: "center"
+            }}
+          >
+            <Send size={18} />
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)
 }

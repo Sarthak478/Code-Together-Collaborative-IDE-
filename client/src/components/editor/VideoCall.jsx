@@ -207,7 +207,7 @@ export default function VideoCall({
   )
 }
 
-function RemoteVideoBubble({ peerId, stream, username, themeData }) {
+function RemoteVideoBubble({ stream, username }) {
     const videoRef = useRef(null)
 
     useEffect(() => {

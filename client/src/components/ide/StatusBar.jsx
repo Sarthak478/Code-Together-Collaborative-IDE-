@@ -1,4 +1,4 @@
-export default function StatusBar({ activeLanguage, roomMode, terminalOpen, isHost, username, bg, textColor, accent, actualRoomType }) {
+export default function StatusBar({ activeLanguage, roomMode, terminalOpen, isHost, username, accent, actualRoomType }) {
   return (
     <div
       className="ide-status-bar"

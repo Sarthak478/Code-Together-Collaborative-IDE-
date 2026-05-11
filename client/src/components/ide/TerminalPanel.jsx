@@ -90,7 +90,7 @@ function TerminalInstance({ roomId, terminalId, isActive, isDark, onAskRalph, on
                textData = data.data
             }
             else if (data.type === "exit") term.writeln(`\r\n\x1b[33m[Process exited with code ${data.code}]\x1b[0m`)
-          } catch (_) {
+          } catch (_e) {
             term.write(event.data)
             textData = event.data
           }
@@ -137,7 +137,7 @@ function TerminalInstance({ roomId, terminalId, isActive, isDark, onAskRalph, on
       if (ws) ws.close()
       if (term) term.dispose()
     }
-  }, [roomId, terminalId, isDark])
+  }, [roomId, terminalId, isDark, onAskRalph, onTerminalReady])
 
   // Resize handler
   const resizeTimeoutRef = useRef(null)
@@ -153,7 +153,7 @@ function TerminalInstance({ roomId, terminalId, isActive, isDark, onAskRalph, on
               const dims = fitRef.current.proposeDimensions()
               if (dims) wsRef.current.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }))
             }
-          } catch (_) {}
+          } catch (_e) { /* ignored */ }
         }
       }, 250)
     }

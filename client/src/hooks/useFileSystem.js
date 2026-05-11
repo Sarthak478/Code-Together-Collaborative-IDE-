@@ -1,8 +1,9 @@
 import { useCallback, useState, useEffect, useRef } from "react"
 import { EXT_TO_LANG } from "../constants/editorConfigs"
 import { API_URL } from "../config"
+const IGNORE_PATTERNS = ["node_modules", ".git", "__pycache__", ".venv", ".pytest_cache", ".next", ".DS_Store"]
 
-export default function useFileSystem(ydoc, provider, isCreating, roomId, isHost) {
+export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHost) {
   const [tree, setTree] = useState({}) // Maps parentPath -> Array of children
   const [version, setVersion] = useState(0)
 
@@ -87,7 +88,7 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, isHost
         }
       }
     } catch (e) { console.error("Content fetch block:", e) }
-  }, [roomId, getFileText, ydoc, isHost])
+  }, [roomId, getFileText, ydoc])
 
   /* Save Yjs text back to Disk via REST */
   const saveFileToDisk = useCallback(async (filePath, forcedContent = null) => {
@@ -180,11 +181,11 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, isHost
 
   const [importProgress, setImportProgress] = useState(null) // { current, total, fileName }
 
-  const IGNORE_PATTERNS = ["node_modules", ".git", "__pycache__", ".venv", ".pytest_cache", ".next", ".DS_Store"]
 
-  const isPathIgnored = (path) => {
+
+  const isPathIgnored = useCallback((path) => {
     return IGNORE_PATTERNS.some(p => path.includes(`/${p}/`) || path.startsWith(`${p}/`))
-  }
+  }, [])
 
   const importFiles = useCallback(async (files, parentPath = "/") => {
     const fileList = Array.from(files)
@@ -290,7 +291,7 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, isHost
 
     setImportProgress(null)
     refreshPath(parentPath)
-  }, [roomId, getFileText, ydoc, refreshPath, tree])
+  }, [roomId, getFileText, ydoc, refreshPath, tree, isPathIgnored])
 
   /* ── Tree helpers ── */
   const getChildren = useCallback((parentPath) => {
