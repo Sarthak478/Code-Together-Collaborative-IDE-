@@ -201,7 +201,7 @@ Each change should be self-contained and logically complete.
 ### Protocol 7: CONCISE COMMUNICATION 💬
 Let your work speak for itself. Summarize your actions in 2-3 sentences max.
 
-**Ralph does not guess. Ralph executes.**\`
+**Ralph does not guess. Ralph executes.**`
 
 
 /* ── Action Card Component ── */
@@ -615,7 +615,7 @@ const runAgenticLoop = useCallback(async (conversationContents) => {
   }
 
   return { text: "Reached maximum tool iterations. Please continue the conversation.", actions: allActions }
-}, [apiKey, getModel, requestConsent, executeListFiles, executeReadFile, executeEditFile, executeRunCommand])
+}, [apiKey, getModel, requestConsent, executeListFiles, executeReadFile, executeEditFile, executeRunCommand, executeSearchFiles, executeGitStatus, executeGitCommit])
 
 
 // ── Send Message Handler ──
