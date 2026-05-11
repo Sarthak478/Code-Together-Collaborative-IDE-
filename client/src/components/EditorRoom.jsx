@@ -2,7 +2,7 @@ import Editor from "@monaco-editor/react"
 import useEditorRoom from "../hooks/useEditorRoom"
 import { API_URL } from "../config"
 import { motion, AnimatePresence } from "framer-motion"
-import { MessageCircle, GitFork, Wand2, AlertCircle, DoorOpen } from "lucide-react"
+import { MessageCircle, Wand2, AlertCircle, DoorOpen } from "lucide-react"
 
 import Navbar from "./editor/Navbar"
 import Toolbar from "./editor/Toolbar"
@@ -80,7 +80,6 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
         callActive={room.callActive}
         onToggleCall={() => room.setCallActive(!room.callActive)}
         onToggleSettings={() => room.setSettingsOpen(true)}
-        onToggleGit={() => room.toggleRightPanel("git")}
         onToggleAccessControl={() => setAccessControlOpen(!accessControlOpen)}
         onToggleInvite={() => setInviteOpen(!inviteOpen)}
         chatOpen={room.chatOpen}
@@ -90,7 +89,6 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
         borderCol={room.borderCol}
         textColor={room.textColor}
         accent={room.accent}
-        gitStatus={room.gitStatus}
       />
 
       {/* ── Toolbar ── */}
@@ -137,13 +135,6 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
             accent={room.accent} 
             count={room.visibleChatMsgs.length}
             title="Chat"
-          />
-          <PanelToggleButton 
-            icon={<GitFork size={20} />} 
-            active={room.rightPanel === "git"} 
-            onClick={() => room.toggleRightPanel("git")} 
-            accent={room.accent} 
-            title="Source Control"
           />
           <PanelToggleButton 
             icon={<Wand2 size={20} />} 
@@ -230,18 +221,6 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
                       panelBg: room.panelBg 
                     }}
                   />
-                ) : room.rightPanel === "git" ? (
-                  <SourceControlPanel
-                    roomId={roomId}
-                    gitStatus={room.gitStatus}
-                    isGitLoading={room.isGitLoading}
-                    onRefresh={room.refreshGitStatus}
-                    onViewDiff={(path, staged) => setActiveDiff({ path, staged })}
-                    username={username}
-                    personalPrefs={room.personalPrefs}
-                    onOpenSettings={() => room.setSettingsOpen(true)}
-                    themeData={{ bg: room.bg, textColor: room.textColor, borderCol: room.borderCol, accent: room.accent, inputBg: room.inputBg, panelBg: room.panelBg, headerBg: room.headerBg }}
-                  />
                 ) : room.rightPanel === "ai" && (
                   <AIPanel
                     activeFile="Main File"
@@ -278,7 +257,6 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
           kickUser={room.kickUser}
           username={username}
           roomId={roomId}
-          refreshGitStatus={room.refreshGitStatus}
           themeData={{ 
             bg: room.bg, 
             headerBg: room.headerBg, 
@@ -361,25 +339,7 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
           themeData={{ accent: room.accent, textColor: room.textColor, panelBg: room.panelBg }}
         />
       )}
-      {/* Git Diff Modal */}
-      {activeDiff && (
-        <DiffModal 
-          roomId={roomId}
-          filePath={activeDiff.path}
-          staged={activeDiff.staged}
-          onClose={() => setActiveDiff(null)}
-          themeData={{ accent: room.accent, textColor: room.textColor, panelBg: room.panelBg, isDark: room.isDark, borderCol: room.borderCol, inputBg: room.inputBg }}
-          onStage={async (path) => {
-            await fetch(`${API_URL}/git/stage`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ roomId, filePaths: [path] })
-            })
-            room.refreshGitStatus()
-          }}
-        />
-      )}
-    </div>
+      </div>
   )
 }
 

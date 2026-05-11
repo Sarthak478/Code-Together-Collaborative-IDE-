@@ -34,24 +34,7 @@ export default function Toolbar({
   onTogglePreview,
   isDark
 }) {
-  const [copied, setCopied] = useState(false)
 
-  const handleInvite = async () => {
-    try {
-      await navigator.clipboard.writeText(roomId)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      const el = document.createElement("textarea")
-      el.value = roomId
-      document.body.appendChild(el)
-      el.select()
-      document.execCommand("copy")
-      document.body.removeChild(el)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
 
   return (
     <div 
@@ -204,24 +187,7 @@ export default function Toolbar({
           )}
         </div>
         
-        <button 
-          onClick={handleInvite}
-          title={copied ? "Room ID Copied!" : "Copy Room ID to invite collaborators"}
-          style={{ 
-            background: copied ? `${accent}22` : "transparent", 
-            border: copied ? `1px solid ${accent}44` : "1px solid transparent", 
-            cursor: "pointer", 
-            color: copied ? (isDark ? "#a6e3a1" : "#16a34a") : accent, 
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            padding: "6px 12px", borderRadius: 8, transition: "all 0.2s",
-            fontSize: 12, fontWeight: 600
-          }}
-          onMouseEnter={e => { if (!copied) e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)" }}
-          onMouseLeave={e => { if (!copied) e.currentTarget.style.background = "transparent" }}
-        >
-          {copied ? <Check size={16} /> : <UserPlus size={16} />}
-          <span>{copied ? "Copied!" : "Invite"}</span>
-        </button>
+        
       </div>
     </div>
   )
