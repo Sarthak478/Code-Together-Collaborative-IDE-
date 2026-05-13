@@ -14,6 +14,7 @@ import AIPanel from "./ide/AIPanel"
 import AccessControlModal from "./editor/AccessControlModal"
 import InviteModal from "./editor/InviteModal"
 import { useState } from "react"
+import { ROOM_MODES } from "../constants/roomModes"
 
 /* ─── EditorRoom ────────────────────────────────────────────────── */
 export default function EditorRoom({ roomId, initialRoomType, isCreating, username, onLeave }) {
@@ -42,7 +43,7 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
         onClose={() => setInviteOpen(false)} 
         roomId={roomId} 
         roomType={room.actualRoomType}
-        roomMode="compiler"
+        roomMode={ROOM_MODES.COMPILER}
         isHost={room.isHost}
         username={username}
       />
@@ -254,7 +255,7 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
           kickUser={room.kickUser}
           username={username}
           roomId={roomId}
-          roomMode="compiler"
+          roomMode={ROOM_MODES.COMPILER}
           themeData={{ 
             bg: room.bg, 
             headerBg: room.headerBg, 

@@ -1,8 +1,5 @@
 name: CodeTogether CI
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 # The "on" section tells GitHub when to run this robot.
 # We want it to run whenever someone pushes code or opens a pull request to the "main" branch.
 on:
@@ -23,10 +20,10 @@ jobs:
       uses: actions/checkout@v4
 
     # Step 2: Install Node.js so we can run npm commands.
-    - name: Use Node.js 24.x
+    - name: Use Node.js 22.x (LTS)
       uses: actions/setup-node@v4
       with:
-        node-version: '24.x'
+        node-version: '22.x'
         # This speeds things up by remembering our downloaded packages for next time.
         cache: 'npm'
         cache-dependency-path: |

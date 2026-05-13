@@ -20,6 +20,7 @@ import DiffModal from "./ui/DiffModal"
 import AccessControlModal from "./editor/AccessControlModal"
 import InviteModal from "./editor/InviteModal"
 import { DoorOpen, AlertCircle, GitFork, MessageCircle, Wand2, Bot, TerminalSquare } from "lucide-react"
+import { ROOM_MODES } from "../constants/roomModes"
 
 export default function IDERoom(props) {
   const ide = useIDERoom(props)
@@ -121,7 +122,7 @@ export default function IDERoom(props) {
         onClose={() => setInviteOpen(false)} 
         roomId={ide.roomId} 
         roomType={ide.actualRoomType}
-        roomMode="ide"
+        roomMode={ROOM_MODES.IDE}
         isHost={ide.isHost}
         username={ide.editor.username}
       />
@@ -491,7 +492,7 @@ export default function IDERoom(props) {
       {/* ── Status Bar ── */}
       <StatusBar
         activeLanguage={ide.activeLanguage}
-        roomMode="ide"
+        roomMode={ROOM_MODES.IDE}
         terminalOpen={ide.terminalOpen}
         isHost={ide.isHost}
         username={ide.editor.username}
@@ -527,7 +528,7 @@ export default function IDERoom(props) {
           username={ide.editor.username}
           clientID={ide.editor.provider.awareness.clientID}
           roomId={ide.roomId}
-          roomMode="ide"
+          roomMode={ROOM_MODES.IDE}
           refreshGitStatus={ide.refreshGitStatus}
         />
       )}

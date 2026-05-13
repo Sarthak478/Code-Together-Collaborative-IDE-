@@ -1,6 +1,7 @@
 import { useState, lazy, Suspense } from "react"
 import Landing from "./components/Landing"
 import RoomWrapper from "./components/RoomWrapper"
+import { ROOM_MODES } from "./constants/roomModes"
 
 const EditorRoom = lazy(() => import("./components/EditorRoom"))
 const IDERoom = lazy(() => import("./components/IDERoom"))
@@ -26,7 +27,7 @@ export default function App() {
   const saved = getSession()
   const [roomId, setRoomId] = useState(saved?.roomId ?? null)
   const [roomType, setRoomType] = useState(saved?.roomType ?? "collaborative")
-  const [roomMode, setRoomMode] = useState(saved?.roomMode ?? "compiler")
+  const [roomMode, setRoomMode] = useState(saved?.roomMode ?? ROOM_MODES.COMPILER)
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState(null)
   const [username, setUsername] = useState(() => {
@@ -75,7 +76,7 @@ export default function App() {
         roomMode={roomMode}
         onLeave={onLeave}
       >
-        {roomMode === "ide" ? (
+        {roomMode === ROOM_MODES.IDE ? (
           <IDERoom
             roomId={roomId}
             initialRoomType={roomType}
