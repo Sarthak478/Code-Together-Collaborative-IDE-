@@ -527,6 +527,7 @@ export default function IDERoom(props) {
           username={ide.editor.username}
           clientID={ide.editor.provider.awareness.clientID}
           roomId={ide.roomId}
+          roomMode="ide"
           refreshGitStatus={ide.refreshGitStatus}
         />
       )}

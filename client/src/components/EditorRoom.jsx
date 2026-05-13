@@ -254,6 +254,7 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
           kickUser={room.kickUser}
           username={username}
           roomId={roomId}
+          roomMode="compiler"
           themeData={{ 
             bg: room.bg, 
             headerBg: room.headerBg, 

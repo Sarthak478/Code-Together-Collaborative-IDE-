@@ -35,7 +35,7 @@ export default function SettingsPanel({
   roomTheme, roomFont, onSetRoomTheme,
   chatEnabled, onToggleChatEnabled, showUsersList, onToggleShowUsers,
   pushRoomUI, clearRoomUI, isHost, activeUsers, kickUser,
-  themeData = {}, username, clientID, roomId, refreshGitStatus
+  themeData = {}, username, clientID, roomId, refreshGitStatus, roomMode = "ide"
 }) {
   const { 
     textColor = "#cdd6f4", 
@@ -168,7 +168,8 @@ export default function SettingsPanel({
                    <GridRow options={CURSORS} value={personalPrefs.cursor} onChange={v => updatePersonalPref("cursor", v)} isDark={isDark} inputBg={inputBg} borderCol={borderCol} textColor={textColor} />
                 </Field>
 
-                {/* Git Settings */}
+                {/* Git Settings - Only show for IDE mode */}
+                {roomMode === "ide" && (
                 <div style={{ marginTop: 8, padding: "16px", background: "rgba(255,255,255,0.02)", borderRadius: 12, border: `1px solid ${borderCol}` }}>
                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 800, textTransform: "uppercase", opacity: 0.6, marginBottom: 12, fontFamily: "'Manrope', sans-serif", letterSpacing: "0.08em" }}>
                       <GitFork size={14} /> Git Configuration
@@ -294,6 +295,7 @@ export default function SettingsPanel({
                       </div>
                    </div>
                 </div>
+                )}
              </div>
           </div>
 
