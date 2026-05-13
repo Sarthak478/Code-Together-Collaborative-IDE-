@@ -248,37 +248,39 @@ export default function Navbar({
           </button>
         )}
 
-        <button 
-          onClick={onToggleInvite}
-          title="Invite Link"
-          style={{ 
-            background: colors.surface, 
-            border: `1px solid ${colors.border}`, 
-            cursor: "pointer", 
-            width: 40, 
-            height: 40, 
-            borderRadius: 10,
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "center",
-            color: colors.primary, 
-            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.transform = "translateY(-2px)"
-            e.currentTarget.style.background = isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,1)"
-            e.currentTarget.style.borderColor = colors.primary
-            e.currentTarget.style.boxShadow = `0 4px 12px ${colors.primary}40`
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.transform = "translateY(0)"
-            e.currentTarget.style.background = colors.surface
-            e.currentTarget.style.borderColor = colors.border
-            e.currentTarget.style.boxShadow = "none"
-          }}
-        >
-          <UserPlus size={18} />
-        </button>
+        {typeof onToggleInvite === "function" && (
+          <button 
+            onClick={onToggleInvite}
+            title="Invite Link"
+            style={{ 
+              background: colors.surface, 
+              border: `1px solid ${colors.border}`, 
+              cursor: "pointer", 
+              width: 40, 
+              height: 40, 
+              borderRadius: 10,
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center",
+              color: colors.primary, 
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = "translateY(-2px)"
+              e.currentTarget.style.background = isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,1)"
+              e.currentTarget.style.borderColor = colors.primary
+              e.currentTarget.style.boxShadow = `0 4px 12px ${colors.primary}40`
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = "translateY(0)"
+              e.currentTarget.style.background = colors.surface
+              e.currentTarget.style.borderColor = colors.border
+              e.currentTarget.style.boxShadow = "none"
+            }}
+          >
+            <UserPlus size={18} />
+          </button>
+        )}
         
         {/* Settings Button */}
         <button 

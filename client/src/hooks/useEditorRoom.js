@@ -74,29 +74,6 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     }, 4000)
   }, [])
 
-  /* ── Version Control (Git) State ── */
-  const [gitStatus, setGitStatus] = useState(null)
-  const [isGitLoading, setIsGitLoading] = useState(false)
-
-  const refreshGitStatus = useCallback(async () => {
-    setIsGitLoading(true)
-    try {
-      const res = await fetch(`${API_URL}/git/status?roomId=${roomId}`)
-      const data = await res.json()
-      setGitStatus(data)
-    } catch (err) {
-      console.error("Git Status Error:", err)
-    } finally {
-      setIsGitLoading(false)
-    }
-  }, [roomId])
-
-  useEffect(() => {
-    refreshGitStatus()
-    const interval = setInterval(refreshGitStatus, 15000)
-    return () => clearInterval(interval)
-  }, [refreshGitStatus])
-
   const toggleRightPanel = useCallback((panel) => {
     setRightPanel(prev => prev === panel ? null : panel)
   }, [])
@@ -541,8 +518,6 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     callActive, setCallActive,
     peerId, setPeerId,
     toasts,
-    // Git
-    gitStatus, isGitLoading, refreshGitStatus,
     // Users
     activeUsers, visibleActiveUsersList, hostName,
     // Chat
