@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react"
 import { generateRoomId } from "../utils/helpers"
 import { motion as Motion, AnimatePresence } from "framer-motion"
 import { COLLAB_URL } from "../config"
+import { ROOM_MODES } from "../constants/roomModes"
 
 /* ─── Theme Configuration (Neon Luminary) ────────────────────────────── */
 const themes = {
@@ -65,7 +66,7 @@ const FONT_SIZES = { xs: 12, sm: 13, base: 14, lg: 15, xl: 18, heading: 24 }
 export default function Landing({ username, onUsernameChange, onJoin, initialError }) {
   const [joinId, setJoinId] = useState("")
   const [createType, setCreateType] = useState("collaborative")
-  const [roomMode, setRoomMode] = useState("ide")
+  const [roomMode, setRoomMode] = useState(ROOM_MODES.IDE)
   const [isJoining, setIsJoining] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [toasts, setToasts] = useState([])
@@ -98,11 +99,11 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
       const roomType = params.get("type")
       const roomMode = params.get("mode")
       const validTypes = ["collaborative", "interview", "broadcast"]
-      const validModes = ["compiler", "ide"]
+      const validModes = [ROOM_MODES.COMPILER, ROOM_MODES.IDE]
       setInviteDetails({
         roomId,
         roomType: validTypes.includes(roomType) ? roomType : "collaborative",
-        roomMode: validModes.includes(roomMode) ? roomMode : "ide"
+        roomMode: validModes.includes(roomMode) ? roomMode : null
       })
       setJoinId(roomId)
       setActiveTab("join")
@@ -218,7 +219,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
         id,
         inviteMatches ? inviteDetails.roomType : "collaborative",
         false,
-        inviteMatches ? inviteDetails.roomMode : "ide"
+        inviteMatches ? inviteDetails.roomMode : null
       )
     } catch(e) {
       console.error(e)

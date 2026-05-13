@@ -4,6 +4,7 @@ import * as Y from "yjs"
 import { HocuspocusProvider } from "@hocuspocus/provider"
 
 import { LANGUAGES, THEMES, FONT_FAMILIES, CURSORS } from "../constants/editorConfigs"
+import { ROOM_MODES } from "../constants/roomModes"
 import { loadPersonalPrefs, savePersonalPrefs } from "../utils/helpers"
 import { WS_URL, API_URL, COLLAB_URL } from "../config"
 
@@ -26,6 +27,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
 
     if (isCreating) {
       roomMap.set("roomType", initialRoomType)
+      roomMap.set("roomMode", ROOM_MODES.COMPILER)
     }
 
     const joinTime = Date.now()
