@@ -12,14 +12,12 @@ import SettingsPanel from "./editor/SettingsPanel"
 import VideoCall from "./editor/VideoCall"
 import AIPanel from "./ide/AIPanel"
 import AccessControlModal from "./editor/AccessControlModal"
-import InviteModal from "./editor/InviteModal"
 import { useState } from "react"
 
 /* ─── EditorRoom ────────────────────────────────────────────────── */
 export default function EditorRoom({ roomId, initialRoomType, isCreating, username, onLeave }) {
   const room = useEditorRoom({ roomId, initialRoomType, isCreating, username, onLeave })
   const [accessControlOpen, setAccessControlOpen] = useState(false)
-  const [inviteOpen, setInviteOpen] = useState(false)
 
   return (
     <div
@@ -35,16 +33,6 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
         isOpen={accessControlOpen} 
         onClose={() => setAccessControlOpen(false)} 
         roomId={roomId} 
-      />
-
-      <InviteModal 
-        isOpen={inviteOpen} 
-        onClose={() => setInviteOpen(false)} 
-        roomId={roomId} 
-        roomType={room.actualRoomType}
-        roomMode="compiler"
-        isHost={room.isHost}
-        username={username}
       />
 
       {/* ── Toasts ── */}
@@ -78,7 +66,6 @@ export default function EditorRoom({ roomId, initialRoomType, isCreating, userna
         onToggleCall={() => room.setCallActive(!room.callActive)}
         onToggleSettings={() => room.setSettingsOpen(true)}
         onToggleAccessControl={() => setAccessControlOpen(!accessControlOpen)}
-        onToggleInvite={() => setInviteOpen(!inviteOpen)}
         chatOpen={room.chatOpen}
         onToggleChat={() => room.setChatOpen(o => !o)}
         onLeave={() => room.setExitConfirmOpen(true)}
