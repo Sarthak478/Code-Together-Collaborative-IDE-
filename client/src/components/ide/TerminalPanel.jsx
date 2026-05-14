@@ -34,6 +34,8 @@ function TerminalInstance({ roomId, terminalId, isActive, isDark, onAskRalph, on
           cursorBlink: true,
           fontSize: 13,
           fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+          scrollback: 5000,
+          convertEol: true,
           theme: isDark ? {
             background: "#0d0d1a", foreground: "#cdd6f4", cursor: "#89b4fa", selectionBackground: "rgba(137, 180, 250, 0.3)",
             black: "#45475a", red: "#f38ba8", green: "#a6e3a1", yellow: "#f9e2af", blue: "#89b4fa",
@@ -87,11 +89,29 @@ function TerminalInstance({ roomId, terminalId, isActive, isDark, onAskRalph, on
             const data = JSON.parse(event.data)
             if (data.type === "output") {
                term.write(data.data)
+               // Ensure scrolling to bottom with a slight delay to allow DOM update
+               setTimeout(() => {
+                 try {
+                   term.scrollToBottom()
+                 } catch (_err) { /* ignore */ }
+               }, 0)
                textData = data.data
             }
-            else if (data.type === "exit") term.writeln(`\r\n\x1b[33m[Process exited with code ${data.code}]\x1b[0m`)
+            else if (data.type === "exit") {
+              term.writeln(`\r\n\x1b[33m[Process exited with code ${data.code}]\x1b[0m`)
+              setTimeout(() => {
+                try {
+                  term.scrollToBottom()
+                } catch (_err) { /* ignore */ }
+              }, 0)
+            }
           } catch (_e) {
             term.write(event.data)
+            setTimeout(() => {
+              try {
+                term.scrollToBottom()
+              } catch (_err) { /* ignore */ }
+            }, 0)
             textData = event.data
           }
 

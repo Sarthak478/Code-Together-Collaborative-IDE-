@@ -111,6 +111,13 @@ export default function IDERoom(props) {
         fontFamily: "'Manrope', 'Inter', system-ui, sans-serif"
       }}
     >
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+      `}</style>
+
       <AccessControlModal 
         isOpen={accessControlOpen} 
         onClose={() => setAccessControlOpen(false)} 
@@ -199,26 +206,56 @@ export default function IDERoom(props) {
           </button>
         </div>
 
-        {/* User Presence (Center-ish) */}
+        {/* User Presence (Center-ish) with Enhanced Details */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "0 16px", overflowX: "auto", maxWidth: 400 }}>
-          {ide.visibleActiveUsersList.map(u => (
-            <div
-              key={u.id}
-              onClick={() => { if (u.activeFile && u.id !== ide.editor.provider.awareness.clientID) ide.openFile(u.activeFile) }}
-              title={u.id === ide.editor.provider.awareness.clientID ? `@${u.name} (You)` : `Click to follow @${u.name}`}
-              style={{
-                width: 28, height: 28, borderRadius: "50%", background: u.color,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "#1e1e2e", fontWeight: "bold", fontSize: 11, cursor: "pointer",
-                border: u.activeFile === ide.activeFile ? `2px solid ${ide.accent}` : "2px solid transparent",
-                flexShrink: 0, transition: "transform 0.2s"
-              }}
-              onMouseEnter={e => e.currentTarget.style.transform = "scale(1.1)"}
-              onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
-            >
-              {u.name.slice(0, 1).toUpperCase()}
-            </div>
-          ))}
+          {ide.visibleActiveUsersList.map(u => {
+            const isYou = u.id === ide.editor.provider.awareness.clientID;
+            const onSameFile = u.activeFile === ide.activeFile;
+            const statusText = isYou 
+              ? `@${u.name} (You)${u.activeFile ? ` - ${u.activeFile.split("/").pop()}` : ""}`
+              : `Click to follow @${u.name}${u.activeFile ? ` - ${u.activeFile.split("/").pop()}` : ""}`;
+            
+            return (
+              <div
+                key={u.id}
+                onClick={() => { if (u.activeFile && !isYou) ide.openFile(u.activeFile) }}
+                title={statusText}
+                style={{
+                  width: 28, height: 28, borderRadius: "50%", background: u.color,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#1e1e2e", fontWeight: "bold", fontSize: 11, cursor: isYou ? "default" : "pointer",
+                  border: onSameFile ? `2px solid ${ide.accent}` : "2px solid transparent",
+                  flexShrink: 0, transition: "transform 0.2s, box-shadow 0.2s",
+                  boxShadow: onSameFile ? `0 0 8px ${ide.accent}66` : "none",
+                  position: "relative"
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = "scale(1.15)";
+                  e.currentTarget.style.boxShadow = `0 0 12px ${u.color}80`;
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.boxShadow = onSameFile ? `0 0 8px ${ide.accent}66` : "none";
+                }}
+              >
+                {u.name.slice(0, 1).toUpperCase()}
+                {/* Active indicator */}
+                <div 
+                  style={{
+                    position: "absolute",
+                    width: 8,
+                    height: 8,
+                    background: "#10b981",
+                    borderRadius: "50%",
+                    border: "2px solid " + u.color,
+                    bottom: -2,
+                    right: -2,
+                    animation: "pulse 2s infinite"
+                  }}
+                />
+              </div>
+            );
+          })}
         </div>
 
         {/* Right Side: Interview + Preview */}
@@ -330,6 +367,7 @@ export default function IDERoom(props) {
           accent={ide.accent}
           isDark={ide.isDark}
           headerBg={ide.headerBg}
+          addToast={ide.addToast}
         />
 
         {/* Center Panel (Editor + Terminal) */}

@@ -168,6 +168,12 @@
 
 .ide-terminal-container .xterm {
   padding: 8px;
+  height: 100%;
+}
+
+.ide-terminal-container .xterm-viewport {
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
 }
 
 .ide-terminal-container .xterm-viewport::-webkit-scrollbar {

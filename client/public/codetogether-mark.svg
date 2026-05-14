@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">CodeTogether</title>
+  <desc id="desc">CodeTogether app icon</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5b7cff" />
+      <stop offset="100%" stop-color="#ff5ea8" />
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="52" height="52" rx="16" fill="url(#bg)" />
+  <path d="M22 25l-8 7l8 7" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M42 25l8 7l-8 7" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M35 19L29 45" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" />
+</svg>

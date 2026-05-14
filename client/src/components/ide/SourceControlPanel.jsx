@@ -50,6 +50,7 @@ export default function SourceControlPanel({
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncError, setSyncError] = useState("")
   const [syncSuccess, setSyncSuccess] = useState("")
+  const [localTestConfirmed, setLocalTestConfirmed] = useState(false)
 
   const [userRepos, setUserRepos] = useState([])
   const [repoFetchWarning, setRepoFetchWarning] = useState("")
@@ -193,6 +194,10 @@ export default function SourceControlPanel({
 
     if (hasUncommittedChanges && !commitMessage.trim()) {
       setSyncError("Please enter a commit message before pushing. All changes will be committed automatically.")
+      return
+    }
+    if (!localTestConfirmed) {
+      setSyncError("Hybrid mode active: test locally first, then tick the confirmation before pushing.")
       return
     }
 
@@ -692,7 +697,17 @@ export default function SourceControlPanel({
               </button>
             </>
           ) : (
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "grid", gap: 8 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 10, opacity: 0.85, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={localTestConfirmed}
+                  onChange={e => setLocalTestConfirmed(e.target.checked)}
+                  style={{ accentColor: accent }}
+                />
+                I tested on local server (hybrid mode)
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={handlePull}
                 disabled={isSyncing}
@@ -707,16 +722,17 @@ export default function SourceControlPanel({
               </button>
               <button
                 onClick={handlePush}
-                disabled={isSyncing}
+                disabled={isSyncing || !localTestConfirmed}
                 className="ide-btn-premium"
                 style={{
                   flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                   background: accent, border: "none", color: "#1e1e2e", padding: "8px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
-                  cursor: isSyncing ? "not-allowed" : "pointer", opacity: isSyncing ? 0.8 : 1
+                  cursor: isSyncing || !localTestConfirmed ? "not-allowed" : "pointer", opacity: isSyncing || !localTestConfirmed ? 0.6 : 1
                 }}
               >
                 <Upload size={14} /> Push
               </button>
+              </div>
             </div>
           )}
         </div>

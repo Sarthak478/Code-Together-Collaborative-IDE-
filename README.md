@@ -57,3 +57,9 @@ CodeTogether is built on privacy. All collaborative sessions are ephemeral; once
 
 ---
 *Built with ❤️ for the future of collaborative engineering.*
+
+## Hybrid Mode (Local Test Before Push)
+1. Start backend locally: `cd server && npm run dev`
+2. Start frontend with hybrid flag: `cd client && set VITE_HYBRID_MODE=true && npm run dev`
+3. In Source Control -> GitHub Sync, tick `I tested on local server (hybrid mode)` before clicking Push.
+

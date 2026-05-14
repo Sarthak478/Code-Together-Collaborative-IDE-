@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { FILE_BADGES, DEFAULT_FILE_BADGE } from "../../constants/editorConfigs"
 import { 
   Folder, 
   FileCode, 
@@ -27,7 +28,38 @@ import {
   Globe
 } from "lucide-react"
 
-export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canEdit, textColor, borderCol, inputBg, panelBg, accent, isDark }) {
+function getBadgeMeta(name) {
+  const ext = name.split(".").pop()?.toLowerCase() || ""
+  return FILE_BADGES[ext] || DEFAULT_FILE_BADGE
+}
+
+function ExtensionBadge({ name }) {
+  const badge = getBadgeMeta(name)
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minWidth: 28,
+        height: 18,
+        padding: "0 6px",
+        borderRadius: 999,
+        fontSize: 9,
+        fontWeight: 800,
+        letterSpacing: "0.04em",
+        color: badge.color,
+        background: badge.background,
+        border: `1px solid ${badge.color}33`,
+        flexShrink: 0,
+      }}
+    >
+      {badge.label}
+    </span>
+  )
+}
+
+export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canEdit, textColor, borderCol, inputBg, panelBg, accent, isDark, addToast }) {
   const [searchTerm, setSearchTerm] = useState("")
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [creatingIn, setCreatingIn] = useState(null) // parentPath where we're creating
@@ -66,9 +98,13 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
     if (e.key === "Enter" && renameValue.trim() && renameValue.trim() !== renamingPath.split("/").pop()) {
       const path = renamingPath
       const newN = renameValue.trim()
-      setRenamingPath(null)
-      setRenameValue("")
-      if (fs.renameEntry) await fs.renameEntry(path, newN)
+      try {
+        if (fs.renameEntry) await fs.renameEntry(path, newN)
+        setRenamingPath(null)
+        setRenameValue("")
+      } catch (err) {
+        addToast?.(`⚠️ ${err.message || "Rename failed."}`)
+      }
     } else if (e.key === "Escape") {
       setRenamingPath(null)
       setRenameValue("")
@@ -109,14 +145,20 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
       const type = creatingType
       const name = newName.trim()
       const parentPath = creatingIn || "/"
-      setCreatingType(null)
-      setCreatingIn(null)
-      setNewName("")
-      
+
+      let result
       if (type === "file") {
-        await fs.createFile(parentPath, name)
+        result = await fs.createFile(parentPath, name)
       } else {
-        await fs.createFolder(parentPath, name)
+        result = await fs.createFolder(parentPath, name)
+      }
+
+      if (result?.success) {
+        setCreatingType(null)
+        setCreatingIn(null)
+        setNewName("")
+      } else if (result?.error) {
+        addToast?.(`⚠️ ${result.error}`)
       }
     } else if (e.key === "Escape") {
       setCreatingType(null)
@@ -176,19 +218,81 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
     const props = { size: 14 }
     
     switch (ext) {
+      // Data & Config
       case "json": return <FileJson {...props} color="#f9e2af" />
-      case "md": return <FileType {...props} color="#89b4fa" />
-      case "css": case "scss": return <FileType2 {...props} color="#fab387" />
-      case "py": return <FileType2 {...props} color="#89dceb" />
-      case "js": case "jsx": return <FileCode {...props} color="#f9e2af" />
-      case "ts": case "tsx": return <FileCode {...props} color="#89b4fa" />
-      case "html": return <Globe {...props} color="#eba0ac" />
-      case "png": case "jpg": case "jpeg": case "svg": case "gif": return <ImageIcon {...props} color="#a6e3a1" />
-      case "yaml": case "yml": case "toml": return <SettingsIcon {...props} color="#94e2d5" />
-      case "sql": return <Database {...props} color="#cba6f7" />
-      case "env": return <Shield {...props} color="#eba0ac" />
-      case "sh": case "bash": return <TerminalIcon {...props} color="#89dceb" />
-      default: return <FileCode {...props} />
+      case "xml": return <FileJson {...props} color="#a6e3a1" />
+      
+      // Documentation
+      case "md": case "markdown": case "mkdn": return <FileType {...props} color="#89b4fa" />
+      case "txt": return <FileCode {...props} color="#bac2de" />
+      case "rst": return <FileType {...props} color="#89b4fa" />
+      
+      // Web Dev
+      case "html": case "htm": return <Globe {...props} color="#eba0ac" />
+      case "css": case "scss": case "sass": case "less": return <FileType2 {...props} color="#fab387" />
+      case "vue": return <FileCode {...props} color="#a6e3a1" />
+      
+      // JavaScript/TypeScript
+      case "js": case "jsx": case "mjs": case "cjs": return <FileCode {...props} color="#f9e2af" />
+      case "ts": case "tsx": case "mts": case "cts": return <FileCode {...props} color="#89b4fa" />
+      
+      // Python
+      case "py": case "pyw": case "pyi": case "pyc": return <FileType2 {...props} color="#89dceb" />
+      
+      // Java & JVM
+      case "java": return <FileCode {...props} color="#f38ba8" />
+      case "class": case "jar": case "war": case "ear": return <FileCode {...props} color="#f38ba8" />
+      case "kotlin": case "kt": case "kts": return <FileCode {...props} color="#cba6f7" />
+      case "scala": return <FileCode {...props} color="#f9e2af" />
+      case "clj": case "cljs": case "edn": return <FileCode {...props} color="#a6e3a1" />
+      case "groovy": case "gradle": return <FileCode {...props} color="#a6e3a1" />
+      
+      // C/C++/C#
+      case "c": case "h": return <FileCode {...props} color="#89b4fa" />
+      case "cpp": case "cc": case "cxx": case "hpp": case "h++": return <FileCode {...props} color="#89b4fa" />
+      case "cs": case "csproj": return <FileCode {...props} color="#89dceb" />
+      
+      // Go & Rust
+      case "go": return <FileCode {...props} color="#a6e3a1" />
+      case "rs": return <FileCode {...props} color="#f38ba8" />
+      
+      // PHP
+      case "php": case "php3": case "php4": case "php5": case "phtml": return <FileCode {...props} color="#cba6f7" />
+      
+      // Ruby
+      case "rb": case "erb": case "gemspec": case "rake": return <FileCode {...props} color="#f38ba8" />
+      
+      // Shell & System
+      case "sh": case "bash": case "zsh": case "fish": case "ksh": case "tcsh": return <TerminalIcon {...props} color="#89dceb" />
+      case "ps1": case "psm1": case "psd1": return <TerminalIcon {...props} color="#89b4fa" />
+      case "bat": case "cmd": case "com": return <TerminalIcon {...props} color="#f9e2af" />
+      
+      // Database
+      case "sql": case "plsql": case "tsql": case "hql": return <Database {...props} color="#cba6f7" />
+      case "db": case "sqlite": case "dbf": return <Database {...props} color="#a6e3a1" />
+      
+      // Environment & Build
+      case "env": case "example": case "dockerfile": case "docker": return <FileCode {...props} color="#89dceb" />
+      case "make": case "makefile": return <FileCode {...props} color="#bac2de" />
+      case "maven": return <FileCode {...props} color="#f9e2af" />
+      case "yaml": case "yml": case "toml": return <SettingsIcon {...props} color="#fab387" />
+      
+      // Package & Build
+      case "json5": case "geojson": return <FileJson {...props} color="#f9e2af" />
+      case "lock": return <SettingsIcon {...props} color="#fab387" />
+      case "package": return <SettingsIcon {...props} color="#f9e2af" />
+      
+      // Images
+      case "png": case "jpg": case "jpeg": case "gif": case "bmp": case "webp": case "ico": case "tiff": case "svg": return <ImageIcon {...props} color="#a6e3a1" />
+      
+      // Archives
+      case "zip": case "rar": case "7z": case "tar": case "gz": case "bz2": case "xz": case "iso": return <FileCode {...props} color="#fab387" />
+      
+      // Other
+      case "log": return <FileType {...props} color="#f38ba8" />
+      case "tmp": case "temp": case "bak": case "backup": return <FileType {...props} color="#6c7086" />
+      
+      default: return <FileCode {...props} color="#bac2de" />
     }
   }
 
@@ -344,6 +448,7 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
                   textColor={textColor}
                   accent={accent}
                   depth={0}
+                  getFileIcon={getFileIcon}
                 />
               ))}
             </div>
@@ -400,6 +505,7 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
                     renameInputRef={renameInputRef}
                     handleRenameSubmit={handleRenameSubmit}
                     onDelete={handleDelete}
+                    getFileIcon={getFileIcon}
                   />
                 ) : (
                   <FileItem
@@ -431,7 +537,7 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
 }
 
 /* ── Folder Node (recursive) ── */
-function FolderNode({ entry, fs, activeFile, onFileClick, expandedFolders, toggleFolder, canEdit, startCreation, creatingIn, creatingType, creationInputRef, newName, setNewName, handleCreateSubmit, setCreatingType, setCreatingIn, textColor, accent, depth, startRename, renamingPath, renameValue, setRenameValue, renameInputRef, handleRenameSubmit, onDelete }) {
+function FolderNode({ entry, fs, activeFile, onFileClick, expandedFolders, toggleFolder, canEdit, startCreation, creatingIn, creatingType, creationInputRef, newName, setNewName, handleCreateSubmit, setCreatingType, setCreatingIn, textColor, accent, depth, startRename, renamingPath, renameValue, setRenameValue, renameInputRef, handleRenameSubmit, onDelete, getFileIcon }) {
   const isExpanded = expandedFolders.has(entry.path)
   const children = fs.getChildren(entry.path)
   const [isHovered, setIsHovered] = useState(false)
@@ -556,6 +662,7 @@ function FolderNode({ entry, fs, activeFile, onFileClick, expandedFolders, toggl
                 renameInputRef={renameInputRef}
                 handleRenameSubmit={handleRenameSubmit}
                 onDelete={onDelete}
+                getFileIcon={getFileIcon}
               />
             ) : (
               <FileItem
@@ -574,6 +681,7 @@ function FolderNode({ entry, fs, activeFile, onFileClick, expandedFolders, toggl
                 renameInputRef={renameInputRef}
                 handleRenameSubmit={handleRenameSubmit}
                 onDelete={onDelete}
+                getFileIcon={getFileIcon}
               />
             )
           ))}
@@ -630,7 +738,7 @@ function FileItem({ file, isActive, onClick, textColor, accent, depth, canEdit, 
           background: `${accent}10`, height: 30, boxSizing: "border-box"
         }}
       >
-        <FileCode size={14} color={accent} />
+        <ExtensionBadge name={file.name} />
         <input
           ref={renameInputRef}
           value={renameValue}
@@ -656,7 +764,7 @@ function FileItem({ file, isActive, onClick, textColor, accent, depth, canEdit, 
         transition: "all 0.15s ease", height: 30, boxSizing: "border-box", cursor: "pointer"
       }}
     >
-      {getFileIcon ? getFileIcon(file.name) : <FileCode size={14} opacity={isActive ? 1 : 0.6} />}
+      {getFileIcon ? getFileIcon(file.name) : <ExtensionBadge name={file.name} />}
       <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, fontFamily: "'Manrope', sans-serif" }}>
         {file.name}
       </span>

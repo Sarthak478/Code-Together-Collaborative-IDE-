@@ -31,6 +31,11 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHos
 
   const pendingRefreshes = useRef(new Set())
 
+  const nameExistsInParent = useCallback((parentPath, name) => {
+    const siblings = tree[parentPath] || []
+    return siblings.some(entry => entry.name.toLowerCase() === name.toLowerCase())
+  }, [tree])
+
   /* ── Tree API Fetching ── */
   const refreshPath = useCallback((path = "/") => {
     if (!(pendingRefreshes.current instanceof Set)) {
@@ -105,24 +110,48 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHos
   const createFile = useCallback(async (parentPath, name) => {
     const cleanParent = parentPath.endsWith("/") ? parentPath : parentPath + "/"
     const filePath = cleanParent + name
-    await fetch(`${API_URL}/fs/create`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roomId, type: "file", path: filePath })
-    })
-    refreshPath(parentPath)
-    return filePath
-  }, [roomId, refreshPath])
+    if (nameExistsInParent(parentPath, name)) {
+      return { success: false, error: `A file named "${name}" already exists.` }
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/fs/create`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId, type: "file", path: filePath })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        return { success: false, error: data.error || `A file named "${name}" already exists.` }
+      }
+      refreshPath(parentPath)
+      return { success: true, path: filePath }
+    } catch (_e) {
+      return { success: false, error: "Unable to create the file right now." }
+    }
+  }, [roomId, refreshPath, nameExistsInParent])
 
   const createFolder = useCallback(async (parentPath, name) => {
     const cleanParent = parentPath.endsWith("/") ? parentPath : parentPath + "/"
     const folderPath = cleanParent + name
-    await fetch(`${API_URL}/fs/create`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roomId, type: "folder", path: folderPath })
-    })
-    refreshPath(parentPath)
-    return folderPath
-  }, [roomId, refreshPath])
+    if (nameExistsInParent(parentPath, name)) {
+      return { success: false, error: `A folder named "${name}" already exists.` }
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/fs/create`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId, type: "folder", path: folderPath })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        return { success: false, error: data.error || `A folder named "${name}" already exists.` }
+      }
+      refreshPath(parentPath)
+      return { success: true, path: folderPath }
+    } catch (_e) {
+      return { success: false, error: "Unable to create the folder right now." }
+    }
+  }, [roomId, refreshPath, nameExistsInParent])
 
   const deleteEntry = useCallback(async (path, type) => {
     const parts = path.split("/")
@@ -158,10 +187,18 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHos
     const parentPath = parts.slice(0, -1).join("/") || "/"
     const newPath = (parentPath.endsWith("/") ? parentPath : parentPath + "/") + newName
 
-    await fetch(`${API_URL}/fs/rename`, {
+    if (oldPath !== newPath && nameExistsInParent(parentPath, newName)) {
+      throw new Error(`"${newName}" already exists in this folder.`)
+    }
+
+    const res = await fetch(`${API_URL}/fs/rename`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ roomId, oldPath, newPath })
     })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || "Rename failed")
+    }
 
     // Migrate content inside Yjs if active
     const oldText = getFileText(oldPath)
@@ -177,7 +214,7 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHos
 
     refreshPath(parentPath)
     return newPath
-  }, [roomId, refreshPath, getFileText, ydoc])
+  }, [roomId, refreshPath, getFileText, ydoc, nameExistsInParent])
 
   const [importProgress, setImportProgress] = useState(null) // { current, total, fileName }
 

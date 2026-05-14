@@ -26,6 +26,10 @@ status: "executing"
 | 4 | Add Vite SRI plugin | Fix "Sub Resource Integrity Attribute Missing" risk. |
 | 4.1 | Fix AIPanel parsing error | Unclosed template literal in SYSTEM_PROMPT. |
 | 4.1 | Clean client lint errors | Resolve 70+ linting issues across components. |
+| 4.2 | Add comprehensive file extension icons | Expanded FileExplorer from 12 to 50+ file types with categorized colors. |
+| 4.2 | Improve terminal language error handling | Updated api.js to list all supported languages instead of generic errors. |
+| 4.2 | Fix terminal auto-scroll behavior | Added setTimeout microtask scheduling in TerminalPanel.jsx. |
+| 4.2 | Enhance user presence visibility | Added file name tooltips, active indicators, and pulse animations in IDERoom.jsx. |
 
 ## Blockers
 - **Phase 4**: Need to audit current Git logic for reliability.

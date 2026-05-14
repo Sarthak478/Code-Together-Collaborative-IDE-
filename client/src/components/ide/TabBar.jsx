@@ -1,8 +1,34 @@
-import { FILE_ICONS, DEFAULT_FILE_ICON } from "../../constants/editorConfigs"
+import { FILE_BADGES, DEFAULT_FILE_BADGE } from "../../constants/editorConfigs"
 
-function getIcon(name) {
+function getBadge(name) {
   const ext = name.split(".").pop()?.toLowerCase() || ""
-  return FILE_ICONS[ext] || DEFAULT_FILE_ICON
+  return FILE_BADGES[ext] || DEFAULT_FILE_BADGE
+}
+
+function ExtensionBadge({ name }) {
+  const badge = getBadge(name)
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minWidth: 28,
+        height: 18,
+        padding: "0 6px",
+        borderRadius: 999,
+        fontSize: 9,
+        fontWeight: 800,
+        letterSpacing: "0.04em",
+        color: badge.color,
+        background: badge.background,
+        border: `1px solid ${badge.color}33`,
+        flexShrink: 0,
+      }}
+    >
+      {badge.label}
+    </span>
+  )
 }
 
 export default function TabBar({ openFiles, activeFile, onSelectFile, onCloseFile, textColor, borderCol, accent, isDark, headerBg }) {
@@ -31,7 +57,7 @@ export default function TabBar({ openFiles, activeFile, onSelectFile, onCloseFil
               fontWeight: isActive ? 600 : 400,
             }}
           >
-            <span style={{ fontSize: 12 }}>{getIcon(name)}</span>
+            <ExtensionBadge name={name} />
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120, fontFamily: "'Manrope', sans-serif", fontWeight: isActive ? 600 : 400, letterSpacing: "0.01em" }}>{name}</span>
             <span
               className="tab-close"

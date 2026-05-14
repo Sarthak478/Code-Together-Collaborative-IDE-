@@ -83,6 +83,75 @@ const initAPI = (app, server) => {
       .replace(/[<>:"|?*]/g, ""); // Windows invalid chars
   }
 
+  function buildRunCommand(language, filepath) {
+    const normalizedLanguage = String(language || "").toLowerCase();
+
+    // Map of supported languages
+    const supportedCommands = {
+      "python": `python "${filepath}"\r`,
+      "javascript": `node "${filepath}"\r`,
+      "typescript": `node --experimental-strip-types "${filepath}"\r`,
+      "kotlin": {
+        cmd: () => {
+          const jarName = `${filepath.replace(/\.kt$/i, "")}.jar`;
+          return `kotlinc "${filepath}" -include-runtime -d "${jarName}" && java -jar "${jarName}"\r`;
+        },
+        lang: "Kotlin"
+      },
+      "cpp": {
+        cmd: () => {
+          const executable = platform() === "win32" ? "a.exe" : "./a.out";
+          return `g++ "${filepath}" && ${executable}\r`;
+        },
+        lang: "C++"
+      },
+      "c": {
+        cmd: () => {
+          const executable = platform() === "win32" ? "a.exe" : "./a.out";
+          return `g++ "${filepath}" && ${executable}\r`;
+        },
+        lang: "C"
+      },
+      "rust": {
+        cmd: () => {
+          const executable = platform() === "win32" ? `${filepath.replace(".rs", ".exe")}` : `./${filepath.replace(".rs", "")}`;
+          return `rustc "${filepath}" && ${executable}\r`;
+        },
+        lang: "Rust"
+      },
+      "go": `go run "${filepath}"\r`,
+      "java": {
+        cmd: () => {
+          const className = filepath.split("/").pop().replace(/\.java$/i, "");
+          const classDir = dirname(filepath);
+          const classPath = classDir === "." ? "." : `${classDir}${platform() === "win32" ? ";" : ":"}.`;
+          return `javac "${filepath}" && java -cp "${classPath}" "${className}"\r`;
+        },
+        lang: "Java"
+      },
+      "php": `php "${filepath}"\r`,
+      "ruby": `ruby "${filepath}"\r`,
+      "csharp": `dotnet script "${filepath}"\r`,
+      "swift": `swift "${filepath}"\r`,
+      "perl": `perl "${filepath}"\r`,
+      "lua": `lua "${filepath}"\r`,
+      "shell": platform() === "win32" ? `powershell -ExecutionPolicy Bypass -File "${filepath}"\r` : `bash "${filepath}"\r`
+    };
+
+    const cmd = supportedCommands[normalizedLanguage];
+    
+    if (!cmd) {
+      return null; // Language not supported
+    }
+
+    // If cmd is an object with a function, call it
+    if (typeof cmd === "object" && cmd.cmd) {
+      return cmd.cmd();
+    }
+
+    return cmd;
+  }
+
   /* -------------------- ROOM TRACKING -------------------- */
 
   const roomClients = new Map();  // roomId -> Set(ws)
@@ -534,25 +603,9 @@ const initAPI = (app, server) => {
 
       const filepath = activeFile.path.replace(/^\//, "");
 
-      let cmdString = "";
-      if (language === "python") {
-        cmdString = `python "${filepath}"\r`;
-      } else if (language === "javascript") {
-        cmdString = `node "${filepath}"\r`;
-      } else if (language === "typescript") {
-        cmdString = `npx ts-node "${filepath}"\r`;
-      } else if (language === "cpp" || language === "c") {
-        const executable = platform() === "win32" ? "a.exe" : "./a.out";
-        cmdString = `g++ "${filepath}" && ${executable}\r`;
-      } else if (language === "rust") {
-        const executable = platform() === "win32" ? `${filepath.replace('.rs', '.exe')}` : `./${filepath.replace('.rs', '')}`;
-        cmdString = `rustc "${filepath}" && ${executable}\r`;
-      } else if (language === "go") {
-        cmdString = `go run "${filepath}"\r`;
-      } else if (language === "java") {
-        cmdString = `java "${filepath}"\r`;
-      } else {
-        cmdString = `${platform() === "win32" ? "" : "./"}"${filepath}"\r`;
+      const cmdString = buildRunCommand(language, filepath);
+      if (!cmdString) {
+        return res.status(400).json({ error: `Language "${language}" is not supported. Supported languages: Python, JavaScript, TypeScript, Kotlin, C/C++, Rust, Go, Java, PHP, Ruby, C#, Swift, Perl, Lua, and Shell.` });
       }
 
       if (platform() === "win32") {
@@ -700,6 +753,9 @@ const initAPI = (app, server) => {
     const { roomId, type, path } = req.body;
     try {
       const fullPath = join(tmpdir(), `liveshare_room_${roomId}`, path.replace(/^\//, ""));
+      if (existsSync(fullPath)) {
+        return res.status(409).json({ error: `A ${type} with this name already exists.` });
+      }
       if (!existsSync(dirname(fullPath))) mkdirSync(dirname(fullPath), { recursive: true });
       if (type === "folder") mkdirSync(fullPath, { recursive: true });
       else writeFileSync(fullPath, "", "utf8");
@@ -717,6 +773,9 @@ const initAPI = (app, server) => {
       const baseDir = join(tmpdir(), `liveshare_room_${roomId}`);
       const fullOld = join(baseDir, oldPath.replace(/^\//, ""));
       const fullNew = join(baseDir, newPath.replace(/^\//, ""));
+      if (fullOld !== fullNew && existsSync(fullNew)) {
+        return res.status(409).json({ error: "An item with this name already exists." });
+      }
       fs.renameSync(fullOld, fullNew);
       res.json({ success: true });
     } catch (err) {
@@ -974,8 +1033,12 @@ const initAPI = (app, server) => {
         const hasChanges = status.modified.length > 0 || status.not_added.length > 0 || status.deleted.length > 0 || status.staged.length > 0;
         if (hasChanges) {
           await git.add(".");
-          const authorName = username || "CodeTogether User";
+          const safeUsername = typeof username === "string" ? username.trim() : "";
+          const authorName = safeUsername || "CodeTogether User";
+          const normalizedAuthor = authorName.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+          const authorEmail = `${normalizedAuthor || "codetogether-user"}@users.noreply.github.com`;
           await git.addConfig("user.name", authorName);
+          await git.addConfig("user.email", authorEmail);
           await git.commit(commitMessage.trim());
         }
       }

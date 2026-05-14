@@ -3,6 +3,7 @@ export const LANGUAGES = [
   { id: "python", label: "Python", snippet: "print('Welcome to CodeTogether')" },
   { id: "javascript", label: "JavaScript", snippet: "console.log('Welcome to CodeTogether');" },
   { id: "typescript", label: "TypeScript", snippet: "console.log('Welcome to CodeTogether');" },
+  { id: "kotlin", label: "Kotlin", snippet: 'fun main() {\n    println("Welcome to CodeTogether")\n}' },
   { id: "cpp", label: "C++", snippet: '#include <iostream>\n\nint main() {\n    std::cout << "Welcome to CodeTogether" << std::endl;\n    return 0;\n}' },
   { id: "java", label: "Java", snippet: 'class Main {\n    public static void main(String[] args) {\n        System.out.println("Welcome to CodeTogether");\n    }\n}' },
   { id: "rust", label: "Rust", snippet: 'fn main() {\n    println!("Welcome to CodeTogether");\n}' },
@@ -47,6 +48,7 @@ export const EXT_TO_LANG = {
   'jsx': 'javascript',
   'ts': 'typescript',
   'tsx': 'typescript',
+  'kt': 'kotlin',
   'cpp': 'cpp',
   'cc': 'cpp',
   'c': 'c',
@@ -71,6 +73,43 @@ export const EXT_TO_LANG = {
   'cfg': 'markdown',
   'env': 'markdown',
 }
+
+export const FILE_BADGES = {
+  py: { label: "PY", color: "#89dceb", background: "rgba(137, 220, 235, 0.16)" },
+  js: { label: "JS", color: "#f9e2af", background: "rgba(249, 226, 175, 0.16)" },
+  jsx: { label: "JSX", color: "#74c7ec", background: "rgba(116, 199, 236, 0.16)" },
+  ts: { label: "TS", color: "#89b4fa", background: "rgba(137, 180, 250, 0.16)" },
+  tsx: { label: "TSX", color: "#94e2d5", background: "rgba(148, 226, 213, 0.16)" },
+  kt: { label: "KT", color: "#cba6f7", background: "rgba(203, 166, 247, 0.16)" },
+  c: { label: "C", color: "#fab387", background: "rgba(250, 179, 135, 0.16)" },
+  h: { label: "H", color: "#f38ba8", background: "rgba(243, 139, 168, 0.16)" },
+  cpp: { label: "C++", color: "#fab387", background: "rgba(250, 179, 135, 0.16)" },
+  cc: { label: "C++", color: "#fab387", background: "rgba(250, 179, 135, 0.16)" },
+  hpp: { label: "HPP", color: "#f38ba8", background: "rgba(243, 139, 168, 0.16)" },
+  java: { label: "JAVA", color: "#f38ba8", background: "rgba(243, 139, 168, 0.16)" },
+  rs: { label: "RS", color: "#fab387", background: "rgba(250, 179, 135, 0.16)" },
+  go: { label: "GO", color: "#74c7ec", background: "rgba(116, 199, 236, 0.16)" },
+  html: { label: "HTML", color: "#f38ba8", background: "rgba(243, 139, 168, 0.16)" },
+  htm: { label: "HTML", color: "#f38ba8", background: "rgba(243, 139, 168, 0.16)" },
+  css: { label: "CSS", color: "#74c7ec", background: "rgba(116, 199, 236, 0.16)" },
+  scss: { label: "SCSS", color: "#f5c2e7", background: "rgba(245, 194, 231, 0.16)" },
+  sql: { label: "SQL", color: "#cba6f7", background: "rgba(203, 166, 247, 0.16)" },
+  md: { label: "MD", color: "#a6e3a1", background: "rgba(166, 227, 161, 0.16)" },
+  json: { label: "JSON", color: "#f9e2af", background: "rgba(249, 226, 175, 0.16)" },
+  xml: { label: "XML", color: "#94e2d5", background: "rgba(148, 226, 213, 0.16)" },
+  yaml: { label: "YAML", color: "#94e2d5", background: "rgba(148, 226, 213, 0.16)" },
+  yml: { label: "YAML", color: "#94e2d5", background: "rgba(148, 226, 213, 0.16)" },
+  toml: { label: "TOML", color: "#94e2d5", background: "rgba(148, 226, 213, 0.16)" },
+  env: { label: "ENV", color: "#f38ba8", background: "rgba(243, 139, 168, 0.16)" },
+  sh: { label: "SH", color: "#a6e3a1", background: "rgba(166, 227, 161, 0.16)" },
+  bash: { label: "SH", color: "#a6e3a1", background: "rgba(166, 227, 161, 0.16)" },
+  png: { label: "PNG", color: "#a6e3a1", background: "rgba(166, 227, 161, 0.16)" },
+  jpg: { label: "JPG", color: "#a6e3a1", background: "rgba(166, 227, 161, 0.16)" },
+  jpeg: { label: "JPG", color: "#a6e3a1", background: "rgba(166, 227, 161, 0.16)" },
+  svg: { label: "SVG", color: "#fab387", background: "rgba(250, 179, 135, 0.16)" },
+}
+
+export const DEFAULT_FILE_BADGE = { label: "FILE", color: "#bac2de", background: "rgba(186, 194, 222, 0.14)" }
 
 /* ─── File icon mapping ────────────────────────────────────────── */
 export const FILE_ICONS = {

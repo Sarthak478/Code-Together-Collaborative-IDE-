@@ -3,6 +3,29 @@ import Peer from "peerjs"
 import { motion, AnimatePresence } from "framer-motion"
 import { Mic, MicOff, Video, VideoOff, Maximize2, User } from "lucide-react"
 
+const PEER_CONFIG = {
+  host: "0.peerjs.com",
+  port: 443,
+  path: "/",
+  secure: true,
+  config: {
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:global.stun.twilio.com:3478" },
+    ],
+  },
+}
+
+const buildPeerId = (roomId, username) => {
+  const safeRoomId = String(roomId || "room").toLowerCase().replace(/[^a-z0-9-]+/g, "-")
+  const safeUsername = String(username || "guest").toLowerCase().replace(/[^a-z0-9-]+/g, "-")
+  const uniquePart = typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID().slice(0, 8)
+    : Math.random().toString(36).slice(2, 10)
+
+  return `ls-${safeRoomId}-${safeUsername || "guest"}-${uniquePart}`
+}
+
 export default function VideoCall({ 
   roomId, 
   username, 
@@ -31,16 +54,30 @@ export default function VideoCall({
         setLocalStream(stream)
         if (localVideoRef.current) localVideoRef.current.srcObject = stream
 
-        const myId = `ls-${roomId}-${username}-${Math.floor(Math.random() * 1000)}`
-        peer = new Peer(myId, { debug: 1 })
+        const myId = buildPeerId(roomId, username)
+        peer = new Peer(myId, PEER_CONFIG)
         peerRef.current = peer
 
-        peer.on("open", (id) => setPeerId(id))
+        peer.on("open", (id) => {
+          setError(null)
+          setPeerId(id)
+        })
 
         peer.on("call", (call) => {
           call.answer(stream)
           call.on("stream", (remoteStream) => {
             setRemoteStreams(prev => ({ ...prev, [call.peer]: remoteStream }))
+          })
+          call.on("close", () => {
+            setRemoteStreams(prev => {
+              const next = { ...prev }
+              delete next[call.peer]
+              return next
+            })
+            delete callsRef.current[call.peer]
+          })
+          call.on("error", () => {
+            setError("Call connection dropped. Try rejoining the call.")
           })
           callsRef.current[call.peer] = call
         })
@@ -59,6 +96,11 @@ export default function VideoCall({
     init()
 
     return () => {
+      Object.values(callsRef.current).forEach(call => {
+        try { call.close() } catch (_err) { /* ignored */ }
+      })
+      callsRef.current = {}
+      setRemoteStreams({})
       if (peer) {
         peer.destroy()
         setPeerId(null)
@@ -75,6 +117,7 @@ export default function VideoCall({
     activeUsers.forEach(user => {
       if (user.peerId && user.peerId !== peerId && !remoteStreams[user.peerId] && !callsRef.current[user.peerId]) {
         const call = peerRef.current.call(user.peerId, localStream)
+        if (!call) return
         call.on("stream", (remoteStream) => {
             setRemoteStreams(prev => ({ ...prev, [user.peerId]: remoteStream }))
         })
@@ -84,6 +127,9 @@ export default function VideoCall({
                 delete next[user.peerId]
                 return next
             })
+        })
+        call.on("error", () => {
+            setError(`Could not connect to ${user.name || "this participant"}.`)
         })
         callsRef.current[user.peerId] = call
       }
