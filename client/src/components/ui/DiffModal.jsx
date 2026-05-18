@@ -84,7 +84,7 @@ export default function DiffModal({
            </div>
            
            <div style={{ display: "flex", gap: 12 }}>
-             {staged === "false" && onStage && (
+             {(staged === false || staged === "false") && onStage && (
                <button 
                 onClick={() => { onStage(filePath); onClose(); }}
                 className="ide-btn-premium"

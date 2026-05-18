@@ -30,6 +30,8 @@ status: "executing"
 | 4.2 | Improve terminal language error handling | Updated api.js to list all supported languages instead of generic errors. |
 | 4.2 | Fix terminal auto-scroll behavior | Added setTimeout microtask scheduling in TerminalPanel.jsx. |
 | 4.2 | Enhance user presence visibility | Added file name tooltips, active indicators, and pulse animations in IDERoom.jsx. |
+| 4.3 | Move terminal to right side | Repositioned terminal as right-side panel like VS Code (IDERoom.jsx). |
+| 4.3 | Add HTML auto-preview | Auto-open preview panel for HTML/Markdown files on run (useIDERoom.js). |
 
 ## Blockers
 - **Phase 4**: Need to audit current Git logic for reliability.

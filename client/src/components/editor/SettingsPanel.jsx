@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { THEMES, FONT_FAMILIES, CURSORS } from "../../constants/editorConfigs"
 import { ROOM_MODES } from "../../constants/roomModes"
 import { Section, Field, GridRow } from "../ui/SettingsLayout"
@@ -51,6 +51,9 @@ export default function SettingsPanel({
 
   const [isInitializing, setIsInitializing] = useState(false);
   const [initResult, setInitResult] = useState({ type: "", message: "" }); // type: "success" | "error"
+  const [patDraft, setPatDraft] = useState("")
+  const [isValidatingPat, setIsValidatingPat] = useState(false)
+  const [patResult, setPatResult] = useState({ type: "", message: "", token: "" })
 
   const handleInitRepo = async () => {
     setIsInitializing(true);
@@ -86,7 +89,65 @@ export default function SettingsPanel({
     }
   }
 
-  const hasPat = personalPrefs.githubPat && personalPrefs.githubPat.trim() !== ""
+  const savedPat = personalPrefs.githubPat?.trim() || ""
+  const hasPat = savedPat !== ""
+  const isSavedPatVerified = hasPat && patResult.type === "success" && patResult.token === savedPat
+
+  const validateGithubPat = useCallback(async (token, { persist = true, clearOnFail = false } = {}) => {
+    const cleanToken = token.trim()
+    if (!cleanToken) {
+      setPatResult({ type: "error", message: "Paste a GitHub token first.", token: "" })
+      return false
+    }
+
+    setIsValidatingPat(true)
+    setPatResult({ type: "", message: "", token: cleanToken })
+
+    try {
+      const res = await fetch(`${API_URL}/git/user-repos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pat: cleanToken })
+      })
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        throw new Error(data.error || "GitHub rejected this token.")
+      }
+
+      if (persist) {
+        updatePersonalPref("githubPat", cleanToken)
+        setPatDraft("")
+      }
+
+      const repoCount = Array.isArray(data.repos) ? data.repos.length : 0
+      setPatResult({
+        type: "success",
+        message: `Token verified. ${repoCount} repositories available.`,
+        token: cleanToken
+      })
+      return true
+    } catch (e) {
+      console.error(e)
+      if (clearOnFail && savedPat === cleanToken) {
+        updatePersonalPref("githubPat", "")
+      }
+      setPatResult({
+        type: "error",
+        message: e.message || "Token validation failed.",
+        token: cleanToken
+      })
+      return false
+    } finally {
+      setIsValidatingPat(false)
+    }
+  }, [savedPat, updatePersonalPref])
+
+  useEffect(() => {
+    if (!savedPat) return
+    if (patResult.type === "success" && patResult.token === savedPat) return
+    validateGithubPat(savedPat, { persist: false, clearOnFail: true })
+  }, [savedPat, patResult.type, patResult.token, validateGithubPat])
 
   return (
     <>
@@ -219,17 +280,21 @@ export default function SettingsPanel({
                                 boxShadow: "0 0 8px rgba(166, 227, 161, 0.6)", flexShrink: 0
                               }} />
                               <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 11, fontWeight: 800, color: "#a6e3a1" }}>PAT Configured</div>
+                                <div style={{ fontSize: 11, fontWeight: 800, color: "#a6e3a1" }}>
+                                  {isValidatingPat || !isSavedPatVerified ? "Checking PAT..." : "PAT Verified"}
+                                </div>
                                 <div style={{ fontSize: 9, opacity: 0.5, marginTop: 2 }}>
                                   {personalPrefs.githubPat.startsWith("github_pat_") ? "Fine-grained" : "Classic"} token ending in •••{personalPrefs.githubPat.slice(-4)}
                                 </div>
                               </div>
-                              <Shield size={14} color="#a6e3a1" opacity={0.6} />
+                              {isValidatingPat ? <RefreshCw size={14} color="#a6e3a1" className="ide-icon-pulse" /> : <Shield size={14} color="#a6e3a1" opacity={0.6} />}
                             </div>
                             <button
                               onClick={() => {
                                 if (window.confirm("Disconnect GitHub PAT? You will need to re-enter it to push/pull.")) {
                                   updatePersonalPref("githubPat", "")
+                                  setPatDraft("")
+                                  setPatResult({ type: "", message: "", token: "" })
                                 }
                               }}
                               style={{
@@ -252,14 +317,51 @@ export default function SettingsPanel({
                             </button>
                           </div>
                         ) : (
-                          /* PAT not configured — show input */
+                          <>
                           <input 
                             type="password" 
                             placeholder="ghp_xxxxxxxxxxxx"
-                            value={personalPrefs.githubPat || ""}
-                            onChange={e => updatePersonalPref("githubPat", e.target.value)}
-                            style={{ width: "100%", background: "rgba(0,0,0,0.3)", color: textColor, border: `1px solid ${borderCol}`, borderRadius: 8, padding: "8px 12px", fontSize: 11, outline: "none", boxSizing: "border-box", marginBottom: 6 }}
+                            value={patDraft}
+                            onChange={e => {
+                              setPatDraft(e.target.value)
+                              setPatResult({ type: "", message: "", token: "" })
+                            }}
+                            onKeyDown={e => {
+                              if (e.key === "Enter" && !isValidatingPat) validateGithubPat(patDraft)
+                            }}
+                            style={{ width: "100%", background: "rgba(0,0,0,0.3)", color: textColor, border: `1px solid ${borderCol}`, borderRadius: 8, padding: "8px 12px", fontSize: 11, outline: "none", boxSizing: "border-box", marginBottom: 8 }}
                           />
+                          <button
+                            type="button"
+                            onClick={() => validateGithubPat(patDraft)}
+                            disabled={isValidatingPat || !patDraft.trim()}
+                            style={{
+                              width: "100%", padding: "9px 0", borderRadius: 8,
+                              background: patDraft.trim() ? accent : "rgba(255,255,255,0.05)",
+                              color: patDraft.trim() ? "#1e1e2e" : textColor,
+                              border: "none", fontSize: 11, fontWeight: 800,
+                              cursor: isValidatingPat || !patDraft.trim() ? "not-allowed" : "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                              opacity: isValidatingPat || !patDraft.trim() ? 0.65 : 1
+                            }}
+                          >
+                            {isValidatingPat ? <RefreshCw size={13} className="ide-icon-pulse" /> : <Shield size={13} />}
+                            {isValidatingPat ? "Validating..." : "Validate and Save PAT"}
+                          </button>
+                          </>
+                        )}
+
+                        {patResult.message && (
+                           <div style={{ 
+                             marginTop: 10, padding: "9px 12px", borderRadius: 9, 
+                             background: patResult.type === "success" ? "rgba(166, 227, 161, 0.1)" : "rgba(243, 139, 168, 0.1)",
+                             border: `1px solid ${patResult.type === "success" ? "rgba(166, 227, 161, 0.3)" : "rgba(243, 139, 168, 0.3)"}`,
+                             fontSize: 10, color: patResult.type === "success" ? "#a6e3a1" : "#f38ba8",
+                             display: "flex", alignItems: "center", gap: 7, lineHeight: 1.4
+                           }}>
+                             {patResult.type === "success" ? <Check size={13} /> : <AlertTriangle size={13} />}
+                             <span style={{ fontWeight: 600 }}>{patResult.message}</span>
+                           </div>
                         )}
 
                         {hasPat && roomId && (

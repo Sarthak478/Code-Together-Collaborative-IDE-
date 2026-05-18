@@ -398,11 +398,6 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
             letterSpacing: "-1px"
           }}>
             Code<span style={{ color: currentTheme.accent }}>Together</span>
-            <br />
-            <span style={{ 
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-            }}>Neon Luminary</span>
           </h1>
           <p style={{ 
             fontSize: "1.1rem", 

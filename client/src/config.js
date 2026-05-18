@@ -1,6 +1,6 @@
 /* -- Centralized API Configuration -- */
-const LOCAL_API = "http://localhost:1236";
-const LOCAL_WS = "ws://localhost:1236";
+const LOCAL_API = import.meta.env.VITE_LOCAL_API_URL || "http://localhost:1236";
+const LOCAL_WS = import.meta.env.VITE_LOCAL_WS_URL || LOCAL_API.replace(/^http/i, "ws");
 
 const isHybridMode = String(import.meta.env.VITE_HYBRID_MODE || "").toLowerCase() === "true";
 const isLocalHost =

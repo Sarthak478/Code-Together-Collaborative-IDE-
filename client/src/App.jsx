@@ -31,7 +31,8 @@ export default function App() {
   const [roomId, setRoomId] = useState(saved?.roomId ?? null)
   const [roomType, setRoomType] = useState(saved?.roomType ?? "collaborative")
   const [roomMode, setRoomMode] = useState(saved?.roomMode ?? null)
-  const [isResolvingRoomMode, setIsResolvingRoomMode] = useState(Boolean(saved?.roomId))
+  // Only resolve mode if we don't have one saved (e.g., joining a room for first time)
+  const [isResolvingRoomMode, setIsResolvingRoomMode] = useState(Boolean(saved?.roomId && !saved?.roomMode))
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState(null)
   const [username, setUsername] = useState(() => {
@@ -48,7 +49,7 @@ export default function App() {
     // When joining (not creating), mode will be null — detect from room
     // When creating, mode is explicitly set
     const nextMode = creating ? mode : (mode ?? null)
-    setIsResolvingRoomMode(!creating)
+    setIsResolvingRoomMode(!creating && !mode)
     setRoomMode(nextMode)
     saveSession(id, type, nextMode)
   }

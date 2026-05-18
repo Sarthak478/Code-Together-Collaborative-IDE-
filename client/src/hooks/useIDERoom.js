@@ -94,6 +94,8 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   const [actualRoomType, setRoomType] = useState(initialRoomType)
   const [output, setOutput] = useState("")
   const [runner, setRunner] = useState(null)
+  const [gitStatus, setGitStatus] = useState(null)
+  const [isGitLoading, setIsGitLoading] = useState(false)
 
   /* canEdit: host always can; others check room type AND not individually restricted */
   const myClientId = editor.provider.awareness.clientID
@@ -137,17 +139,9 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   const [isPersistenceSynced, setIsPersistenceSynced] = useState(false)
   const lastToastId = useRef(null)
 
-  const addToast = useCallback((msgText) => {
-    const id = Date.now() + Math.random().toString()
-    setToasts(prev => [...prev, { id, text: msgText }])
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
-  }, [])
-
-  /* ── Version Control (Git) State ── */
-  const [gitStatus, setGitStatus] = useState(null) // { isRepo, modified, staged, etc }
-  const [isGitLoading, setIsGitLoading] = useState(false)
-
   const refreshGitStatus = useCallback(async () => {
+    if (!roomId) return
+
     setIsGitLoading(true)
     try {
       const res = await fetch(`${API_URL}/git/status?roomId=${roomId}`)
@@ -160,12 +154,11 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     }
   }, [roomId])
 
-  // Refresh git status periodically or when files change significantly
-  useEffect(() => {
-    refreshGitStatus()
-    const interval = setInterval(refreshGitStatus, 15000) // Every 15s
-    return () => clearInterval(interval)
-  }, [refreshGitStatus])
+  const addToast = useCallback((msgText) => {
+    const id = Date.now() + Math.random().toString()
+    setToasts(prev => [...prev, { id, text: msgText }])
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
+  }, [])
 
   /* ── Personal UI ── */
   const [personalPrefs, setPersonalPrefs] = useState(() => {
@@ -208,6 +201,10 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       editor.ydoc.destroy()
     }
   }, [editor])
+
+  useEffect(() => {
+    refreshGitStatus()
+  }, [refreshGitStatus])
 
   useEffect(() => {
     if (isHost && editor.roomMap) {
@@ -462,8 +459,19 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     if (activeLanguage === "html" || activeLanguage === "markdown") {
       setPreviewOpen(true)
       setTerminalOpen(false)
-      addToast(`${activeFileEntry.name} opened in preview.`)
+      addToast(`📺 ${activeFileEntry.name} is now in Live Preview`)
       return
+    }
+    
+    // For frontend files (React, Vue, etc), also show preview option
+    const frontendExtensions = ["jsx", "tsx", "vue", "svelte", "astro"]
+    if (frontendExtensions.some(ext => activeLanguage?.includes(ext))) {
+      setTerminalOpen(true)
+      addToast(`⌨️ Running ${activeLanguage} file in Terminal`)
+    } else {
+      // For backend files (Python, Node, etc), open terminal
+      setTerminalOpen(true)
+      addToast(`⌨️ Running ${activeLanguage} file in Terminal`)
     }
 
     // Intercept heavy local workloads before sending them to the cloud terminal.
@@ -668,6 +676,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     previewOpen, setPreviewOpen,
     // Room state
     roomId, actualRoomType, output, runner,
+    gitStatus, isGitLoading,
     // Permissions
     isHost, canEdit, canRun, canChangeRoom,
     // Theme
@@ -692,9 +701,10 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     chatInput, setChatInput, chatTarget, setChatTarget,
     // Actions
     runCode, syncFilesToTerminal, downloadCode, saveCode, sendChat, kickUser, restrictUser, unrestrictUser,
+    refreshGitStatus,
     onLeave, updatePersonalPref, pushRoomUI, clearRoomUI,
     onToggleChatEnabled, onToggleShowUsers, onSetRoomTheme,
-    setOutput, addToast, gitStatus, isGitLoading, refreshGitStatus
+    setOutput, addToast
   }), [
     editor, onEditorMount, monacoTheme, monacoOptions, fs,
     openFiles, activeFile, activeFileEntry, activeLanguage, activeYText,
@@ -703,6 +713,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     rightPanel, toggleRightPanel,
     previewOpen,
     roomId, actualRoomType, output, runner,
+    gitStatus, isGitLoading,
     isHost, canEdit, canRun, canChangeRoom,
     activeTheme, activeFontSize, activeFontFamily, isDark,
     bg, headerBg, toolbarBg, textColor, panelBg, borderCol, inputBg, accent,
@@ -719,8 +730,9 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     chatEnabled, showUsersList, visibleChatMsgs,
     chatInput, chatTarget,
     runCode, syncFilesToTerminal, downloadCode, saveCode, sendChat, kickUser, restrictUser, unrestrictUser,
+    refreshGitStatus,
     onLeave, updatePersonalPref, pushRoomUI, clearRoomUI,
     onToggleChatEnabled, onToggleShowUsers, onSetRoomTheme,
-    gitStatus, isGitLoading, refreshGitStatus, addToast
+    addToast
   ])
 }

@@ -57,7 +57,16 @@ app.options(/.*/, cors(corsOptions));
 
 // Force HTTPS Redirection (For Port 80 Security)
 app.use((req, res, next) => {
-    if (req.header('x-forwarded-proto') !== 'https' && process.env.NODE_ENV === 'production') {
+    const host = req.header("host") || "";
+    const forwardedProto = req.header("x-forwarded-proto");
+    const isLocalHost = /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(host);
+
+    if (
+        process.env.NODE_ENV === "production" &&
+        !isLocalHost &&
+        forwardedProto &&
+        forwardedProto !== "https"
+    ) {
         res.redirect(`https://${req.header('host')}${req.url}`);
     } else {
         next();

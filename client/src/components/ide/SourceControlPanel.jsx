@@ -34,13 +34,14 @@ import { motion, AnimatePresence } from "framer-motion"
 
 export default function SourceControlPanel({
   roomId,
-  gitStatus,
-  isGitLoading,
+  gitStatus: initialGitStatus,
+  isGitLoading: initialIsGitLoading,
   onRefresh,
   themeData,
   username,
   personalPrefs,
-  onOpenSettings
+  onOpenSettings,
+  onViewDiff
 }) {
   const [commitMessage, setCommitMessage] = useState("")
   const [isCommitting, setIsCommitting] = useState(false)
@@ -51,12 +52,42 @@ export default function SourceControlPanel({
   const [syncError, setSyncError] = useState("")
   const [syncSuccess, setSyncSuccess] = useState("")
   const [localTestConfirmed, setLocalTestConfirmed] = useState(false)
+  const [gitStatus, setGitStatus] = useState(initialGitStatus || null)
+  const [isGitLoading, setIsGitLoading] = useState(initialIsGitLoading || false)
 
   const [userRepos, setUserRepos] = useState([])
   const [repoFetchWarning, setRepoFetchWarning] = useState("")
   const [isFetchingRepos, setIsFetchingRepos] = useState(false)
   const [isEditingBranch, setIsEditingBranch] = useState(false)
   const [newBranchName, setNewBranchName] = useState("")
+
+  // Refresh Git status
+  const refreshGitStatus = useCallback(async () => {
+    setIsGitLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/git/status?roomId=${roomId}`)
+      const data = await res.json()
+      setGitStatus(data)
+    } catch (err) {
+      console.error("Git Status Error:", err)
+    } finally {
+      setIsGitLoading(false)
+    }
+  }, [roomId])
+
+  useEffect(() => {
+    setGitStatus(initialGitStatus || null)
+  }, [initialGitStatus])
+
+  useEffect(() => {
+    setIsGitLoading(initialIsGitLoading || false)
+  }, [initialIsGitLoading])
+
+  useEffect(() => {
+    if (!initialGitStatus) {
+      refreshGitStatus()
+    }
+  }, [initialGitStatus, refreshGitStatus])
 
   const { accent, textColor, borderCol, inputBg, panelBg } = themeData
 
@@ -77,7 +108,7 @@ export default function SourceControlPanel({
       if (res.ok) {
         setSyncSuccess("✓ Git Repository Initialized")
         setTimeout(() => setSyncSuccess(""), 3000)
-        onRefresh()
+        refreshGitStatus()
         setShowRepoSetup(true)
       }
     } catch (e) { console.error(e) }
@@ -125,7 +156,8 @@ export default function SourceControlPanel({
       if (res.ok) {
         setIsEditingBranch(false)
         setNewBranchName("")
-        onRefresh()
+        await refreshGitStatus()
+        onRefresh?.()
       } else {
         const data = await res.json()
         setSyncError(data.error || "Branch operation failed")
@@ -226,7 +258,8 @@ export default function SourceControlPanel({
       setSyncSuccess("✓ Successfully pushed to GitHub")
       setCommitMessage("")
       setTimeout(() => setSyncSuccess(""), 3000)
-      onRefresh()
+      await refreshGitStatus()
+      onRefresh?.()
     } catch (e) {
       console.error(e)
       setSyncError(e.message || "Failed to push to GitHub")
@@ -265,7 +298,8 @@ export default function SourceControlPanel({
 
       setSyncSuccess("✓ Successfully pulled from GitHub")
       setTimeout(() => setSyncSuccess(""), 3000)
-      onRefresh()
+      await refreshGitStatus()
+      onRefresh?.()
     } catch (e) {
       console.error(e)
       setSyncError(e.message || "Failed to pull from GitHub")
@@ -276,31 +310,47 @@ export default function SourceControlPanel({
 
   const handleStageFile = async (filePath) => {
     try {
-      await fetch(`${API_URL}/git/stage`, {
+      const res = await fetch(`${API_URL}/git/stage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomId, filePaths: [filePath] })
       })
-      onRefresh()
-    } catch (e) { console.error(e) }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Failed to stage file")
+      }
+      await refreshGitStatus()
+      onRefresh?.()
+    } catch (e) {
+      console.error(e)
+      setSyncError(e.message || "Failed to stage file")
+    }
   }
 
   const handleUnstageFile = async (filePath) => {
     try {
-      await fetch(`${API_URL}/git/unstage`, {
+      const res = await fetch(`${API_URL}/git/unstage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomId, filePaths: [filePath] })
       })
-      onRefresh()
-    } catch (e) { console.error(e) }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Failed to unstage file")
+      }
+      await refreshGitStatus()
+      onRefresh?.()
+    } catch (e) {
+      console.error(e)
+      setSyncError(e.message || "Failed to unstage file")
+    }
   }
 
   const handleCommit = async () => {
     if (!commitMessage.trim()) return
     setIsCommitting(true)
     try {
-      await fetch(`${API_URL}/git/commit`, {
+      const res = await fetch(`${API_URL}/git/commit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -310,9 +360,17 @@ export default function SourceControlPanel({
           authorEmail: personalPrefs?.gitEmail || `${username}@codetogether.io`
         })
       })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Commit failed")
+      }
       setCommitMessage("")
-      onRefresh()
-    } catch (e) { console.error(e) }
+      await refreshGitStatus()
+      onRefresh?.()
+    } catch (e) {
+      console.error(e)
+      setSyncError(e.message || "Commit failed")
+    }
     finally { setIsCommitting(false) }
   }
 
@@ -630,7 +688,7 @@ export default function SourceControlPanel({
                 path={path}
                 type="staged"
                 onAction={() => handleUnstageFile(path)}
-                onViewDiff={() => undefined}
+                onViewDiff={onViewDiff ? () => onViewDiff(path, true) : undefined}
                 accent={accent}
                 textColor={textColor}
               />
@@ -649,7 +707,7 @@ export default function SourceControlPanel({
               path={path}
               type="modified"
               onAction={() => handleStageFile(path)}
-              onViewDiff={() => undefined}
+              onViewDiff={onViewDiff ? () => onViewDiff(path, false) : undefined}
               accent={accent}
               textColor={textColor}
             />

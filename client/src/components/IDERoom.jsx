@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { motion as Motion, AnimatePresence } from "framer-motion"
 import { API_URL } from "../config"
 import Editor from "@monaco-editor/react"
@@ -26,11 +26,7 @@ export default function IDERoom(props) {
   const ide = useIDERoom(props)
   const [accessControlOpen, setAccessControlOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
-  
-  // Terminal Resize Handle State
-  const [isResizingTerminal, setIsResizingTerminal] = useState(false)
   const [activeDiff, setActiveDiff] = useState(null) // { path, staged }
-  const isResizingTerminalRef = useRef(false)
   
   // Ralph Automation State
   const [ralphPrompt, setRalphPrompt] = useState(null)
@@ -46,11 +42,6 @@ export default function IDERoom(props) {
     setSendTerminalCommand(() => sendFn)
   }, [])
 
-  // Sync ref with state for mousemove event listener
-  useEffect(() => {
-    isResizingTerminalRef.current = isResizingTerminal
-  }, [isResizingTerminal])
-
   // Global Ctrl+S handler
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -62,45 +53,6 @@ export default function IDERoom(props) {
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [ide])
-
-  // Resize Drag Handlers
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      if (!isResizingTerminalRef.current) return
-      // Prevent highlighting text while dragging
-      e.preventDefault()
-      
-      const windowHeight = window.innerHeight
-      const statusBarHeight = 24
-      const navbarHeight = 56
-      const minHeight = 40
-      const maxHeight = windowHeight - statusBarHeight - navbarHeight - 100 // Leave space for editor
-
-      // Calculate new height from bottom
-      const newHeight = windowHeight - e.clientY - statusBarHeight
-      
-      ide.setTerminalHeight(Math.max(minHeight, Math.min(newHeight, maxHeight)))
-    }
-
-    const handleMouseUp = () => {
-      setIsResizingTerminal(false)
-    }
-
-    if (isResizingTerminal) {
-      document.addEventListener("mousemove", handleMouseMove)
-      document.addEventListener("mouseup", handleMouseUp)
-    }
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove)
-      document.removeEventListener("mouseup", handleMouseUp)
-    }
-  }, [isResizingTerminal, ide])
-
-  const handleMouseDownTerminal = useCallback((e) => {
-    e.preventDefault()
-    setIsResizingTerminal(true)
-  }, [])
 
   return (
     <div
@@ -159,38 +111,8 @@ export default function IDERoom(props) {
         padding: "6px 12px", background: ide.toolbarBg, borderBottom: `1px solid ${ide.borderCol}`,
         height: 48, boxSizing: "border-box"
       }}>
-        {/* Run Button (Left) */}
+        {/* Download Button (Left) */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button
-            onClick={ide.runCode}
-            disabled={!ide.canRun || !ide.activeFile}
-            className="ide-btn-premium"
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              background: ide.canRun && ide.activeFile ? `linear-gradient(135deg, ${ide.accent}, rgba(137,180,250,0.9))` : ide.inputBg,
-              color: ide.canRun && ide.activeFile ? "#fff" : ide.textColor,
-              opacity: (!ide.canRun || !ide.activeFile) ? 0.5 : 1,
-              border: `1px solid ${ide.canRun && ide.activeFile ? ide.accent : ide.borderCol}`,
-              padding: "6px 16px", borderRadius: 10, fontWeight: 600, fontSize: 13,
-              fontFamily: "'Manrope', sans-serif", letterSpacing: "0.01em",
-              cursor: (!ide.canRun || !ide.activeFile) ? "not-allowed" : "pointer",
-              boxShadow: (ide.canRun && ide.activeFile) ? `0 4px 20px ${ide.accent}44` : "none"
-            }}
-          >
-            {ide.runner === ide.editor.username ? (
-              <>
-                <Motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}>⚙️</Motion.span>
-                Starting
-              </>
-            ) : ide.runner ? (
-              "⏳ Queued"
-            ) : (
-              <>
-                <span>▶</span> {ide.activeLanguage === "html" || ide.activeLanguage === "markdown" ? "Open Preview" : "Run in Terminal"}
-              </>
-            )}
-          </button>
-          
           <button
             onClick={ide.downloadCode}
             disabled={!ide.activeFile}
@@ -258,7 +180,7 @@ export default function IDERoom(props) {
           })}
         </div>
 
-        {/* Right Side: Interview + Preview */}
+        {/* Right Side: Interview + Run/Preview/Terminal */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, height: "100%" }}>
           {ide.actualRoomType === "interview" && (
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginLeft: 16 }}>
@@ -290,22 +212,58 @@ export default function IDERoom(props) {
           )}
 
           <button
-            onClick={() => ide.setPreviewOpen(!ide.previewOpen)}
+            onClick={ide.runCode}
+            disabled={!ide.canRun || !ide.activeFile}
+            className="ide-btn-premium"
             style={{
-              background: ide.previewOpen ? "transparent" : (ide.isDark ? "rgba(137, 180, 250, 0.2)" : "rgba(13, 110, 253, 0.1)"),
-              color: ide.previewOpen ? ide.textColor : ide.accent,
-              border: `1px solid ${ide.previewOpen ? "transparent" : ide.borderCol}`, cursor: "pointer", fontSize: 13, fontWeight: 600,
-              padding: "4px 10px", borderRadius: 10, transition: "all 0.2s",
-              fontFamily: "'Manrope', sans-serif"
+              display: "flex", alignItems: "center", gap: 6,
+              background: ide.canRun && ide.activeFile ? `linear-gradient(135deg, ${ide.accent}, rgba(137,180,250,0.9))` : ide.inputBg,
+              color: ide.canRun && ide.activeFile ? "#fff" : ide.textColor,
+              opacity: (!ide.canRun || !ide.activeFile) ? 0.5 : 1,
+              border: `1px solid ${ide.canRun && ide.activeFile ? ide.accent : ide.borderCol}`,
+              padding: "6px 16px", borderRadius: 10, fontWeight: 600, fontSize: 13,
+              fontFamily: "'Manrope', sans-serif", letterSpacing: "0.01em",
+              cursor: (!ide.canRun || !ide.activeFile) ? "not-allowed" : "pointer",
+              boxShadow: (ide.canRun && ide.activeFile) ? `0 4px 20px ${ide.accent}44` : "none"
             }}
+            title="Run code in terminal"
           >
-            {ide.previewOpen ? "❌ Close Preview" : "🚀 Open Preview"}
+            {ide.runner === ide.editor.username ? (
+              <>
+                <Motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}>⚙️</Motion.span>
+                Starting
+              </>
+            ) : ide.runner ? (
+              "⏳ Queued"
+            ) : (
+              <>
+                <span>▶</span> {ide.activeLanguage === "html" || ide.activeLanguage === "markdown" ? "Open Preview" : "Run in Terminal"}
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={() => ide.setPreviewOpen(!ide.previewOpen)}
+            disabled={!ide.activeFile}
+            style={{
+              background: ide.previewOpen ? ide.accent : ide.inputBg,
+              color: ide.previewOpen ? "#fff" : ide.textColor,
+              opacity: !ide.activeFile ? 0.5 : 1,
+              border: `1px solid ${ide.previewOpen ? ide.accent : ide.borderCol}`,
+              padding: "6px 16px", borderRadius: 10, fontWeight: 600, fontSize: 13,
+              fontFamily: "'Manrope', sans-serif", letterSpacing: "0.01em",
+              cursor: !ide.activeFile ? "not-allowed" : "pointer",
+              display: "flex", alignItems: "center", gap: 6
+            }}
+            title="Toggle Live Preview"
+          >
+            👁️ Live Preview
           </button>
         </div>
       </div>
 
       {/* ── Main content row ── */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+      <div style={{ display: "flex", flex: 1, overflow: "hidden", flexDirection: "row" }}>
         
         {/* Left Mini Sidebar for Panels */}
         <div style={{ 
@@ -337,17 +295,10 @@ export default function IDERoom(props) {
             accent={ide.accent} 
             title="AI Coder"
           />
-
-          <div style={{ width: 24, height: 1, background: `linear-gradient(90deg, transparent, ${ide.borderCol}, transparent)`, margin: "8px 0" }} />
-
           <IDEPanelToggleButton 
             icon={<TerminalSquare size={20} />} 
             active={ide.terminalOpen} 
-            onClick={() => {
-              const nextState = !ide.terminalOpen;
-              ide.setTerminalOpen(nextState);
-              if (nextState) ide.syncFilesToTerminal();
-            }} 
+            onClick={() => ide.toggleTerminal()} 
             accent={ide.accent} 
             title="Terminal"
           />
@@ -389,7 +340,7 @@ export default function IDERoom(props) {
           />
 
           {/* Editor Container */}
-          <div style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", flexDirection: "row" }}>
+          <div style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 0 }}>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
               {ide.activeFile && !ide.isSyncingFile && ide.isPersistenceSynced ? (
                 <Editor
@@ -438,33 +389,33 @@ export default function IDERoom(props) {
             )}
           </div>
 
-
-
-          {/* Resize Handle */}
-          {ide.terminalOpen && (
-            <div
-              className={`ide-resize-handle ${isResizingTerminal ? 'dragging' : ''}`}
-              onMouseDown={handleMouseDownTerminal}
-            />
-          )}
-
-          {/* Terminal */}
-          {ide.terminalOpen && (
-            <TerminalPanel
-              roomId={ide.roomId}
-              height={ide.terminalHeight}
-              isDark={ide.isDark}
-              borderCol={ide.borderCol}
-              headerBg={ide.headerBg}
-              textColor={ide.textColor}
-              accent={ide.accent}
-              onAskRalph={handleAskRalph}
-              onSendCommandReady={handleSendCommandReady}
-            />
-          )}
+          {/* Terminal Panel at Bottom - Vertical Layout */}
+          <AnimatePresence initial={false}>
+            {ide.terminalOpen && (
+              <Motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 300, opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 400, damping: 40 }}
+                style={{ overflow: "hidden", borderTop: `1px solid ${ide.borderCol}`, background: ide.panelBg, zIndex: 5, display: "flex", flexDirection: "column" }}
+              >
+                <TerminalPanel
+                  roomId={ide.roomId}
+                  height="100%"
+                  isDark={ide.isDark}
+                  borderCol={ide.borderCol}
+                  headerBg={ide.headerBg}
+                  textColor={ide.textColor}
+                  accent={ide.accent}
+                  onAskRalph={handleAskRalph}
+                  onSendCommandReady={handleSendCommandReady}
+                />
+              </Motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Right Panel (Chat or Extensions) */}
+        {/* Right Panel (Chat, Git, AI only) */}
         <AnimatePresence initial={false}>
           {ide.rightPanel && (
             <Motion.div
@@ -472,9 +423,9 @@ export default function IDERoom(props) {
               animate={{ width: 320, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ type: "spring", stiffness: 400, damping: 40 }}
-              style={{ overflow: "hidden", borderLeft: `1px solid ${ide.borderCol}`, background: ide.panelBg, zIndex: 5 }}
+              style={{ overflow: "hidden", borderLeft: `1px solid ${ide.borderCol}`, background: ide.panelBg, zIndex: 5, display: "flex", flexDirection: "column" }}
             >
-              <div style={{ width: 320, height: "100%", display: "flex", flexDirection: "column" }}>
+              <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
                 {ide.rightPanel === "chat" ? (
                   <ChatPanel
                     messages={ide.visibleChatMsgs}
@@ -525,6 +476,49 @@ export default function IDERoom(props) {
             </Motion.div>
           )}
         </AnimatePresence>
+
+        {/* Preview Panel (Right side, below or beside terminal) */}
+        {ide.previewOpen && !ide.terminalOpen && (
+          <div style={{ 
+            width: 450, borderLeft: `1px solid ${ide.borderCol}`, 
+            background: ide.isDark ? "#0d0d1a" : "#f1f3f5", 
+            display: "flex", flexDirection: "column", zIndex: 4
+          }}>
+            <div style={{ 
+              display: "flex", alignItems: "center", justifyContent: "space-between", 
+              padding: "8px 12px", background: ide.headerBg, 
+              borderBottom: `1px solid ${ide.borderCol}`, fontSize: 12,
+              fontFamily: "'Manrope', sans-serif"
+            }}>
+              <span style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 6, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: ide.accent, display: "inline-block" }} />
+                Live Preview
+              </span>
+              <button 
+                onClick={() => ide.setPreviewOpen(false)} 
+                style={{ background: "transparent", border: "none", cursor: "pointer", color: ide.textColor, opacity: 0.6, fontSize: 12, transition: "opacity 0.2s", fontFamily: "'Manrope', sans-serif", fontWeight: 500 }}
+                onMouseEnter={e => e.currentTarget.style.opacity = "1"}
+                onMouseLeave={e => e.currentTarget.style.opacity = "0.6"}
+              >✕ Close</button>
+            </div>
+            <div style={{ flex: 1, overflow: "auto", padding: 12 }}>
+              {ide.activeLanguage === 'html' ? (
+                <iframe 
+                  srcDoc={ide.activeYText?.toString() || ""} 
+                  title="HTML Preview" 
+                  style={{ width: '100%', height: '100%', border: 'none', background: '#fff', borderRadius: 8 }} 
+                  sandbox="allow-scripts allow-forms allow-same-origin" 
+                />
+              ) : (
+                <div style={{ color: ide.textColor }}>
+                  <div style={{ marginBottom: 16, fontSize: 13, opacity: 0.7 }}>
+                    Preview not available for {ide.activeLanguage} files
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Status Bar ── */}

@@ -14,6 +14,18 @@ const dotenv = require("dotenv");
 const rateLimit = require("express-rate-limit");
 const axios = require("axios");
 const { sendInviteEmail } = require("./services/emailService.js");
+const {
+  getGit,
+  isValidRepo,
+  ensureRepoInitialized,
+  normalizePat,
+  redactSecret,
+  resolveCurrentBranch,
+  simplifyGitError,
+  remoteBranchExists,
+  reinitRepo,
+  withAuthenticatedOrigin
+} = require("./services/gitService.js");
 
 dotenv.config();
 
@@ -85,10 +97,13 @@ const initAPI = (app, server) => {
 
   function buildRunCommand(language, filepath) {
     const normalizedLanguage = String(language || "").toLowerCase();
+    const pythonCommand = platform() === "win32"
+      ? `if (Get-Command python -ErrorAction SilentlyContinue) { python "${filepath}" } elseif (Get-Command py -ErrorAction SilentlyContinue) { py -3 "${filepath}" } else { Write-Error "Python runtime not found" }\r`
+      : `python3 "${filepath}" || python "${filepath}"\r`;
 
     // Map of supported languages
     const supportedCommands = {
-      "python": `python "${filepath}"\r`,
+      "python": pythonCommand,
       "javascript": `node "${filepath}"\r`,
       "typescript": `node --experimental-strip-types "${filepath}"\r`,
       "kotlin": {
@@ -163,20 +178,21 @@ const initAPI = (app, server) => {
   const roomWatchers = new Map(); // roomId -> chokidarWatcher
   const roomCleanupTimers = new Map(); // roomId -> timeoutId
   const roomLastResizer = new Map(); // roomId -> { clientId, cols, rows, time }
+  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-  function cleanupRoomFolder(roomId) {
-    const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
-    if (existsSync(roomCwd)) {
-      console.log(`[CLEANUP] Deleting stale room folder: ${roomId}`);
-      try {
-        rmSync(roomCwd, { recursive: true, force: true });
-      } catch (e) {
-        console.error(`[CLEANUP:ERROR] Failed to delete ${roomId}:`, e.message);
-      }
-    }
+  async function stopRoomResources(roomId) {
     roomCleanupTimers.delete(roomId);
 
-    // Terminate all PTY processes related to this room
+    const watcher = roomWatchers.get(roomId);
+    if (watcher) {
+      roomWatchers.delete(roomId);
+      try {
+        await watcher.close();
+      } catch (error) {
+        console.warn(`[WATCHER] Failed to close watcher for ${roomId}:`, error.message);
+      }
+    }
+
     for (const [key, ptyProcess] of roomTerminals.entries()) {
       if (key.startsWith(`${roomId}_`)) {
         try { ptyProcess.kill(); } catch (e) { }
@@ -184,6 +200,49 @@ const initAPI = (app, server) => {
         roomTerminalHistory.delete(key);
         roomLastResizer.delete(key);
       }
+    }
+
+    roomClients.delete(roomId);
+    roomQueues.delete(roomId);
+  }
+
+  async function removeRoomFolder(roomCwd) {
+    if (!existsSync(roomCwd)) return;
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      try {
+        rmSync(roomCwd, { recursive: true, force: true });
+        return;
+      } catch (error) {
+        if ((error.code === "EBUSY" || error.code === "EPERM") && attempt < 3) {
+          await delay(150 * (attempt + 1));
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+
+  async function clearRoomWorkspace(roomId, { recreate = false } = {}) {
+    const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
+    await stopRoomResources(roomId);
+    await removeRoomFolder(roomCwd);
+
+    if (recreate) {
+      mkdirSync(roomCwd, { recursive: true });
+    }
+  }
+
+  async function cleanupRoomFolder(roomId) {
+    const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
+    if (existsSync(roomCwd)) {
+      console.log(`[CLEANUP] Deleting stale room folder: ${roomId}`);
+    }
+
+    try {
+      await clearRoomWorkspace(roomId);
+    } catch (e) {
+      console.error(`[CLEANUP:ERROR] Failed to delete ${roomId}:`, e.message);
     }
   }
 
@@ -453,37 +512,65 @@ const initAPI = (app, server) => {
         return resolve({ stdout: "", stderr: "Failed to write temp file: " + e.message, exitCode: 1 });
       }
 
-      let command;
-      if (language === "python") command = `python "${tmpFile}"`;
-      else if (language === "javascript") command = `node "${tmpFile}"`;
-      else if (language === "typescript") command = `node --experimental-strip-types "${tmpFile}"`;
+      const commands = language === "python"
+        ? (platform() === "win32"
+          ? [`python "${tmpFile}"`, `py -3 "${tmpFile}"`]
+          : [`python3 "${tmpFile}"`, `python "${tmpFile}"`])
+        : language === "javascript"
+          ? [`node "${tmpFile}"`]
+          : [`node --experimental-strip-types "${tmpFile}"`];
 
-      exec(command, { timeout: 10000 }, async (error, stdout, stderr) => {
+      const isMissingRuntimeError = (error, stderr = "") => {
+        const combined = `${stderr}\n${error?.message || ""}`.toLowerCase();
+        return (
+          combined.includes("is not recognized as an internal or external command") ||
+          combined.includes("command not found") ||
+          combined.includes("no installed pythons found") ||
+          combined.includes("requested python version") ||
+          combined.includes("python runtime not found") ||
+          combined.includes("not found")
+        );
+      };
+
+      const finalize = (result) => {
         try { unlinkSync(tmpFile); } catch (_) { }
+        resolve(result);
+      };
 
-        let finalStderr = stderr || (error && error.message && !stderr ? error.message : "");
+      const runLocalCommand = (commandIndex = 0) => {
+        exec(commands[commandIndex], { timeout: 10000 }, async (error, stdout, stderr) => {
+          let finalStderr = stderr || (error && error.message && !stderr ? error.message : "");
 
-        if (language === "typescript") {
-          finalStderr = finalStderr
-            .split("\n")
-            .filter(line => !line.includes("ExperimentalWarning: Type Stripping is an experimental feature"))
-            .filter(line => !line.includes("Use `node --trace-warnings"))
-            .join("\n")
-            .trim();
-        }
+          if (language === "typescript") {
+            finalStderr = finalStderr
+              .split("\n")
+              .filter(line => !line.includes("ExperimentalWarning: Type Stripping is an experimental feature"))
+              .filter(line => !line.includes("Use `node --trace-warnings"))
+              .join("\n")
+              .trim();
+          }
 
-        if (finalStderr.includes("is not recognized as an internal or external command")) {
-          console.log(`Local runtime for ${language} missing. Falling back to remote...`);
-          const remoteResult = await executeRemote(language, code);
-          return resolve(remoteResult);
-        }
+          if (error && isMissingRuntimeError(error, finalStderr)) {
+            if (commandIndex + 1 < commands.length) {
+              runLocalCommand(commandIndex + 1);
+              return;
+            }
 
-        resolve({
-          stdout: stdout || "",
-          stderr: finalStderr,
-          exitCode: error ? (error.code ?? 1) : 0,
+            console.log(`Local runtime for ${language} missing. Falling back to remote...`);
+            const remoteResult = await executeRemote(language, code);
+            finalize(remoteResult);
+            return;
+          }
+
+          finalize({
+            stdout: stdout || "",
+            stderr: finalStderr,
+            exitCode: error ? (error.code ?? 1) : 0,
+          });
         });
-      });
+      };
+
+      runLocalCommand();
     });
   }
 
@@ -659,17 +746,12 @@ const initAPI = (app, server) => {
 
   /* -------------------- CLEAR ROOM FILES (for folder re-import) ---- */
 
-  app.post("/fs/clear-room", (req, res) => {
+  app.post("/fs/clear-room", async (req, res) => {
     const { roomId } = req.body;
     if (!roomId) return res.status(400).json({ error: "roomId required" });
 
-    const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
-
     try {
-      if (existsSync(roomCwd)) {
-        rmSync(roomCwd, { recursive: true, force: true });
-      }
-      mkdirSync(roomCwd, { recursive: true });
+      await clearRoomWorkspace(roomId, { recreate: true });
       res.json({ success: true, message: "Room files cleared" });
     } catch (error) {
       console.error("Clear room error:", error);
@@ -732,23 +814,6 @@ const initAPI = (app, server) => {
     }
   });
 
-  app.post("/fs/clear-room", (req, res) => {
-    const { roomId } = req.body;
-    if (!roomId) return res.status(400).json({ error: "roomId is required" });
-
-    const roomDir = join(tmpdir(), `liveshare_room_${roomId}`);
-    try {
-      if (existsSync(roomDir)) {
-        rmSync(roomDir, { recursive: true, force: true });
-      }
-      res.json({ success: true, message: "Room cleared" });
-    } catch (err) {
-      console.error("Clear room error:", err);
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-
   app.post("/fs/create", (req, res) => {
     const { roomId, type, path } = req.body;
     try {
@@ -795,19 +860,8 @@ const initAPI = (app, server) => {
   });
 
   /* -------------------- GIT INTEGRATION -------------------- */
-  const getGit = (roomId) => {
-    const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
-    return simpleGit(roomCwd);
-  };
-
-  const normalizePat = (pat) => (typeof pat === "string" ? pat.trim() : "");
-
-  const redactSecret = (value, secret) => {
-    const text = value instanceof Error ? value.message : String(value || "");
-    const token = normalizePat(secret);
-    return token ? text.split(token).join("[redacted]") : text;
-  };
-
+  // Core Git functions imported from gitService.js
+  
   const isFineGrainedPat = (pat) => pat.startsWith("github_pat_");
 
   const getGithubAuthHeaders = (pat) => {
@@ -822,8 +876,7 @@ const initAPI = (app, server) => {
     return headers;
   };
 
-  const buildAuthenticatedGitHubUrl = (remoteUrl, pat, username = "x-access-token") => {
-    const token = normalizePat(pat);
+  const normalizeGithubRemoteUrl = (remoteUrl) => {
     let cleanRemote = String(remoteUrl || "").trim();
 
     if (cleanRemote.startsWith("git@github.com:")) {
@@ -832,11 +885,11 @@ const initAPI = (app, server) => {
 
     const url = new URL(cleanRemote);
     if (url.hostname !== "github.com") {
-      throw new Error("Only github.com remotes are supported for PAT sync.");
+      throw new Error("Only github.com remotes are supported.");
     }
 
-    url.username = String(username || "x-access-token");
-    url.password = token;
+    url.username = "";
+    url.password = "";
     return url.toString();
   };
 
@@ -901,48 +954,46 @@ const initAPI = (app, server) => {
     }
   });
 
+  /* -------------------- AUTO-INITIALIZE GIT ENDPOINT -------------------- */
+  app.post("/git/ensure-initialized", async (req, res) => {
+    const { roomId, username } = req.body;
+    if (!roomId) return res.status(400).json({ error: "roomId required" });
+
+    try {
+      const result = await ensureRepoInitialized(roomId, "main", username || "CodeTogether User", `${(username || "user").toLowerCase()}@codetogether.io`);
+      res.json({
+        success: true,
+        initialized: result.initialized,
+        branch: result.branch || "main",
+        message: result.initialized ? "Git repository initialized" : "Git repository was already initialized"
+      });
+    } catch (err) {
+      console.error("Ensure init error:", err);
+      res.status(500).json({ error: simplifyGitError(err) });
+    }
+  });
+
   /* -------------------- ERROR MAPPING HELPER -------------------- */
-  const simplifyGitError = (err, secret) => {
-    const msg = redactSecret(err.message || String(err), secret);
-    const lower = msg.toLowerCase();
-
-    if (lower.includes("authentication failed") || lower.includes("invalid username or password")) {
-      return "Your GitHub Token (PAT) is invalid or expired. Please check your settings.";
-    }
-    if (lower.includes("write access to repository not granted") || lower.includes("permission to") || lower.includes("permission denied") || lower.includes("403")) {
-      return "GitHub denied repository access. Classic PATs need the 'repo' scope; fine-grained PATs must include this repository with Contents read/write permission.";
-    }
-    if (lower.includes("remote: repository not found")) {
-      return "GitHub repository not found, or this token does not have access to it. Check the remote URL and token repository access.";
-    }
-    if (lower.includes("couldn't find remote ref")) {
-      return "Branch not found on GitHub. Try pushing your code first.";
-    }
-    if (lower.includes("rejected") || lower.includes("non-fast-forward")) {
-      return "Sync blocked. Someone else has changed these files—try pulling changes first.";
-    }
-    if (msg.includes("CONFLICT") || lower.includes("automatic merge failed")) {
-      return "Merge conflict! You'll need to manually resolve differences in the files.";
-    }
-    if (lower.includes("already exists") && lower.includes("remote origin")) {
-      return "Remote already exists. We've updated it to your new URL.";
-    }
-
-    return msg.split(':').pop().trim() || "An unexpected Git error occurred.";
-  };
 
   app.post("/git/init", async (req, res) => {
     const { roomId, defaultBranch = "main", authorName, authorEmail } = req.body;
+    if (!roomId) return res.status(400).json({ error: "roomId required" });
+
     try {
       const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
       if (!existsSync(roomCwd)) {
         mkdirSync(roomCwd, { recursive: true });
       }
       const git = getGit(roomId);
+      const wasRepo = await git.checkIsRepo();
       await git.init();
 
-      // Set default branch immediately
-      await git.checkout(["-b", defaultBranch]);
+      if (!wasRepo) {
+        const currentBranch = (await git.branch(["--show-current"])).current;
+        if (currentBranch !== defaultBranch) {
+          await git.checkout(["-b", defaultBranch]);
+        }
+      }
 
       // Configure author if provided
       if (authorName) await git.addConfig("user.name", authorName);
@@ -957,6 +1008,10 @@ const initAPI = (app, server) => {
 
   app.post("/git/stage", async (req, res) => {
     const { roomId, filePaths } = req.body;
+    if (!roomId || !Array.isArray(filePaths) || filePaths.length === 0) {
+      return res.status(400).json({ error: "roomId and filePaths required" });
+    }
+
     try {
       const git = getGit(roomId);
       await git.add(filePaths);
@@ -968,6 +1023,10 @@ const initAPI = (app, server) => {
 
   app.post("/git/unstage", async (req, res) => {
     const { roomId, filePaths } = req.body;
+    if (!roomId || !Array.isArray(filePaths) || filePaths.length === 0) {
+      return res.status(400).json({ error: "roomId and filePaths required" });
+    }
+
     try {
       const git = getGit(roomId);
       await git.reset(["HEAD", ...filePaths]);
@@ -979,6 +1038,10 @@ const initAPI = (app, server) => {
 
   app.post("/git/commit", async (req, res) => {
     const { roomId, message, authorName, authorEmail } = req.body;
+    if (!roomId || !String(message || "").trim()) {
+      return res.status(400).json({ error: "roomId and commit message required" });
+    }
+
     try {
       const git = getGit(roomId);
       if (authorName && authorEmail) {
@@ -1001,13 +1064,14 @@ const initAPI = (app, server) => {
 
     try {
       const git = getGit(roomId);
+      const savedRemoteUrl = normalizeGithubRemoteUrl(remoteUrl);
       const remotes = await git.getRemotes();
       if (remotes.find(r => r.name === "origin")) {
         await git.removeRemote("origin");
       }
-      await git.addRemote("origin", remoteUrl);
-      const savedRemoteUrl = (await git.remote(["get-url", "origin"])).trim();
-      res.json({ success: true, remoteUrl: savedRemoteUrl });
+      await git.addRemote("origin", savedRemoteUrl);
+      const currentRemoteUrl = (await git.remote(["get-url", "origin"])).trim();
+      res.json({ success: true, remoteUrl: currentRemoteUrl });
     } catch (err) {
       res.status(500).json({ error: simplifyGitError(err) });
     }
@@ -1025,8 +1089,8 @@ const initAPI = (app, server) => {
       const git = getGit(roomId);
 
       // Get current branch
-      const status = await git.status();
-      const currentBranch = status.current;
+      let status = await git.status();
+      const currentBranch = await resolveCurrentBranch(git);
 
       // If a commit message was provided, auto-stage all changes and commit first
       if (commitMessage && commitMessage.trim()) {
@@ -1040,6 +1104,7 @@ const initAPI = (app, server) => {
           await git.addConfig("user.name", authorName);
           await git.addConfig("user.email", authorEmail);
           await git.commit(commitMessage.trim());
+          status = await git.status();
         }
       }
 
@@ -1059,28 +1124,24 @@ const initAPI = (app, server) => {
         return res.status(400).json({ error: "No remote repository configured. Please connect to a GitHub repository first." });
       }
 
-      const authUrl = buildAuthenticatedGitHubUrl(remoteUrl, token, username);
-
-      // Temporarily swap origin to authenticated URL, push, then restore
+      // Temporarily update origin with auth, push, then restore the clean URL
       try {
-        await git.removeRemote("origin");
-        await git.addRemote("origin", authUrl);
-        await git.push(["-u", "origin", currentBranch]);
+        await withAuthenticatedOrigin(roomId, token, username, async ({ git: authedGit }) => {
+          await authedGit.push(["--set-upstream", "origin", currentBranch]);
+        });
       } catch (pushErr) {
-        if (pushErr.message.includes("rejected") || pushErr.message.includes("failed to push") || pushErr.message.includes("non-fast-forward")) {
+        const errMsg = pushErr.message.toLowerCase();
+        if (errMsg.includes("rejected") || errMsg.includes("failed to push") || errMsg.includes("non-fast-forward")) {
           return res.status(400).json({
             error: "Push rejected. The remote contains work you don't have locally. Try pulling first."
           });
         }
-        throw pushErr;
-      } finally {
-        // Always restore the clean (non-authenticated) remote URL
-        try {
-          await git.removeRemote("origin");
-          await git.addRemote("origin", remoteUrl);
-        } catch (_restoreErr) {
-          console.warn("[git/push] Failed to restore clean remote URL:", _restoreErr.message);
+        if (errMsg.includes("authentication") || errMsg.includes("fatal: could not read password")) {
+          return res.status(401).json({
+            error: "GitHub authentication failed. Check your PAT is valid and has push permissions."
+          });
         }
+        throw pushErr;
       }
 
       res.json({ success: true, message: `Pushed to ${currentBranch}` });
@@ -1102,8 +1163,7 @@ const initAPI = (app, server) => {
       const git = getGit(roomId);
 
       // Get current branch
-      const status = await git.status();
-      const currentBranch = status.current;
+      const currentBranch = await resolveCurrentBranch(git);
 
       // Get remote URL
       let remoteUrl;
@@ -1114,10 +1174,18 @@ const initAPI = (app, server) => {
         return res.status(400).json({ error: "No remote repository configured. Please connect to a GitHub repository first." });
       }
 
-      const authUrl = buildAuthenticatedGitHubUrl(remoteUrl, token, username);
+      const branchExists = await remoteBranchExists(roomId, token, currentBranch);
+      if (!branchExists) {
+        return res.status(400).json({
+          error: `Branch '${currentBranch}' does not exist on GitHub yet. Push this branch first.`
+        });
+      }
 
-      // Pull changes
-      await git.pull(authUrl, currentBranch, { "--no-rebase": null, "--allow-unrelated-histories": null });
+      // Pull changes through the authenticated origin URL, then restore the clean URL
+      await withAuthenticatedOrigin(roomId, token, username, async ({ git: authedGit }) => {
+        await authedGit.fetch("origin", currentBranch);
+        await authedGit.raw(["pull", "origin", currentBranch, "--no-rebase", "--allow-unrelated-histories"]);
+      });
 
       res.json({ success: true, message: `Pulled from ${currentBranch}` });
     } catch (err) {
