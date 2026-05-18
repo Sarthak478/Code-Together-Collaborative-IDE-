@@ -1,20 +1,30 @@
 import { motion } from "framer-motion"
-import { Cpu, Copy, PlayCircle, TerminalSquare, Cloud, X } from "lucide-react"
+import { Cpu, Copy, PlayCircle, TerminalSquare, Cloud, RefreshCw, X } from "lucide-react"
 
 export default function LocalAgentModal({
   isOpen,
   fileName,
   commands,
+  status,
   onClose,
   onOpenLocalAgent,
   onContinueInCloud,
   onRunLocalAgent,
+  onRefreshStatus,
   onCopyCommand,
   themeData
 }) {
   if (!isOpen) return null
 
   const { accent, textColor, panelBg, borderCol, inputBg } = themeData
+  const statusText = status?.connected
+    ? `Connected${status.agents?.[0]?.label ? ` to ${status.agents[0].label}` : ""}`
+    : status?.error
+      ? status.error
+      : status?.checking
+        ? "Checking Local Agent connection..."
+        : "Waiting for a Local Agent connection"
+  const statusColor = status?.connected ? "#a6e3a1" : status?.error ? "#f38ba8" : accent
 
   return (
     <div
@@ -91,6 +101,38 @@ export default function LocalAgentModal({
         </div>
 
         <div style={{ padding: 24, display: "grid", gap: 18 }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            padding: 14,
+            borderRadius: 16,
+            background: "rgba(255,255,255,0.03)",
+            border: `1px solid ${borderCol}`
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+              <div style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                background: statusColor,
+                boxShadow: `0 0 12px ${statusColor}66`,
+                flexShrink: 0
+              }} />
+              <div style={{ fontSize: 12, color: textColor, opacity: 0.86, lineHeight: 1.5 }}>
+                {statusText}
+              </div>
+            </div>
+            <button
+              onClick={onRefreshStatus}
+              className="ide-btn-premium"
+              style={{ background: "transparent", color: textColor, border: `1px solid ${borderCol}`, flexShrink: 0 }}
+            >
+              <RefreshCw size={14} /> Refresh
+            </button>
+          </div>
+
           <div style={{
             display: "grid",
             gap: 12,
@@ -179,13 +221,20 @@ export default function LocalAgentModal({
             flexWrap: "wrap"
           }}>
             <div style={{ fontSize: 12, opacity: 0.65, color: textColor }}>
-              Recommended path: copy the Windows command, start it locally, then click Run On Local Agent.
+              Recommended path: copy the Windows command, start it locally, wait for Connected, then click Run On Local Agent.
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button
                 onClick={onRunLocalAgent}
                 className="ide-btn-premium"
-                style={{ background: accent, color: "#1e1e2e", border: "none" }}
+                disabled={!status?.connected}
+                style={{
+                  background: status?.connected ? accent : "rgba(255,255,255,0.08)",
+                  color: status?.connected ? "#1e1e2e" : textColor,
+                  border: "none",
+                  opacity: status?.connected ? 1 : 0.6,
+                  cursor: status?.connected ? "pointer" : "not-allowed"
+                }}
               >
                 <PlayCircle size={14} /> Run On Local Agent
               </button>

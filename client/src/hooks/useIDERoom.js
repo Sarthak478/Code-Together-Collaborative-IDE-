@@ -171,6 +171,12 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     fileName: "",
     language: "python"
   })
+  const [localAgentStatus, setLocalAgentStatus] = useState({
+    checking: false,
+    connected: false,
+    agents: [],
+    error: ""
+  })
   const lastToastId = useRef(null)
 
   const refreshGitStatus = useCallback(async () => {
@@ -196,6 +202,33 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
 
   const localAgentCommands = useMemo(() => getLocalAgentCommandOptions(roomId), [roomId])
 
+  const refreshLocalAgentStatus = useCallback(async () => {
+    if (!roomId) return
+
+    setLocalAgentStatus(prev => ({ ...prev, checking: true, error: "" }))
+    try {
+      const res = await fetch(`${API_URL}/local-agent/status?roomId=${encodeURIComponent(roomId)}`)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data.error || "Local Agent status is unavailable.")
+      }
+
+      setLocalAgentStatus({
+        checking: false,
+        connected: !!data.connected,
+        agents: Array.isArray(data.agents) ? data.agents : [],
+        error: ""
+      })
+    } catch (err) {
+      setLocalAgentStatus({
+        checking: false,
+        connected: false,
+        agents: [],
+        error: err.message || "Could not reach the Local Agent status endpoint."
+      })
+    }
+  }, [roomId])
+
   const closeLocalAgentPrompt = useCallback(() => {
     setLocalAgentPrompt(prev => ({ ...prev, open: false }))
   }, [])
@@ -214,7 +247,19 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       localAgentCommands[0]?.command || getLocalAgentFallbackText(roomId),
       "Local Agent starter command copied."
     )
-  }, [copyLocalAgentCommand, localAgentCommands, roomId])
+    refreshLocalAgentStatus()
+  }, [copyLocalAgentCommand, localAgentCommands, refreshLocalAgentStatus, roomId])
+
+  useEffect(() => {
+    if (!localAgentPrompt.open) return
+
+    refreshLocalAgentStatus()
+    const timer = setInterval(() => {
+      refreshLocalAgentStatus()
+    }, 2500)
+
+    return () => clearInterval(timer)
+  }, [localAgentPrompt.open, refreshLocalAgentStatus])
 
   /* ── Personal UI ── */
   const [personalPrefs, setPersonalPrefs] = useState(() => {
@@ -616,6 +661,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
 
       if (!res.ok || !data.success) {
         addToast(data.error || "Start the Local Agent command first, then try again.")
+        refreshLocalAgentStatus()
         return
       }
 
@@ -624,7 +670,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     } catch (_err) {
       addToast("Could not reach the Local Agent coordinator.")
     }
-  }, [canRun, activeFile, activeFileEntry, activeYText, fs, roomId, editor.username, activeLanguage, addToast, closeLocalAgentPrompt])
+  }, [canRun, activeFile, activeFileEntry, activeYText, fs, roomId, editor.username, activeLanguage, addToast, closeLocalAgentPrompt, refreshLocalAgentStatus])
 
   const syncFilesToTerminal = useCallback(async () => {
     try {
@@ -824,6 +870,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     toasts,
     localAgentPrompt,
     localAgentCommands,
+    localAgentStatus,
     // Users
     activeUsers, visibleActiveUsersList, hostName, restrictedUsers,
     // Chat
@@ -833,7 +880,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     runCode, syncFilesToTerminal, downloadCode, saveCode, sendChat, kickUser, restrictUser, unrestrictUser,
     refreshGitStatus,
     refreshWorkspaceFromDisk,
-    closeLocalAgentPrompt, copyLocalAgentCommand, openLocalAgent, continueRunInCloud, runOnLocalAgent,
+    closeLocalAgentPrompt, copyLocalAgentCommand, openLocalAgent, continueRunInCloud, runOnLocalAgent, refreshLocalAgentStatus,
     onLeave, updatePersonalPref, pushRoomUI, clearRoomUI,
     onToggleChatEnabled, onToggleShowUsers, onSetRoomTheme,
     setOutput, addToast
@@ -860,13 +907,14 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     toasts,
     localAgentPrompt,
     localAgentCommands,
+    localAgentStatus,
     activeUsers, visibleActiveUsersList, hostName, restrictedUsers,
     chatEnabled, showUsersList, visibleChatMsgs,
     chatInput, chatTarget,
     runCode, syncFilesToTerminal, downloadCode, saveCode, sendChat, kickUser, restrictUser, unrestrictUser,
     refreshGitStatus,
     refreshWorkspaceFromDisk,
-    closeLocalAgentPrompt, copyLocalAgentCommand, openLocalAgent, continueRunInCloud, runOnLocalAgent,
+    closeLocalAgentPrompt, copyLocalAgentCommand, openLocalAgent, continueRunInCloud, runOnLocalAgent, refreshLocalAgentStatus,
     onLeave, updatePersonalPref, pushRoomUI, clearRoomUI,
     onToggleChatEnabled, onToggleShowUsers, onSetRoomTheme,
     addToast

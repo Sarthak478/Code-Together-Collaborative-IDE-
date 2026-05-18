@@ -1,5 +1,12 @@
 services:
   - type: web
+    name: code-together-collaborative-ide
+    runtime: node
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+  - type: web
     name: codetogether-frontend
     runtime: static
     buildCommand: cd client && npm install && npm run build

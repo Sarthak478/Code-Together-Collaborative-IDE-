@@ -91,10 +91,12 @@ export default function IDERoom(props) {
         isOpen={ide.localAgentPrompt.open}
         fileName={ide.localAgentPrompt.fileName}
         commands={ide.localAgentCommands}
+        status={ide.localAgentStatus}
         onClose={ide.closeLocalAgentPrompt}
         onOpenLocalAgent={ide.openLocalAgent}
         onContinueInCloud={ide.continueRunInCloud}
         onRunLocalAgent={ide.runOnLocalAgent}
+        onRefreshStatus={ide.refreshLocalAgentStatus}
         onCopyCommand={ide.copyLocalAgentCommand}
         themeData={{ accent: ide.accent, textColor: ide.textColor, panelBg: ide.panelBg, borderCol: ide.borderCol, inputBg: ide.inputBg }}
       />

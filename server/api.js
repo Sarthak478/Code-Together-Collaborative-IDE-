@@ -720,6 +720,14 @@ const initAPI = (app, server) => {
     res.sendFile(join(__dirname, "local-agent.py"));
   });
 
+  app.get("/health", (_req, res) => {
+    res.json({
+      success: true,
+      service: "backend",
+      timestamp: Date.now()
+    });
+  });
+
   app.get("/local-agent/status", (req, res) => {
     const { roomId } = req.query;
     if (!roomId) {
