@@ -95,6 +95,40 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHos
     } catch (e) { console.error("Content fetch block:", e) }
   }, [roomId, getFileText, ydoc])
 
+  const reloadFileContentFromDisk = useCallback(async (filePath) => {
+    if (!filePath) return
+
+    const ytext = getFileText(filePath)
+
+    try {
+      const resp = await fetch(`${API_URL}/content?roomId=${roomId}&path=${encodeURIComponent(filePath)}`)
+
+      if (resp.status === 404) {
+        if (ytext.length > 0) {
+          ydoc.transact(() => {
+            ytext.delete(0, ytext.length)
+          })
+        }
+        return
+      }
+
+      if (!resp.ok) return
+
+      const content = await resp.text()
+      const nextContent = content || ""
+      const currentContent = ytext.toString()
+
+      if (currentContent === nextContent) return
+
+      ydoc.transact(() => {
+        if (ytext.length > 0) ytext.delete(0, ytext.length)
+        if (nextContent) ytext.insert(0, nextContent)
+      })
+    } catch (e) {
+      console.error("Content reload block:", e)
+    }
+  }, [roomId, getFileText, ydoc])
+
   /* Save Yjs text back to Disk via REST */
   const saveFileToDisk = useCallback(async (filePath, forcedContent = null) => {
     const content = forcedContent !== null ? forcedContent : getFileText(filePath).toString()
@@ -345,6 +379,7 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHos
     getFileText,
     getFileContent,
     fetchFileContentToYjs,
+    reloadFileContentFromDisk,
     saveFileToDisk,
     refreshPath,
     getAllFiles,
@@ -363,6 +398,7 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHos
     getFileText,
     getFileContent,
     fetchFileContentToYjs,
+    reloadFileContentFromDisk,
     saveFileToDisk,
     refreshPath,
     getAllFiles,

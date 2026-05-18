@@ -266,25 +266,30 @@ const initAPI = (app, server) => {
     const pendingChanges = new Set();
     let notifyTimeout = null;
 
-    const notifyChange = (filePath) => {
+    const notifyChange = (filePath, eventType = "change") => {
       let rel = relative(roomCwd, filePath).replace(/\\/g, "/");
       if (!rel.startsWith("/")) rel = "/" + rel;
       const parentPath = dirname(rel).replace(/\\/g, "/");
       const safeParent = (parentPath === "." || parentPath === "/") ? "/" : parentPath;
 
-      pendingChanges.add(safeParent);
+      pendingChanges.add(JSON.stringify({
+        path: rel,
+        parentPath: safeParent,
+        eventType
+      }));
 
       if (!notifyTimeout) {
         notifyTimeout = setTimeout(() => {
-          const paths = Array.from(pendingChanges);
+          const events = Array.from(pendingChanges).map(value => JSON.parse(value));
           pendingChanges.clear();
           notifyTimeout = null;
 
-          for (const p of paths) {
+          for (const event of events) {
             broadcast(roomId, {
               type: "fs:changed",
-              path: p,
-              parentPath: p
+              path: event.path,
+              parentPath: event.parentPath,
+              eventType: event.eventType
             });
           }
         }, 500);
@@ -292,10 +297,11 @@ const initAPI = (app, server) => {
     };
 
     watcher
-      .on("add", notifyChange)
-      .on("addDir", notifyChange)
-      .on("unlink", notifyChange)
-      .on("unlinkDir", notifyChange);
+      .on("add", (filePath) => notifyChange(filePath, "add"))
+      .on("addDir", (filePath) => notifyChange(filePath, "addDir"))
+      .on("change", (filePath) => notifyChange(filePath, "change"))
+      .on("unlink", (filePath) => notifyChange(filePath, "unlink"))
+      .on("unlinkDir", (filePath) => notifyChange(filePath, "unlinkDir"));
   }
 
 
@@ -1044,10 +1050,22 @@ const initAPI = (app, server) => {
 
     try {
       const git = getGit(roomId);
+      const status = await git.status();
+      const hasChanges = status.modified.length > 0 || status.not_added.length > 0 || status.deleted.length > 0 || status.staged.length > 0;
+
+      if (!hasChanges) {
+        return res.status(400).json({ error: "No changes available to commit." });
+      }
+
       if (authorName && authorEmail) {
         await git.addConfig("user.name", authorName);
         await git.addConfig("user.email", authorEmail);
       }
+
+      if (status.modified.length > 0 || status.not_added.length > 0 || status.deleted.length > 0) {
+        await git.add(".");
+      }
+
       await git.commit(message);
       res.json({ success: true });
     } catch (err) {

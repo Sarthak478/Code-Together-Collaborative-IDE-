@@ -447,6 +447,7 @@ export default function IDERoom(props) {
                     gitStatus={ide.gitStatus}
                     isGitLoading={ide.isGitLoading}
                     onRefresh={ide.refreshGitStatus}
+                    onWorkspaceSync={ide.refreshWorkspaceFromDisk}
                     onViewDiff={(path, staged) => setActiveDiff({ path, staged })}
                     username={ide.editor.username}
                     personalPrefs={ide.personalPrefs}

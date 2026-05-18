@@ -297,6 +297,17 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
         } else if (data.type === "fs:changed") {
           console.log(`[IDE Room] Received fs:changed for path ${data.path}. Refreshing parent ${data.parentPath}`)
           fs.refreshPath(data.parentPath)
+          if (data.eventType === "change" || data.eventType === "add") {
+            fs.reloadFileContentFromDisk?.(data.path)
+          }
+          if (data.eventType === "unlink") {
+            const ytext = fs.getFileText?.(data.path)
+            if (ytext && ytext.length > 0) {
+              editor.ydoc.transact(() => {
+                ytext.delete(0, ytext.length)
+              })
+            }
+          }
         }
       } catch (_err) { /* ignored */ }
     }
@@ -557,6 +568,23 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     }
   }, [activeFile, fs, addToast])
 
+  const refreshWorkspaceFromDisk = useCallback(async () => {
+    const loadedPaths = Object.keys(fs.tree || {})
+    const pathsToRefresh = Array.from(new Set(["/", ...loadedPaths]))
+    const filePathsToReload = Array.from(
+      new Set([
+        ...openFiles,
+        ...fs.getAllFiles().map(file => file.path)
+      ])
+    )
+
+    pathsToRefresh.forEach((path) => fs.refreshPath(path))
+
+    await Promise.all(
+      filePathsToReload.map((filePath) => fs.reloadFileContentFromDisk?.(filePath))
+    )
+  }, [fs, openFiles])
+
   /* ── Download ── */
   const downloadCode = useCallback(async (e) => {
     e.preventDefault()
@@ -702,6 +730,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     // Actions
     runCode, syncFilesToTerminal, downloadCode, saveCode, sendChat, kickUser, restrictUser, unrestrictUser,
     refreshGitStatus,
+    refreshWorkspaceFromDisk,
     onLeave, updatePersonalPref, pushRoomUI, clearRoomUI,
     onToggleChatEnabled, onToggleShowUsers, onSetRoomTheme,
     setOutput, addToast
@@ -731,6 +760,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     chatInput, chatTarget,
     runCode, syncFilesToTerminal, downloadCode, saveCode, sendChat, kickUser, restrictUser, unrestrictUser,
     refreshGitStatus,
+    refreshWorkspaceFromDisk,
     onLeave, updatePersonalPref, pushRoomUI, clearRoomUI,
     onToggleChatEnabled, onToggleShowUsers, onSetRoomTheme,
     addToast

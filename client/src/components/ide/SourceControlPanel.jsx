@@ -41,7 +41,8 @@ export default function SourceControlPanel({
   username,
   personalPrefs,
   onOpenSettings,
-  onViewDiff
+  onViewDiff,
+  onWorkspaceSync
 }) {
   const [commitMessage, setCommitMessage] = useState("")
   const [isCommitting, setIsCommitting] = useState(false)
@@ -93,6 +94,9 @@ export default function SourceControlPanel({
 
   const githubPat = personalPrefs?.githubPat?.trim() || ""
   const hasPat = !!githubPat
+  const hasUnstagedChanges = !!gitStatus && (gitStatus.modified.length > 0 || gitStatus.not_added.length > 0 || gitStatus.deleted.length > 0)
+  const hasStagedChanges = !!gitStatus && gitStatus.staged.length > 0
+  const hasAnyChanges = hasUnstagedChanges || hasStagedChanges
 
   const handleInit = async () => {
     if (!hasPat) {
@@ -228,11 +232,6 @@ export default function SourceControlPanel({
       setSyncError("Please enter a commit message before pushing. All changes will be committed automatically.")
       return
     }
-    if (!localTestConfirmed) {
-      setSyncError("Hybrid mode active: test locally first, then tick the confirmation before pushing.")
-      return
-    }
-
     setIsSyncing(true)
     setSyncError("")
     setSyncSuccess("")
@@ -258,6 +257,7 @@ export default function SourceControlPanel({
       setSyncSuccess("✓ Successfully pushed to GitHub")
       setCommitMessage("")
       setTimeout(() => setSyncSuccess(""), 3000)
+      await onWorkspaceSync?.()
       await refreshGitStatus()
       onRefresh?.()
     } catch (e) {
@@ -298,6 +298,7 @@ export default function SourceControlPanel({
 
       setSyncSuccess("✓ Successfully pulled from GitHub")
       setTimeout(() => setSyncSuccess(""), 3000)
+      await onWorkspaceSync?.()
       await refreshGitStatus()
       onRefresh?.()
     } catch (e) {
@@ -347,7 +348,10 @@ export default function SourceControlPanel({
   }
 
   const handleCommit = async () => {
-    if (!commitMessage.trim()) return
+    if (!commitMessage.trim()) {
+      setSyncError("Enter a commit message first.")
+      return
+    }
     setIsCommitting(true)
     try {
       const res = await fetch(`${API_URL}/git/commit`, {
@@ -365,6 +369,8 @@ export default function SourceControlPanel({
         throw new Error(data.error || "Commit failed")
       }
       setCommitMessage("")
+      setSyncSuccess(hasUnstagedChanges ? "âœ“ Changes staged and committed" : "âœ“ Commit created")
+      setTimeout(() => setSyncSuccess(""), 3000)
       await refreshGitStatus()
       onRefresh?.()
     } catch (e) {
@@ -405,7 +411,6 @@ export default function SourceControlPanel({
   }
 
   const changesCount = gitStatus.modified.length + gitStatus.not_added.length + gitStatus.deleted.length
-  const hasStaged = gitStatus.staged.length > 0
   const hasRemote = !!gitStatus.remoteUrl
 
   return (
@@ -414,7 +419,13 @@ export default function SourceControlPanel({
         <div style={{ fontWeight: 800, fontSize: 13, textTransform: "uppercase", opacity: 0.8, letterSpacing: "0.5px", display: "flex", alignItems: "center", gap: 10 }}>
           <GitBranch size={16} color={accent} /> Source Control
         </div>
-        <button onClick={onRefresh} style={{ background: "transparent", border: "none", cursor: "pointer", color: textColor, opacity: 0.4 }}>
+        <button
+          onClick={async () => {
+            await refreshGitStatus()
+            await onRefresh?.()
+          }}
+          style={{ background: "transparent", border: "none", cursor: "pointer", color: textColor, opacity: 0.4 }}
+        >
           <RefreshCw size={14} className={isGitLoading || isSyncing ? "ide-icon-pulse" : ""} />
         </button>
       </div>
@@ -572,14 +583,14 @@ export default function SourceControlPanel({
             <motion.button
               initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
               onClick={handleCommit}
-              disabled={isCommitting || !hasStaged}
+              disabled={isCommitting || !hasAnyChanges}
               style={{
                 position: "absolute", bottom: 10, right: 10,
-                background: hasStaged ? accent : "rgba(255,255,255,0.05)",
-                color: hasStaged ? "#1e1e2e" : textColor,
+                background: hasAnyChanges ? accent : "rgba(255,255,255,0.05)",
+                color: hasAnyChanges ? "#1e1e2e" : textColor,
                 border: "none", padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 800,
-                cursor: hasStaged ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: 6,
-                boxShadow: hasStaged ? `0 4px 12px ${accent}44` : "none"
+                cursor: hasAnyChanges ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: 6,
+                boxShadow: hasAnyChanges ? `0 4px 12px ${accent}44` : "none"
               }}
             >
               {isCommitting ? <RefreshCw size={12} className="ide-icon-pulse" /> : <GitCommit size={14} />}
@@ -763,7 +774,7 @@ export default function SourceControlPanel({
                   onChange={e => setLocalTestConfirmed(e.target.checked)}
                   style={{ accentColor: accent }}
                 />
-                I tested on local server (hybrid mode)
+                I tested on local server (recommended)
               </label>
               <div style={{ display: "flex", gap: 8 }}>
               <button
@@ -780,12 +791,12 @@ export default function SourceControlPanel({
               </button>
               <button
                 onClick={handlePush}
-                disabled={isSyncing || !localTestConfirmed}
+                disabled={isSyncing}
                 className="ide-btn-premium"
                 style={{
                   flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                   background: accent, border: "none", color: "#1e1e2e", padding: "8px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
-                  cursor: isSyncing || !localTestConfirmed ? "not-allowed" : "pointer", opacity: isSyncing || !localTestConfirmed ? 0.6 : 1
+                  cursor: isSyncing ? "not-allowed" : "pointer", opacity: isSyncing ? 0.6 : 1
                 }}
               >
                 <Upload size={14} /> Push
