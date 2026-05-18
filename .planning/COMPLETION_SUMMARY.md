@@ -31,14 +31,14 @@
 #### 5️⃣ Terminal Scrolling (TerminalPanel.jsx)
 - Added `setTimeout(scrollToBottom, 0)` for microtask scheduling
 - Applied to data output, exit messages, errors
-- Status: ✅ COMPLETE
+- Status: ✅ COMPLETED
 
 #### 6️⃣ User Presence Indicators (IDERoom.jsx)
 - Green pulsing active status dot
 - File name tooltips ("@user - file.ext")
 - Hover animations with scale effect
 - Visual distinction for same-file editing
-- Status: ✅ COMPLETE
+- Status: ✅ COMPLETED
 
 ---
 
