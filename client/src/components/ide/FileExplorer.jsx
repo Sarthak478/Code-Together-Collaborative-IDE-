@@ -33,19 +33,94 @@ function getBadgeMeta(name) {
   return FILE_BADGES[ext] || DEFAULT_FILE_BADGE
 }
 
+const DEVICON_MAP = {
+  py: "python",
+  pyw: "python",
+  js: "javascript",
+  mjs: "javascript",
+  cjs: "javascript",
+  jsx: "react",
+  ts: "typescript",
+  tsx: "react",
+  c: "c",
+  h: "c",
+  cpp: "cplusplus",
+  cc: "cplusplus",
+  cxx: "cplusplus",
+  hpp: "cplusplus",
+  java: "java",
+  kt: "kotlin",
+  rs: "rust",
+  go: "go",
+  php: "php",
+  rb: "ruby",
+  swift: "swift",
+  scala: "scala",
+  sh: "bash",
+  bash: "bash",
+  zsh: "bash",
+  ps1: "powershell",
+  html: "html5",
+  htm: "html5",
+  css: "css3",
+  scss: "sass",
+  sass: "sass",
+  less: "less",
+  vue: "vuejs",
+  svelte: "svelte",
+  astro: "astro",
+  json: "json",
+  yml: "yaml",
+  yaml: "yaml",
+  xml: "xml",
+  md: "markdown",
+  dockerfile: "docker",
+  sql: "mysql",
+  sqlite: "sqlite",
+}
+
+function getDeviconMeta(name) {
+  const lower = String(name || "").toLowerCase()
+  const baseName = lower.split("/").pop() || lower
+
+  if (baseName === "dockerfile") {
+    return { icon: "docker", variant: "original" }
+  }
+
+  const ext = baseName.includes(".") ? (baseName.split(".").pop() || "") : baseName
+  const mapped = DEVICON_MAP[ext]
+  if (!mapped) return null
+
+  const variant =
+    mapped === "json" ||
+    mapped === "yaml" ||
+    mapped === "markdown" ||
+    mapped === "xml"
+      ? "plain"
+      : "original"
+
+  return { icon: mapped, variant }
+}
+
 function ExtensionBadge({ name }) {
   const badge = getBadgeMeta(name)
+  const devicon = getDeviconMeta(name)
+  const [imageFailed, setImageFailed] = useState(false)
+  const iconUrl = devicon
+    ? `https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/${devicon.icon}/${devicon.icon}-${devicon.variant}.svg`
+    : null
+
   return (
     <span
       style={{
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        minWidth: 28,
-        height: 18,
-        padding: "0 6px",
-        borderRadius: 999,
-        fontSize: 9,
+        width: 22,
+        height: 22,
+        padding: 0,
+        borderRadius: 7,
+        fontSize: 8,
         fontWeight: 800,
         letterSpacing: "0.04em",
         color: badge.color,
@@ -53,8 +128,20 @@ function ExtensionBadge({ name }) {
         border: `1px solid ${badge.color}33`,
         flexShrink: 0,
       }}
+      title={name}
     >
-      {badge.label}
+      {iconUrl && !imageFailed ? (
+        <img
+          src={iconUrl}
+          alt=""
+          width={14}
+          height={14}
+          style={{ display: "block" }}
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        badge.label
+      )}
     </span>
   )
 }
@@ -764,7 +851,7 @@ function FileItem({ file, isActive, onClick, textColor, accent, depth, canEdit, 
         transition: "all 0.15s ease", height: 30, boxSizing: "border-box", cursor: "pointer"
       }}
     >
-      {getFileIcon ? getFileIcon(file.name) : <ExtensionBadge name={file.name} />}
+      <ExtensionBadge name={file.name} />
       <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, fontFamily: "'Manrope', sans-serif" }}>
         {file.name}
       </span>

@@ -32,22 +32,51 @@ const hasLocalComputeTrigger = (language, code) => {
   return LOCAL_AGENT_TRIGGERS.some(trigger => normalized.includes(trigger))
 }
 
-const getLocalAgentLaunchUrl = (roomId) => {
-  const params = new URLSearchParams({
-    room: roomId,
-    server: API_URL,
-  })
-  return `liveshare://connect?${params.toString()}`
+const getLocalAgentBootstrapCommand = (pythonCommand, roomId) => {
+  const serverUrl = API_URL.replace(/\/$/, "")
+  const scriptUrl = `${serverUrl}/local-agent.py`
+  const escapePythonString = (value) => String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'")
+  const bootstrap = [
+    "import pathlib,tempfile,urllib.request,runpy,sys",
+    "p=pathlib.Path(tempfile.gettempdir())/'liveshare-agent.py'",
+    `urllib.request.urlretrieve('${escapePythonString(scriptUrl)}', p)`,
+    `sys.argv=['liveshare-agent.py','--room','${escapePythonString(roomId)}','--server','${escapePythonString(serverUrl)}']`,
+    "runpy.run_path(str(p), run_name='__main__')"
+  ].join("; ")
+
+  return `${pythonCommand} -c "${bootstrap}"`
 }
 
 const getLocalAgentFallbackText = (roomId) => [
-  "If the one-click Local Agent link does not open, use one of these:",
+  "Use one of these commands in your own terminal. No npm install or pip package is required.",
   "",
-  `Python/pipx: pipx run liveshare-agent connect --room ${roomId} --server ${API_URL}`,
-  `Python module: python -m liveshare_agent connect --room ${roomId} --server ${API_URL}`,
-  `Node/npm: npx liveshare-agent connect --room ${roomId} --server ${API_URL}`,
-  `Docker: docker run --rm -it liveshare/agent connect --room ${roomId} --server ${API_URL}`,
+  getLocalAgentBootstrapCommand("py -3", roomId),
+  "",
+  getLocalAgentBootstrapCommand("python3", roomId),
+  "",
+  getLocalAgentBootstrapCommand("python", roomId),
 ].join("\n")
+
+const getLocalAgentCommandOptions = (roomId) => ([
+  {
+    id: "windows-python",
+    title: "Windows Python Launcher",
+    description: "Best for Windows users who have the py launcher installed.",
+    command: getLocalAgentBootstrapCommand("py -3", roomId),
+  },
+  {
+    id: "python3",
+    title: "Python 3",
+    description: "Best for macOS, Linux, and many Python-first setups.",
+    command: getLocalAgentBootstrapCommand("python3", roomId),
+  },
+  {
+    id: "python",
+    title: "Python",
+    description: "Use this if your system exposes Python as python.",
+    command: getLocalAgentBootstrapCommand("python", roomId),
+  },
+])
 
 export default function useIDERoom({ roomId, initialRoomType, isCreating, username, onLeave }) {
   /* ── Yjs stable refs ── */
@@ -137,6 +166,11 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   const [interviewTime, setInterviewTime] = useState(0) // Shared timer
   const [isSyncingFile, setIsSyncingFile] = useState(false)
   const [isPersistenceSynced, setIsPersistenceSynced] = useState(false)
+  const [localAgentPrompt, setLocalAgentPrompt] = useState({
+    open: false,
+    fileName: "",
+    language: "python"
+  })
   const lastToastId = useRef(null)
 
   const refreshGitStatus = useCallback(async () => {
@@ -159,6 +193,28 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     setToasts(prev => [...prev, { id, text: msgText }])
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
   }, [])
+
+  const localAgentCommands = useMemo(() => getLocalAgentCommandOptions(roomId), [roomId])
+
+  const closeLocalAgentPrompt = useCallback(() => {
+    setLocalAgentPrompt(prev => ({ ...prev, open: false }))
+  }, [])
+
+  const copyLocalAgentCommand = useCallback(async (command, successMessage = "Local Agent command copied.") => {
+    try {
+      await navigator.clipboard?.writeText(command)
+      addToast(successMessage)
+    } catch (_err) {
+      addToast("Unable to copy automatically. You can still copy it from the dialog.")
+    }
+  }, [addToast])
+
+  const openLocalAgent = useCallback(async () => {
+    await copyLocalAgentCommand(
+      localAgentCommands[0]?.command || getLocalAgentFallbackText(roomId),
+      "Local Agent starter command copied."
+    )
+  }, [copyLocalAgentCommand, localAgentCommands, roomId])
 
   /* ── Personal UI ── */
   const [personalPrefs, setPersonalPrefs] = useState(() => {
@@ -456,16 +512,24 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   }, [fs.version, openFiles.length, fs, openFile])
 
   /* ── Run code (runs active file) ── */
-  const runCode = useCallback(async () => {
+  const runCode = useCallback(async ({ bypassLocalAgentPrompt = false } = {}) => {
     if (!canRun || !activeFile || !activeFileEntry) return
+
+    const code = activeYText?.toString() || ""
+    if (!bypassLocalAgentPrompt && hasLocalComputeTrigger(activeLanguage, code)) {
+      setLocalAgentPrompt({
+        open: true,
+        fileName: activeFileEntry.name,
+        language: activeLanguage
+      })
+      return
+    }
+    if (!code.trim()) { addToast("⚠️ Cannot run an empty file."); return }
 
     editor.chatArray.push([{
       id: Date.now().toString() + Math.random(),
       sender: editor.username, target: "all", text: "", type: "system", timestamp: Date.now()
     }])
-
-    const code = activeYText?.toString() || ""
-    if (!code.trim()) { addToast("⚠️ Cannot run an empty file."); return }
 
     if (activeLanguage === "html" || activeLanguage === "markdown") {
       setPreviewOpen(true)
@@ -483,29 +547,6 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       // For backend files (Python, Node, etc), open terminal
       setTerminalOpen(true)
       addToast(`⌨️ Running ${activeLanguage} file in Terminal`)
-    }
-
-    // Intercept heavy local workloads before sending them to the cloud terminal.
-    if (hasLocalComputeTrigger(activeLanguage, code)) {
-      const fallbackText = getLocalAgentFallbackText(roomId)
-      const openLocal = window.confirm(
-        "Heavy local compute detected.\n\n" +
-        "This file imports ML/CV libraries that can overload the cloud runner. " +
-        "Use your own system through the Local Agent instead.\n\n" +
-        "Press OK to open the Local Agent connector on this computer.\n" +
-        "Press Cancel to continue running on the cloud.\n\n" +
-        fallbackText
-      )
-
-      if (openLocal) {
-        try {
-          await navigator.clipboard?.writeText(fallbackText)
-          addToast("Local Agent fallback commands copied.")
-        } catch (_err) { /* ignored */ }
-
-        window.location.href = getLocalAgentLaunchUrl(roomId)
-        return
-      }
     }
 
     try {
@@ -538,6 +579,53 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   }, [canRun, activeFile, activeFileEntry, activeYText, roomId, activeLanguage, editor, fs, addToast])
 
   /* ── Sync Files (No Execution) ── */
+  const continueRunInCloud = useCallback(async () => {
+    closeLocalAgentPrompt()
+    await runCode({ bypassLocalAgentPrompt: true })
+  }, [closeLocalAgentPrompt, runCode])
+
+  const runOnLocalAgent = useCallback(async () => {
+    if (!canRun || !activeFile || !activeFileEntry) return
+
+    const code = activeYText?.toString() || ""
+    if (!code.trim()) {
+      addToast("Cannot run an empty file.")
+      return
+    }
+
+    try {
+      const allFiles = fs.getAllFiles().map(f => ({
+        path: f.path,
+        content: fs.getFileContent(f.path)
+      }))
+
+      setTerminalOpen(true)
+
+      const res = await fetch(`${API_URL}/local-agent/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomId,
+          userId: editor.username,
+          files: allFiles,
+          activeFile: activeFileEntry,
+          language: activeLanguage
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok || !data.success) {
+        addToast(data.error || "Start the Local Agent command first, then try again.")
+        return
+      }
+
+      closeLocalAgentPrompt()
+      addToast("Queued on your Local Agent. Keep that terminal open.")
+    } catch (_err) {
+      addToast("Could not reach the Local Agent coordinator.")
+    }
+  }, [canRun, activeFile, activeFileEntry, activeYText, fs, roomId, editor.username, activeLanguage, addToast, closeLocalAgentPrompt])
+
   const syncFilesToTerminal = useCallback(async () => {
     try {
       // ✅ Fixed: use fs.getFileContent (returns string) instead of fs.getFileContent (was undefined)
@@ -555,6 +643,18 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       console.error("Failed to silently sync files to terminal")
     }
   }, [fs, roomId])
+
+  const toggleTerminal = useCallback(() => {
+    setTerminalOpen(prev => {
+      const next = !prev
+      if (next) {
+        setTimeout(() => {
+          syncFilesToTerminal()
+        }, 0)
+      }
+      return next
+    })
+  }, [syncFilesToTerminal])
 
 
   /* ── Save Active File To Disk ── */
@@ -698,7 +798,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     openFiles, activeFile, activeFileEntry, activeLanguage, activeYText,
     openFile, closeFile,
     // Terminal
-    terminalOpen, setTerminalOpen, terminalHeight, setTerminalHeight,
+    terminalOpen, setTerminalOpen, terminalHeight, setTerminalHeight, toggleTerminal,
     // Right panel
     rightPanel, toggleRightPanel,
     previewOpen, setPreviewOpen,
@@ -722,6 +822,8 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     callActive, setCallActive,
     peerId, setPeerId,
     toasts,
+    localAgentPrompt,
+    localAgentCommands,
     // Users
     activeUsers, visibleActiveUsersList, hostName, restrictedUsers,
     // Chat
@@ -731,6 +833,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     runCode, syncFilesToTerminal, downloadCode, saveCode, sendChat, kickUser, restrictUser, unrestrictUser,
     refreshGitStatus,
     refreshWorkspaceFromDisk,
+    closeLocalAgentPrompt, copyLocalAgentCommand, openLocalAgent, continueRunInCloud, runOnLocalAgent,
     onLeave, updatePersonalPref, pushRoomUI, clearRoomUI,
     onToggleChatEnabled, onToggleShowUsers, onSetRoomTheme,
     setOutput, addToast
@@ -738,7 +841,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     editor, onEditorMount, monacoTheme, monacoOptions, fs,
     openFiles, activeFile, activeFileEntry, activeLanguage, activeYText,
     openFile, closeFile,
-    terminalOpen, terminalHeight,
+    terminalOpen, terminalHeight, toggleTerminal,
     rightPanel, toggleRightPanel,
     previewOpen,
     roomId, actualRoomType, output, runner,
@@ -755,12 +858,15 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     callActive,
     peerId,
     toasts,
+    localAgentPrompt,
+    localAgentCommands,
     activeUsers, visibleActiveUsersList, hostName, restrictedUsers,
     chatEnabled, showUsersList, visibleChatMsgs,
     chatInput, chatTarget,
     runCode, syncFilesToTerminal, downloadCode, saveCode, sendChat, kickUser, restrictUser, unrestrictUser,
     refreshGitStatus,
     refreshWorkspaceFromDisk,
+    closeLocalAgentPrompt, copyLocalAgentCommand, openLocalAgent, continueRunInCloud, runOnLocalAgent,
     onLeave, updatePersonalPref, pushRoomUI, clearRoomUI,
     onToggleChatEnabled, onToggleShowUsers, onSetRoomTheme,
     addToast

@@ -265,7 +265,10 @@ export default function SettingsPanel({
                             </a>
                           )}
                         </div>
-                        <div style={{ fontSize: 10, opacity: 0.5, marginBottom: 8 }}>Personal Access Token (PAT)</div>
+                        <div style={{ fontSize: 10, opacity: 0.5, marginBottom: 4 }}>Personal Access Token (PAT)</div>
+                        <div style={{ fontSize: 9, opacity: 0.45, marginBottom: 8, lineHeight: 1.4 }}>
+                          PATs are kept only in current room memory and are removed from browser storage automatically.
+                        </div>
 
                         {hasPat ? (
                           /* PAT is configured — show locked state with Disconnect */
@@ -281,7 +284,7 @@ export default function SettingsPanel({
                               }} />
                               <div style={{ flex: 1 }}>
                                 <div style={{ fontSize: 11, fontWeight: 800, color: "#a6e3a1" }}>
-                                  {isValidatingPat || !isSavedPatVerified ? "Checking PAT..." : "PAT Verified"}
+                                  {isValidatingPat || !isSavedPatVerified ? "Checking PAT..." : "PAT Verified This Session"}
                                 </div>
                                 <div style={{ fontSize: 9, opacity: 0.5, marginTop: 2 }}>
                                   {personalPrefs.githubPat.startsWith("github_pat_") ? "Fine-grained" : "Classic"} token ending in •••{personalPrefs.githubPat.slice(-4)}
@@ -346,7 +349,7 @@ export default function SettingsPanel({
                             }}
                           >
                             {isValidatingPat ? <RefreshCw size={13} className="ide-icon-pulse" /> : <Shield size={13} />}
-                            {isValidatingPat ? "Validating..." : "Validate and Save PAT"}
+                            {isValidatingPat ? "Validating..." : "Validate For This Session"}
                           </button>
                           </>
                         )}

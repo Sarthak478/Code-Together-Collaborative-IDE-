@@ -171,6 +171,9 @@ const initAPI = (app, server) => {
 
   const roomClients = new Map();  // roomId -> Set(ws)
   const roomQueues = new Map();   // roomId -> { running, queue }
+  const localAgents = new Map();  // roomId -> Map(agentId -> { lastSeen, label })
+  const localAgentJobs = new Map(); // roomId -> queued local-agent jobs
+  const LOCAL_AGENT_STALE_MS = 30 * 1000;
 
   /* -------------------- PTY TERMINALS -------------------- */
   const roomTerminals = new Map(); // roomId -> ptyProcess
@@ -204,6 +207,8 @@ const initAPI = (app, server) => {
 
     roomClients.delete(roomId);
     roomQueues.delete(roomId);
+    localAgents.delete(roomId);
+    localAgentJobs.delete(roomId);
   }
 
   async function removeRoomFolder(roomCwd) {
@@ -482,6 +487,56 @@ const initAPI = (app, server) => {
     return roomQueues.get(roomId);
   }
 
+  function getLocalAgentRoom(roomId) {
+    if (!localAgents.has(roomId)) {
+      localAgents.set(roomId, new Map());
+    }
+    return localAgents.get(roomId);
+  }
+
+  function getLocalAgentQueue(roomId) {
+    if (!localAgentJobs.has(roomId)) {
+      localAgentJobs.set(roomId, []);
+    }
+    return localAgentJobs.get(roomId);
+  }
+
+  function touchLocalAgent(roomId, agentId, label = "") {
+    const roomAgents = getLocalAgentRoom(roomId);
+    roomAgents.set(agentId, { lastSeen: Date.now(), label });
+  }
+
+  function pruneLocalAgents(roomId) {
+    const roomAgents = localAgents.get(roomId);
+    if (!roomAgents) return [];
+
+    const now = Date.now();
+    for (const [agentId, agent] of roomAgents.entries()) {
+      if (now - agent.lastSeen > LOCAL_AGENT_STALE_MS) {
+        roomAgents.delete(agentId);
+      }
+    }
+
+    if (roomAgents.size === 0) {
+      localAgents.delete(roomId);
+      return [];
+    }
+
+    return Array.from(roomAgents.entries()).map(([agentId, agent]) => ({
+      agentId,
+      label: agent.label,
+      lastSeen: agent.lastSeen
+    }));
+  }
+
+  function hasActiveLocalAgent(roomId) {
+    return pruneLocalAgents(roomId).length > 0;
+  }
+
+  function createLocalAgentJobId() {
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+
   const { executeRemote } = require("./services/wandbox.js");
   /* -------------------- CODE EXECUTION -------------------- */
 
@@ -656,6 +711,106 @@ const initAPI = (app, server) => {
       renderedCode: result.renderedCode,
     });
 
+  });
+
+  /* -------------------- LOCAL AGENT ENDPOINTS -------------------- */
+
+  app.get("/local-agent.py", (_req, res) => {
+    res.type("text/x-python");
+    res.sendFile(join(__dirname, "local-agent.py"));
+  });
+
+  app.get("/local-agent/status", (req, res) => {
+    const { roomId } = req.query;
+    if (!roomId) {
+      return res.status(400).json({ error: "roomId required" });
+    }
+
+    const agents = pruneLocalAgents(roomId);
+    res.json({
+      success: true,
+      connected: agents.length > 0,
+      agents
+    });
+  });
+
+  app.post("/local-agent/heartbeat", (req, res) => {
+    const { roomId, agentId, label } = req.body || {};
+
+    if (!roomId || !agentId) {
+      return res.status(400).json({ error: "roomId and agentId required" });
+    }
+
+    touchLocalAgent(roomId, agentId, label);
+    res.json({ success: true });
+  });
+
+  app.post("/local-agent/run", (req, res) => {
+    const { roomId, userId, files, activeFile, language } = req.body || {};
+
+    if (!roomId || !Array.isArray(files) || !activeFile) {
+      return res.status(400).json({ error: "roomId, files, and activeFile are required" });
+    }
+
+    if (!hasActiveLocalAgent(roomId)) {
+      return res.status(409).json({
+        error: "No Local Agent is connected yet. Paste the starter command in your terminal, keep it open, then try again."
+      });
+    }
+
+    const jobId = createLocalAgentJobId();
+    const job = {
+      id: jobId,
+      userId: userId || "local-user",
+      files,
+      activeFile,
+      language,
+      createdAt: Date.now()
+    };
+
+    getLocalAgentQueue(roomId).push(job);
+    broadcast(roomId, { type: "run:start", userId: job.userId });
+
+    res.json({
+      success: true,
+      jobId,
+      message: "Queued on Local Agent"
+    });
+  });
+
+  app.post("/local-agent/jobs/next", (req, res) => {
+    const { roomId, agentId, label } = req.body || {};
+
+    if (!roomId || !agentId) {
+      return res.status(400).json({ error: "roomId and agentId required" });
+    }
+
+    touchLocalAgent(roomId, agentId, label);
+    const queue = getLocalAgentQueue(roomId);
+    const job = queue.shift() || null;
+
+    res.json({ success: true, job });
+  });
+
+  app.post("/local-agent/jobs/result", (req, res) => {
+    const { roomId, agentId, label, jobId, userId, output, exitCode } = req.body || {};
+
+    if (!roomId || !agentId || !jobId) {
+      return res.status(400).json({ error: "roomId, agentId, and jobId required" });
+    }
+
+    touchLocalAgent(roomId, agentId, label);
+    const finalOutput = String(output || "").slice(-250000) || "(no output)";
+    const finalExitCode = Number.isFinite(Number(exitCode)) ? Number(exitCode) : 0;
+
+    broadcast(roomId, {
+      type: "run:output",
+      userId: userId || agentId,
+      output: finalOutput,
+      exitCode: finalExitCode
+    });
+
+    res.json({ success: true });
   });
 
   /* -------------------- IDE SYNC AND RUN ENDPOINT -------------------- */

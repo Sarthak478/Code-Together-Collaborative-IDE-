@@ -17,6 +17,7 @@ import AIPanel from "./ide/AIPanel"
 import VideoCall from "./editor/VideoCall"
 import SourceControlPanel from "./ide/SourceControlPanel"
 import DiffModal from "./ui/DiffModal"
+import LocalAgentModal from "./ui/LocalAgentModal"
 import AccessControlModal from "./editor/AccessControlModal"
 import InviteModal from "./editor/InviteModal"
 import { DoorOpen, AlertCircle, GitFork, MessageCircle, Wand2, Bot, TerminalSquare } from "lucide-react"
@@ -84,6 +85,18 @@ export default function IDERoom(props) {
         roomMode={ROOM_MODES.IDE}
         isHost={ide.isHost}
         username={ide.editor.username}
+      />
+
+      <LocalAgentModal
+        isOpen={ide.localAgentPrompt.open}
+        fileName={ide.localAgentPrompt.fileName}
+        commands={ide.localAgentCommands}
+        onClose={ide.closeLocalAgentPrompt}
+        onOpenLocalAgent={ide.openLocalAgent}
+        onContinueInCloud={ide.continueRunInCloud}
+        onRunLocalAgent={ide.runOnLocalAgent}
+        onCopyCommand={ide.copyLocalAgentCommand}
+        themeData={{ accent: ide.accent, textColor: ide.textColor, panelBg: ide.panelBg, borderCol: ide.borderCol, inputBg: ide.inputBg }}
       />
 
       {/* ── Navbar ── */}

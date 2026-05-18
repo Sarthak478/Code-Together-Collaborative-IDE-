@@ -90,7 +90,7 @@ app.use(helmet({
                 "http://localhost:*",
                 "ws://localhost:*"
             ],
-            "img-src": ["'self'", "data:", "blob:"],
+            "img-src": ["'self'", "data:", "blob:", "https://cdn.jsdelivr.net"],
             "worker-src": ["'self'", "blob:"],
             "frame-src": ["'self'"],
             "frame-ancestors": ["'self'"],
@@ -105,7 +105,7 @@ app.use(helmet({
     referrerPolicy: { policy: "strict-origin-when-cross-origin" }
 }));
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "1000mb" }));
 
 // Live state (not persisted in Redis because they represent active memory/sockets)
 const deletionTimers = new Map();
