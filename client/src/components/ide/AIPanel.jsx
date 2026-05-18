@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Bot, Send, Trash2, ExternalLink, Key, Sparkles, Info, CircleDashed,
-  FileEdit, Terminal, FileSearch, ShieldCheck, CheckCircle, XCircle, AlertTriangle
+  FileEdit, Terminal, FileSearch, ShieldCheck, CheckCircle, XCircle,
+  ChevronDown, Plus, Pencil
 } from "lucide-react"
 import { API_URL } from "../../config"
 
@@ -90,10 +91,13 @@ const GEMINI_TOOLS = [{
   ]
 }]
 
-const SYSTEM_PROMPT = `# Ralph: Elite Autonomous AI Coding Agent v2.0
+const AGENT_STORAGE_KEY = "ls_custom_agents"
+const ACTIVE_AGENT_STORAGE_KEY = "ls_active_agent"
+
+const SYSTEM_PROMPT = `# Agent: Elite Autonomous AI Coding Agent v2.0
 
 ## CORE IDENTITY
-You are Ralph, an **elite autonomous AI coding agent** embedded in CodeTogether IDE. You are **ACTION-FIRST, QUALITY-OBSESSED, and PRODUCTION-READY**.
+You are an **elite autonomous AI coding agent** embedded in CodeTogether IDE. You are **ACTION-FIRST, QUALITY-OBSESSED, and PRODUCTION-READY**.
 
 ### Prime Directive
 **DO NOT ASK. DO NOT ASSUME. EXECUTE WITH EXCELLENCE.**
@@ -201,7 +205,295 @@ Each change should be self-contained and logically complete.
 ### Protocol 7: CONCISE COMMUNICATION 💬
 Let your work speak for itself. Summarize your actions in 2-3 sentences max.
 
-**Ralph does not guess. Ralph executes.**`
+**The agent does not guess. The agent executes.**`
+
+const ASK_SYSTEM_PROMPT = `You are Ask, a precise coding assistant inside CodeTogether IDE.
+
+Behavior:
+- Answer directly and clearly.
+- Explain tradeoffs when useful.
+- Use the active file context if it is provided.
+- Prefer practical advice, short examples, and exact fixes.
+- Do not call tools or act autonomously.
+- If the user asks for a large change, break it into crisp implementation guidance.`
+
+const PLAN_SYSTEM_PROMPT = `You are Plan, a senior engineering planner inside CodeTogether IDE.
+
+Behavior:
+- Turn requests into implementation plans.
+- Highlight scope, risks, dependencies, and test strategy.
+- Prefer step-by-step execution plans over long essays.
+- Do not call tools or edit files.
+- When requirements are unclear, make a reasonable plan with clearly stated assumptions.`
+
+const BUILT_IN_AGENTS = [
+  {
+    id: "agent",
+    name: "Agent",
+    badge: "AI",
+    mode: "agentic",
+    prompt: SYSTEM_PROMPT,
+    description: "Autonomous coding agent with file and terminal actions."
+  },
+  {
+    id: "ask",
+    name: "Ask",
+    badge: "?",
+    mode: "chat",
+    prompt: ASK_SYSTEM_PROMPT,
+    description: "Fast coding answers without taking actions."
+  },
+  {
+    id: "plan",
+    name: "Plan",
+    badge: "PL",
+    mode: "plan",
+    prompt: PLAN_SYSTEM_PROMPT,
+    description: "Implementation planning, risks, and step-by-step roadmaps."
+  }
+]
+
+function sanitizeCustomAgent(agent) {
+  const name = String(agent?.name || "").trim().slice(0, 30)
+  const prompt = String(agent?.prompt || "").trim().slice(0, 12000)
+  const badge = String(agent?.badge || name.slice(0, 2).toUpperCase() || "AG").trim().slice(0, 4)
+  const mode = ["agentic", "chat", "plan"].includes(agent?.mode) ? agent.mode : "chat"
+
+  if (!name || !prompt) return null
+
+  return {
+    id: agent?.id || `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name,
+    badge,
+    mode,
+    prompt,
+    description: String(agent?.description || "").trim().slice(0, 120)
+  }
+}
+
+function AgentBadge({ agent, accent, textColor }) {
+  return (
+    <div style={{
+      minWidth: 28,
+      height: 28,
+      borderRadius: 10,
+      padding: "0 8px",
+      background: `${accent}18`,
+      border: `1px solid ${accent}35`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: textColor,
+      fontSize: 11,
+      fontWeight: 800,
+      letterSpacing: "0.04em"
+    }}>
+      {agent.badge || agent.name.slice(0, 2).toUpperCase()}
+    </div>
+  )
+}
+
+function CustomAgentsModal({
+  isOpen,
+  agents,
+  accent,
+  textColor,
+  borderCol,
+  inputBg,
+  panelBg,
+  onClose,
+  onSave,
+  onDelete
+}) {
+  const [draft, setDraft] = useState({
+    id: "",
+    name: "",
+    badge: "",
+    mode: "chat",
+    prompt: "",
+    description: ""
+  })
+
+  if (!isOpen) return null
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    onSave(draft)
+    setDraft({ id: "", name: "", badge: "", mode: "chat", prompt: "", description: "" })
+  }
+
+  const editing = !!draft.id
+
+  return (
+    <div style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 5000,
+      background: "rgba(0,0,0,0.62)",
+      backdropFilter: "blur(8px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20
+    }}>
+      <motion.div
+        initial={{ opacity: 0, y: 14, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        style={{
+          width: "min(820px, 100%)",
+          maxHeight: "88vh",
+          overflow: "auto",
+          background: panelBg,
+          border: `1px solid ${borderCol}`,
+          borderRadius: 22,
+          boxShadow: "0 30px 80px rgba(0,0,0,0.38)"
+        }}
+      >
+        <div style={{
+          padding: 20,
+          borderBottom: `1px solid ${borderCol}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12
+        }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: textColor }}>Custom Agents</div>
+            <div style={{ fontSize: 12, opacity: 0.65, color: textColor, marginTop: 4 }}>
+              Create your own coding personas. These stay only in this browser.
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="ide-btn-premium"
+            style={{ background: "transparent", color: textColor, border: `1px solid ${borderCol}` }}
+          >
+            Close
+          </button>
+        </div>
+
+        <div style={{ padding: 20, display: "grid", gap: 18 }}>
+          <div style={{ display: "grid", gap: 10 }}>
+            {agents.length === 0 ? (
+              <div style={{
+                padding: 14,
+                borderRadius: 14,
+                border: `1px dashed ${borderCol}`,
+                color: textColor,
+                opacity: 0.62,
+                fontSize: 12
+              }}>
+                No custom agents yet. Create one below.
+              </div>
+            ) : (
+              agents.map(agent => (
+                <div
+                  key={agent.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: 12,
+                    borderRadius: 14,
+                    background: "rgba(255,255,255,0.02)",
+                    border: `1px solid ${borderCol}`
+                  }}
+                >
+                  <AgentBadge agent={agent} accent={accent} textColor={textColor} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: textColor }}>{agent.name}</div>
+                    <div style={{ fontSize: 11, opacity: 0.62, color: textColor }}>
+                      {agent.mode === "agentic" ? "Agentic" : agent.mode === "plan" ? "Planner" : "Ask-only"}
+                      {agent.description ? ` • ${agent.description}` : ""}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setDraft(agent)}
+                    className="ide-btn-premium"
+                    style={{ background: "transparent", color: textColor, border: `1px solid ${borderCol}` }}
+                  >
+                    <Pencil size={14} /> Edit
+                  </button>
+                  <button
+                    onClick={() => onDelete(agent.id)}
+                    className="ide-btn-premium"
+                    style={{ background: "transparent", color: "#f38ba8", border: "1px solid rgba(243,139,168,0.32)" }}
+                  >
+                    <Trash2 size={14} /> Delete
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: textColor }}>
+              {editing ? "Edit Agent" : "New Agent"}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1.3fr 0.6fr 0.8fr", gap: 10 }}>
+              <input
+                type="text"
+                value={draft.name}
+                onChange={(e) => setDraft(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Agent name"
+                style={{ background: inputBg, color: textColor, border: `1px solid ${borderCol}`, borderRadius: 10, padding: "10px 12px", outline: "none", fontSize: 13 }}
+              />
+              <input
+                type="text"
+                value={draft.badge}
+                onChange={(e) => setDraft(prev => ({ ...prev, badge: e.target.value }))}
+                placeholder="Badge"
+                style={{ background: inputBg, color: textColor, border: `1px solid ${borderCol}`, borderRadius: 10, padding: "10px 12px", outline: "none", fontSize: 13 }}
+              />
+              <select
+                value={draft.mode}
+                onChange={(e) => setDraft(prev => ({ ...prev, mode: e.target.value }))}
+                style={{ background: inputBg, color: textColor, border: `1px solid ${borderCol}`, borderRadius: 10, padding: "10px 12px", outline: "none", fontSize: 13 }}
+              >
+                <option value="chat">Ask-only</option>
+                <option value="plan">Planner</option>
+                <option value="agentic">Agentic</option>
+              </select>
+            </div>
+            <input
+              type="text"
+              value={draft.description}
+              onChange={(e) => setDraft(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Short description"
+              style={{ background: inputBg, color: textColor, border: `1px solid ${borderCol}`, borderRadius: 10, padding: "10px 12px", outline: "none", fontSize: 13 }}
+            />
+            <textarea
+              value={draft.prompt}
+              onChange={(e) => setDraft(prev => ({ ...prev, prompt: e.target.value }))}
+              placeholder="System prompt"
+              rows={12}
+              style={{ background: inputBg, color: textColor, border: `1px solid ${borderCol}`, borderRadius: 14, padding: "12px 14px", outline: "none", fontSize: 12, lineHeight: 1.6, resize: "vertical", fontFamily: "'JetBrains Mono', monospace" }}
+            />
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              {editing && (
+                <button
+                  type="button"
+                  onClick={() => setDraft({ id: "", name: "", badge: "", mode: "chat", prompt: "", description: "" })}
+                  className="ide-btn-premium"
+                  style={{ background: "transparent", color: textColor, border: `1px solid ${borderCol}` }}
+                >
+                  New Draft
+                </button>
+              )}
+              <button
+                type="submit"
+                className="ide-btn-premium"
+                style={{ background: accent, color: "#fff", border: "none" }}
+              >
+                <Plus size={14} /> {editing ? "Save Agent" : "Create Agent"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
 
 
 /* ── Action Card Component ── */
@@ -269,7 +561,7 @@ function ActionCard({ action, accent, textColor }) {
 
 
 /* ── Consent Dialog ── */
-function ConsentDialog({ onAccept, onDecline, accent, textColor, borderCol, inputBg }) {
+function ConsentDialog({ agentName, onAccept, onDecline, accent, textColor, borderCol, inputBg }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -282,10 +574,10 @@ function ConsentDialog({ onAccept, onDecline, accent, textColor, borderCol, inpu
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 13 }}>
         <ShieldCheck size={18} color={accent} />
-        <span>Ralph wants to take actions</span>
+        <span>{agentName} wants to take actions</span>
       </div>
       <div style={{ fontSize: 12, lineHeight: 1.6, opacity: 0.75 }}>
-        Ralph needs permission to <strong>edit files</strong> and <strong>run terminal commands</strong> in your project.
+        {agentName} needs permission to <strong>edit files</strong> and <strong>run terminal commands</strong> in your project.
         This is a one-time approval for this session. Clearing the chat revokes all access.
       </div>
       <div style={{ display: "flex", gap: 8 }}>
@@ -330,10 +622,27 @@ export default function AIPanel({
   const [isLoading, setIsLoading] = useState(false)
   const [hasConsented, setHasConsented] = useState(false)
   const [pendingConsentResolve, setPendingConsentResolve] = useState(null)
+  const [customAgents, setCustomAgents] = useState([])
+  const [activeAgentId, setActiveAgentId] = useState(BUILT_IN_AGENTS[0].id)
+  const [agentMenuOpen, setAgentMenuOpen] = useState(false)
+  const [customAgentsOpen, setCustomAgentsOpen] = useState(false)
   
   const scrollRef = useRef(null)
   const consentResolveRef = useRef(null)
   const hasConsentedRef = useRef(false) // Ref mirrors state to avoid stale closures
+  const availableAgents = useMemo(() => [...BUILT_IN_AGENTS, ...customAgents], [customAgents])
+  const activeAgent = useMemo(
+    () => availableAgents.find(agent => agent.id === activeAgentId) || BUILT_IN_AGENTS[0],
+    [availableAgents, activeAgentId]
+  )
+
+  const resetConversation = useCallback(() => {
+    setMessages([])
+    setHasConsented(false)
+    hasConsentedRef.current = false
+    setPendingConsentResolve(false)
+    consentResolveRef.current = null
+  }, [])
 
   // Load API key from localStorage (key only, no data)
   useEffect(() => {
@@ -341,6 +650,18 @@ export default function AIPanel({
     if (savedKey) {
       setApiKey(savedKey)
       setIsConfigured(true)
+    }
+
+    try {
+      const savedAgents = JSON.parse(localStorage.getItem(AGENT_STORAGE_KEY) || "[]")
+      setCustomAgents(Array.isArray(savedAgents) ? savedAgents.map(sanitizeCustomAgent).filter(Boolean) : [])
+    } catch {
+      setCustomAgents([])
+    }
+
+    const savedActiveAgent = localStorage.getItem(ACTIVE_AGENT_STORAGE_KEY)
+    if (savedActiveAgent) {
+      setActiveAgentId(savedActiveAgent)
     }
   }, [])
 
@@ -519,7 +840,7 @@ const runAgenticLoop = useCallback(async (conversationContents) => {
       body: JSON.stringify({
         contents: currentContents,
         tools: GEMINI_TOOLS,
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }
+        systemInstruction: { parts: [{ text: activeAgent.prompt }] }
       })
     })
 
@@ -545,7 +866,7 @@ const runAgenticLoop = useCallback(async (conversationContents) => {
     if (!hasConsentedRef.current) {
       const approved = await requestConsent()
       if (!approved) {
-        return { text: "⚠️ Action denied. Ralph will not modify your project without permission.", actions: [] }
+        return { text: `Action denied. ${activeAgent.name} will not modify your project without permission.`, actions: [] }
       }
     }
 
@@ -615,7 +936,26 @@ const runAgenticLoop = useCallback(async (conversationContents) => {
   }
 
   return { text: "Reached maximum tool iterations. Please continue the conversation.", actions: allActions }
-}, [apiKey, getModel, requestConsent, executeListFiles, executeReadFile, executeEditFile, executeRunCommand, executeSearchFiles, executeGitStatus, executeGitCommit])
+}, [apiKey, getModel, requestConsent, executeListFiles, executeReadFile, executeEditFile, executeRunCommand, executeSearchFiles, executeGitStatus, executeGitCommit, activeAgent])
+
+const runStandardReply = useCallback(async (conversationContents) => {
+  const modelName = await getModel()
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: conversationContents,
+      systemInstruction: { parts: [{ text: activeAgent.prompt }] }
+    })
+  })
+
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error?.message || "Gemini API error")
+
+  const parts = data.candidates?.[0]?.content?.parts || []
+  const text = parts.filter(part => part.text).map(part => part.text).join("\n").trim()
+  return { text: text || `${activeAgent.name} has nothing to add right now.`, actions: [] }
+}, [activeAgent, apiKey, getModel])
 
 
 // ── Send Message Handler ──
@@ -645,8 +985,9 @@ const sendMessage = useCallback(async (e, overrideText = null) => {
       }))
     contents.push({ role: "user", parts: [{ text: prompt }] })
 
-    // Run the agentic loop
-    const result = await runAgenticLoop(contents)
+    const result = activeAgent.mode === "agentic"
+      ? await runAgenticLoop(contents)
+      : await runStandardReply(contents)
 
     // Add final response
     setMessages(prev => {
@@ -662,7 +1003,7 @@ const sendMessage = useCallback(async (e, overrideText = null) => {
   } finally {
     setIsLoading(false)
   }
-}, [input, apiKey, isLoading, activeFile, activeYText, messages, runAgenticLoop])
+}, [input, apiKey, isLoading, activeFile, activeYText, messages, runAgenticLoop, runStandardReply, activeAgent])
 
 
 // ── Auto-prompt from terminal error watcher ──
@@ -687,13 +1028,49 @@ const clearConfig = () => {
   localStorage.removeItem("ls_gemini_model")
   setApiKey("")
   setIsConfigured(false)
-  setMessages([])
-  setHasConsented(false)
-  hasConsentedRef.current = false
-  setPendingConsentResolve(false)
-  consentResolveRef.current = null
+  resetConversation()
   modelRef.current = null  // Forget the model too
 }
+
+const selectAgent = useCallback((agentId) => {
+  setActiveAgentId(agentId)
+  localStorage.setItem(ACTIVE_AGENT_STORAGE_KEY, agentId)
+  setAgentMenuOpen(false)
+  resetConversation()
+}, [resetConversation])
+
+const saveCustomAgent = useCallback((draft) => {
+  const nextAgent = sanitizeCustomAgent(draft)
+  if (!nextAgent) return
+
+  setCustomAgents(prev => {
+    const next = prev.some(agent => agent.id === nextAgent.id)
+      ? prev.map(agent => agent.id === nextAgent.id ? nextAgent : agent)
+      : [...prev, nextAgent]
+    localStorage.setItem(AGENT_STORAGE_KEY, JSON.stringify(next))
+    return next
+  })
+
+  localStorage.setItem(ACTIVE_AGENT_STORAGE_KEY, nextAgent.id)
+  setActiveAgentId(nextAgent.id)
+  setCustomAgentsOpen(false)
+  setAgentMenuOpen(false)
+  resetConversation()
+}, [resetConversation])
+
+const deleteCustomAgent = useCallback((agentId) => {
+  setCustomAgents(prev => {
+    const next = prev.filter(agent => agent.id !== agentId)
+    localStorage.setItem(AGENT_STORAGE_KEY, JSON.stringify(next))
+    return next
+  })
+
+  if (activeAgentId === agentId) {
+    localStorage.setItem(ACTIVE_AGENT_STORAGE_KEY, BUILT_IN_AGENTS[0].id)
+    setActiveAgentId(BUILT_IN_AGENTS[0].id)
+    resetConversation()
+  }
+}, [activeAgentId, resetConversation])
 
 
 // ═══════════════════════════════════════════════════
@@ -704,7 +1081,7 @@ if (!isConfigured) {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: panelBg }}>
       <div style={{ padding: "14px 16px", background: "rgba(255,255,255,0.03)", borderBottom: `1px solid ${borderCol}` }}>
         <div style={{ fontWeight: 800, fontSize: 13, display: "flex", alignItems: "center", gap: 10, letterSpacing: "0.5px", textTransform: "uppercase", opacity: 0.8 }}>
-          <Bot size={18} color={accent} /> Ralph
+          <Bot size={18} color={accent} /> {activeAgent.name}
         </div>
       </div>
 
@@ -718,7 +1095,7 @@ if (!isConfigured) {
         </div>
 
         <div>
-          <h3 style={{ margin: "0 0 8px 0", fontSize: 18, fontWeight: 700 }}>Agentic AI Programmer</h3>
+          <h3 style={{ margin: "0 0 8px 0", fontSize: 18, fontWeight: 700 }}>{activeAgent.name}</h3>
           <p style={{ fontSize: 13, color: textColor, opacity: 0.6, lineHeight: 1.6 }}>
             Ralph can read your files, edit your code, and run terminal commands — all autonomously.
             Zero data persistence. Your keys stay local, your code stays private.
@@ -761,7 +1138,7 @@ if (!isConfigured) {
               justifyContent: "center", border: "none"
             }}
           >
-            Awaken Ralph
+            Start with {activeAgent.name}
           </button>
         </form>
       </div>
@@ -775,26 +1152,115 @@ if (!isConfigured) {
 // ═══════════════════════════════════════════════════
 return (
   <div style={{ display: "flex", flexDirection: "column", height: "100%", background: panelBg }}>
+    <CustomAgentsModal
+      isOpen={customAgentsOpen}
+      agents={customAgents}
+      accent={accent}
+      textColor={textColor}
+      borderCol={borderCol}
+      inputBg={inputBg}
+      panelBg={panelBg}
+      onClose={() => setCustomAgentsOpen(false)}
+      onSave={saveCustomAgent}
+      onDelete={deleteCustomAgent}
+    />
+
     {/* Header */}
     <div style={{
       padding: "14px 16px", background: "rgba(255,255,255,0.03)", borderBottom: `1px solid ${borderCol}`,
-      display: "flex", alignItems: "center", justifyContent: "space-between"
+      display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative"
     }}>
-      <div style={{ fontWeight: 800, fontSize: 13, display: "flex", alignItems: "center", gap: 10, letterSpacing: "0.5px", textTransform: "uppercase", opacity: 0.8 }}>
-        <Bot size={18} color={accent} /> Ralph
-        {hasConsented && (
-          <span style={{ fontSize: 9, background: `${accent}20`, color: accent, padding: "2px 6px", borderRadius: 4, fontWeight: 600, letterSpacing: 0 }}>
-            AGENTIC
-          </span>
-        )}
-      </div>
       <button
-        onClick={clearConfig}
-        title="Clear chat & revoke access (total amnesia)"
-        style={{ background: "transparent", border: "none", cursor: "pointer", color: textColor, opacity: 0.4 }}
+        onClick={() => setAgentMenuOpen(prev => !prev)}
+        style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0, color: textColor }}
       >
-        <Trash2 size={16} />
+        <div style={{ fontWeight: 800, fontSize: 13, display: "flex", alignItems: "center", gap: 10, letterSpacing: "0.5px", textTransform: "uppercase", opacity: 0.9 }}>
+          <AgentBadge agent={activeAgent} accent={accent} textColor={textColor} />
+          <span>{activeAgent.name}</span>
+          <ChevronDown size={15} color={textColor} />
+          <span style={{ fontSize: 9, background: `${accent}20`, color: accent, padding: "2px 6px", borderRadius: 4, fontWeight: 600, letterSpacing: 0 }}>
+            {activeAgent.mode === "agentic" ? (hasConsented ? "AGENTIC" : "READY") : activeAgent.mode === "plan" ? "PLAN" : "ASK"}
+          </span>
+        </div>
       </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <button
+          onClick={() => setCustomAgentsOpen(true)}
+          title="Configure custom agents"
+          style={{ background: "transparent", border: "none", cursor: "pointer", color: textColor, opacity: 0.6 }}
+        >
+          <Pencil size={15} />
+        </button>
+        <button
+          onClick={clearConfig}
+          title="Clear chat & revoke access (total amnesia)"
+          style={{ background: "transparent", border: "none", cursor: "pointer", color: textColor, opacity: 0.4 }}
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
+
+      {agentMenuOpen && (
+        <div style={{
+          position: "absolute",
+          top: "calc(100% + 8px)",
+          left: 16,
+          width: "calc(100% - 32px)",
+          background: panelBg,
+          border: `1px solid ${borderCol}`,
+          borderRadius: 14,
+          boxShadow: "0 18px 40px rgba(0,0,0,0.35)",
+          overflow: "hidden",
+          zIndex: 40
+        }}>
+          {availableAgents.map(agent => (
+            <button
+              key={agent.id}
+              onClick={() => selectAgent(agent.id)}
+              style={{
+                width: "100%",
+                border: "none",
+                borderBottom: `1px solid ${borderCol}`,
+                background: activeAgent.id === agent.id ? `${accent}14` : "transparent",
+                color: textColor,
+                padding: "10px 12px",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                cursor: "pointer",
+                textAlign: "left"
+              }}
+            >
+              <AgentBadge agent={agent} accent={accent} textColor={textColor} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{agent.name}</div>
+                <div style={{ fontSize: 11, opacity: 0.62 }}>{agent.description}</div>
+              </div>
+            </button>
+          ))}
+          <button
+            onClick={() => {
+              setCustomAgentsOpen(true)
+              setAgentMenuOpen(false)
+            }}
+            style={{
+              width: "100%",
+              border: "none",
+              background: "transparent",
+              color: textColor,
+              padding: "10px 12px",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              cursor: "pointer",
+              textAlign: "left"
+            }}
+          >
+            <Plus size={14} color={accent} />
+            Configure Custom Agents...
+          </button>
+        </div>
+      )}
     </div>
 
     {/* Messages */}
@@ -807,7 +1273,11 @@ return (
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>What should I build?</div>
             <div style={{ fontSize: 11, maxWidth: 200, lineHeight: 1.5 }}>
-              Ralph can read, edit, and run your code autonomously. Try: &quot;Fix the import error&quot; or &quot;Create a new API route&quot;
+              {activeAgent.mode === "agentic"
+                ? `${activeAgent.name} can read, edit, and run your code. Try "Fix the import error" or "Create a new API route".`
+                : activeAgent.mode === "plan"
+                  ? `${activeAgent.name} is ready to break work into steps, risks, and milestones.`
+                  : `${activeAgent.name} is ready to answer coding questions and explain tradeoffs.`}
             </div>
           </div>
         </div>
@@ -852,6 +1322,7 @@ return (
       {/* Consent Dialog */}
       {pendingConsentResolve && (
         <ConsentDialog
+          agentName={activeAgent.name}
           onAccept={handleConsentAccept}
           onDecline={handleConsentDecline}
           accent={accent}
@@ -867,7 +1338,7 @@ return (
           <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}>
             <CircleDashed size={14} color={accent} />
           </motion.div>
-          Ralph is working...
+          {activeAgent.name} is working...
         </div>
       )}
     </div>
@@ -880,7 +1351,7 @@ return (
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder={activeFile ? `Ask Ralph about ${activeFile.split("/").pop()}...` : "Tell Ralph what to do..."}
+            placeholder={activeFile ? `Ask ${activeAgent.name} about ${activeFile.split("/").pop()}...` : `Tell ${activeAgent.name} what to do...`}
             style={{
               width: "100%", background: inputBg, color: textColor, border: `1px solid ${borderCol}`,
               borderRadius: 12, padding: "10px 14px", paddingRight: 40, outline: "none", fontSize: 13,
