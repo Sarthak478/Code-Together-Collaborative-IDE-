@@ -236,7 +236,9 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     }
 
     provider.awareness.on("change", onAwarenessChange)
-    recalcHost()
+    const initialAwarenessSync = setTimeout(() => {
+      recalcHost()
+    }, 0)
 
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${API_URL.replace(/^https?:/, wsProtocol)}/execution`)
@@ -264,10 +266,11 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     }, 1000)
 
     return () => {
+      clearTimeout(initialAwarenessSync)
       clearInterval(timerInterval)
       roomMap.unobserve(onRoomChange)
       chatArray.unobserve(onChatChange)
-      provider.awareness.off("change", recalcHost)
+      provider.awareness.off("change", onAwarenessChange)
       ws.close()
     }
   }, [editor, recalcHost, roomId, onLeave, username])
@@ -302,14 +305,21 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
 
     if (newMsg.id !== lastToastId.current) {
       lastToastId.current = newMsg.id
+      const toastMessage = newMsg.type === "system"
+        ? `🚀 @${newMsg.sender} ran the code`
+        : newMsg.type === "system_kick"
+          ? `🚪 ${newMsg.text}`
+          : !chatOpen
+            ? `💬 @${newMsg.sender}: ${newMsg.text}`
+            : ""
 
-      if (newMsg.type === "system") {
-        addToast(`🚀 @${newMsg.sender} ran the code`)
-      } else if (newMsg.type === "system_kick") {
-        addToast(`🚪 ${newMsg.text}`)
-      } else if (!chatOpen) {
-        addToast(`💬 @${newMsg.sender}: ${newMsg.text}`)
-      }
+      if (!toastMessage) return
+
+      const toastTimer = setTimeout(() => {
+        addToast(toastMessage)
+      }, 0)
+
+      return () => clearTimeout(toastTimer)
     }
   }, [chatMessages, chatOpen, editor.username, addToast])
 
