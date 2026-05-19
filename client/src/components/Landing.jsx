@@ -84,7 +84,18 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
     }
     return 'dark' // Defaulting to dark for Neon Luminary
   })
+  const [orbAnimationValues] = useState(() => {
+    return [...Array(15)].map(() => ({
+      x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 800),
+      y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 600),
+      width: 1 + Math.random() * 3,
+      height: 1 + Math.random() * 3,
+      duration: 4 + Math.random() * 6,
+      delay: Math.random() * 5
+    }))
+  })
   const joinInputRef = useRef(null)
+  const hasShownInitialError = useRef(false)
 
   useEffect(() => {
     localStorage.setItem('theme', theme)
@@ -100,6 +111,9 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
       const roomMode = params.get("mode")
       const validTypes = ["collaborative", "interview", "broadcast"]
       const validModes = [ROOM_MODES.COMPILER, ROOM_MODES.IDE]
+      
+      // Use a single state update for all related changes
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInviteDetails({
         roomId,
         roomType: validTypes.includes(roomType) ? roomType : "collaborative",
@@ -107,6 +121,7 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
       })
       setJoinId(roomId)
       setActiveTab("join")
+      
       // Clear the URL parameter without refreshing
       const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname
       window.history.replaceState({ path: newUrl }, "", newUrl)
@@ -169,7 +184,10 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
   }, [])
 
   useEffect(() => {
-    if (initialError) addToast(initialError)
+    if (initialError && !hasShownInitialError.current) {
+      addToast(initialError)
+      hasShownInitialError.current = true
+    }
   }, [initialError, addToast])
 
   const validateRoom = useCallback(async (roomId) => {
@@ -285,25 +303,25 @@ export default function Landing({ username, onUsernameChange, onJoin, initialErr
 
       {/* Floating Orbs */}
       <div style={{ position: "absolute", width: "100%", height: "100%", overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
-        {[...Array(15)].map((_, i) => (
+        {orbAnimationValues.map((orb, i) => (
           <Motion.div
             key={i}
             initial={{ opacity: 0, scale: 0 }}
             animate={{ 
               opacity: [0, 0.4, 0],
               scale: [0, 1.5, 0],
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight
+              x: orb.x,
+              y: orb.y
             }}
             transition={{
-              duration: 4 + Math.random() * 6,
+              duration: orb.duration,
               repeat: Infinity,
-              delay: Math.random() * 5
+              delay: orb.delay
             }}
             style={{
               position: "absolute",
-              width: 1 + Math.random() * 3,
-              height: 1 + Math.random() * 3,
+              width: orb.width,
+              height: orb.height,
               background: i % 2 === 0 ? currentTheme.accent : currentTheme.secondaryAccent,
               borderRadius: "50%",
               boxShadow: `0 0 10px ${i % 2 === 0 ? currentTheme.accent : currentTheme.secondaryAccent}`,
