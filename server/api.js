@@ -173,6 +173,7 @@ const initAPI = (app, server) => {
   const roomQueues = new Map();   // roomId -> { running, queue }
   const localAgents = new Map();  // roomId -> Map(agentId -> { lastSeen, label })
   const localAgentJobs = new Map(); // roomId -> queued local-agent jobs
+  const localAgentTerminalSessions = new Map(); // roomId -> { agentId, label, history, pendingInputs, pendingResize, pendingSyncFiles, shell, lastSeen }
   const LOCAL_AGENT_STALE_MS = 30 * 1000;
 
   /* -------------------- PTY TERMINALS -------------------- */
@@ -209,6 +210,7 @@ const initAPI = (app, server) => {
     roomQueues.delete(roomId);
     localAgents.delete(roomId);
     localAgentJobs.delete(roomId);
+    localAgentTerminalSessions.delete(roomId);
   }
 
   async function removeRoomFolder(roomCwd) {
@@ -321,6 +323,42 @@ const initAPI = (app, server) => {
       if (!roomId) { ws.close(); return; }
 
       const termKey = `${roomId}_${terminalId}`;
+      const localTerminalSession = getLocalAgentTerminalSession(roomId);
+
+      if (localTerminalSession) {
+        ws.roomId = roomId;
+        ws.terminalId = terminalId;
+        ws.isTerminal = true;
+        ws.terminalMode = "local-agent";
+
+        if (localTerminalSession.history) {
+          ws.send(JSON.stringify({ type: "output", data: localTerminalSession.history }));
+        }
+
+        ws.on("message", (msg) => {
+          try {
+            const data = JSON.parse(msg.toString());
+            const session = getLocalAgentTerminalSession(roomId);
+            if (!session) return;
+
+            session.lastSeen = Date.now();
+
+            if (data.type === "input" && typeof data.data === "string") {
+              session.pendingInputs.push(data.data);
+            } else if (data.type === "resize") {
+              session.pendingResize = {
+                cols: Number(data.cols) || 80,
+                rows: Number(data.rows) || 24
+              };
+            }
+          } catch (e) {
+            console.error("Local terminal WS message error", e);
+          }
+        });
+
+        return;
+      }
+
       const shell = platform() === "win32" ? "powershell.exe" : "bash";
       const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
       if (!existsSync(roomCwd)) {
@@ -344,11 +382,7 @@ const initAPI = (app, server) => {
 
         ptyProcess.onData((data) => {
           // Broadcast to all clients assigned to this specific terminal
-          wss.clients.forEach(client => {
-            if (client.roomId === roomId && client.terminalId === terminalId && client.isTerminal && client.readyState === 1) {
-              client.send(JSON.stringify({ type: "output", data }));
-            }
-          });
+          broadcastTerminal(roomId, terminalId, { type: "output", data });
 
           // Save history (last 5000 chars)
           let hist = roomTerminalHistory.get(termKey) + data;
@@ -359,11 +393,7 @@ const initAPI = (app, server) => {
         ptyProcess.onExit(({ exitCode }) => {
           console.log(`Terminal ${terminalId} for room ${roomId} exited with code ${exitCode}`);
           roomTerminals.delete(termKey);
-          wss.clients.forEach(client => {
-            if (client.roomId === roomId && client.terminalId === terminalId && client.isTerminal && client.readyState === 1) {
-              client.send(JSON.stringify({ type: "exit", code: exitCode }));
-            }
-          });
+          broadcastTerminal(roomId, terminalId, { type: "exit", code: exitCode });
         });
       }
 
@@ -535,6 +565,69 @@ const initAPI = (app, server) => {
 
   function createLocalAgentJobId() {
     return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  function getLocalAgentTerminalSession(roomId) {
+    const session = localAgentTerminalSessions.get(roomId);
+    if (!session) return null;
+
+    if (Date.now() - session.lastSeen > LOCAL_AGENT_STALE_MS) {
+      localAgentTerminalSessions.delete(roomId);
+      return null;
+    }
+
+    return session;
+  }
+
+  function upsertLocalAgentTerminalSession(roomId, agentId, label = "", shell = "") {
+    const existing = localAgentTerminalSessions.get(roomId);
+    const session = existing && existing.agentId === agentId
+      ? existing
+      : {
+          agentId,
+          label,
+          history: "",
+          pendingInputs: [],
+          pendingResize: null,
+          pendingSyncFiles: null,
+          shell,
+          lastSeen: Date.now()
+        };
+
+    session.agentId = agentId;
+    session.label = label || session.label || "";
+    session.shell = shell || session.shell || "";
+    session.lastSeen = Date.now();
+
+    localAgentTerminalSessions.set(roomId, session);
+    return session;
+  }
+
+  function broadcastTerminal(roomId, terminalId, payload, { includeAllRoomTerminals = false } = {}) {
+    const serialized = JSON.stringify(payload);
+    wss.clients.forEach((client) => {
+      if (!client.isTerminal || client.readyState !== 1 || client.roomId !== roomId) {
+        return;
+      }
+
+      if (!includeAllRoomTerminals && client.terminalId !== terminalId) {
+        return;
+      }
+
+      client.send(serialized);
+    });
+  }
+
+  function appendLocalTerminalOutput(roomId, data) {
+    const session = getLocalAgentTerminalSession(roomId);
+    if (!session || !data) return;
+
+    let hist = `${session.history || ""}${data}`;
+    if (hist.length > 12000) hist = hist.slice(-12000);
+    session.history = hist;
+    session.lastSeen = Date.now();
+
+    broadcastTerminal(roomId, null, { type: "output", data }, { includeAllRoomTerminals: true });
   }
 
   const { executeRemote } = require("./services/wandbox.js");
@@ -735,10 +828,13 @@ const initAPI = (app, server) => {
     }
 
     const agents = pruneLocalAgents(roomId);
+    const terminal = getLocalAgentTerminalSession(roomId);
     res.json({
       success: true,
       connected: agents.length > 0,
-      agents
+      agents,
+      terminalConnected: !!terminal,
+      terminalShell: terminal?.shell || ""
     });
   });
 
@@ -763,6 +859,28 @@ const initAPI = (app, server) => {
     if (!hasActiveLocalAgent(roomId)) {
       return res.status(409).json({
         error: "No Local Agent is connected yet. Paste the starter command in your terminal, keep it open, then try again."
+      });
+    }
+
+    const terminalSession = getLocalAgentTerminalSession(roomId);
+    if (terminalSession) {
+      const filepath = String(activeFile.path || "").replace(/^\//, "");
+      const cmdString = buildRunCommand(language, filepath);
+
+      if (!cmdString) {
+        return res.status(400).json({
+          error: `Language "${language}" is not supported. Supported languages: Python, JavaScript, TypeScript, Kotlin, C/C++, Rust, Go, Java, PHP, Ruby, C#, Swift, Perl, Lua, and Shell.`
+        });
+      }
+
+      terminalSession.pendingSyncFiles = files;
+      terminalSession.pendingInputs.push({ type: "run", command: cmdString, resetCwd: true });
+      terminalSession.lastSeen = Date.now();
+
+      return res.json({
+        success: true,
+        jobId: createLocalAgentJobId(),
+        message: "Queued on Local Agent terminal"
       });
     }
 
@@ -821,6 +939,41 @@ const initAPI = (app, server) => {
     res.json({ success: true });
   });
 
+  app.post("/local-agent/terminal/poll", (req, res) => {
+    const { roomId, agentId, label, shell, output, exitCode } = req.body || {};
+
+    if (!roomId || !agentId) {
+      return res.status(400).json({ error: "roomId and agentId required" });
+    }
+
+    touchLocalAgent(roomId, agentId, label);
+    const session = upsertLocalAgentTerminalSession(roomId, agentId, label, shell);
+
+    if (typeof output === "string" && output.length > 0) {
+      appendLocalTerminalOutput(roomId, output);
+    }
+
+    if (exitCode !== undefined && exitCode !== null) {
+      broadcastTerminal(roomId, null, { type: "exit", code: Number(exitCode) || 0 }, { includeAllRoomTerminals: true });
+    }
+
+    const inputs = session.pendingInputs.splice(0, session.pendingInputs.length);
+    const resize = session.pendingResize;
+    const syncFiles = session.pendingSyncFiles;
+    session.pendingResize = null;
+    session.pendingSyncFiles = null;
+    session.lastSeen = Date.now();
+
+    res.json({
+      success: true,
+      actions: {
+        inputs,
+        resize,
+        syncFiles
+      }
+    });
+  });
+
   /* -------------------- IDE SYNC AND RUN ENDPOINT -------------------- */
 
   app.post("/sync-and-run", (req, res) => {
@@ -845,6 +998,22 @@ const initAPI = (app, server) => {
         }
         writeFileSync(fullPath, f.content || "", "utf8");
       });
+
+      const localTerminalSession = getLocalAgentTerminalSession(roomId);
+      if (localTerminalSession) {
+        const filepath = activeFile.path.replace(/^\//, "");
+        const cmdString = buildRunCommand(language, filepath);
+
+        if (!cmdString) {
+          return res.status(400).json({ error: `Language "${language}" is not supported. Supported languages: Python, JavaScript, TypeScript, Kotlin, C/C++, Rust, Go, Java, PHP, Ruby, C#, Swift, Perl, Lua, and Shell.` });
+        }
+
+        localTerminalSession.pendingSyncFiles = files;
+        localTerminalSession.pendingInputs.push({ type: "run", command: cmdString, resetCwd: true });
+        localTerminalSession.lastSeen = Date.now();
+
+        return res.json({ success: true, message: "Synced to Local Agent terminal and queued for execution." });
+      }
 
       let ptyProcess = roomTerminals.get(`${roomId}_1`);
       if (!ptyProcess) {
@@ -904,6 +1073,12 @@ const initAPI = (app, server) => {
         }
         writeFileSync(fullPath, f.content || "", "utf8");
       });
+
+      const localTerminalSession = getLocalAgentTerminalSession(roomId);
+      if (localTerminalSession) {
+        localTerminalSession.pendingSyncFiles = files;
+        localTerminalSession.lastSeen = Date.now();
+      }
 
       res.json({ success: true, message: "Sync successful" });
 

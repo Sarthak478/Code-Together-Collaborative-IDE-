@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
-"""Small stdlib-only Local Agent for LiveShare IDE rooms.
+"""Stdlib-only Local Agent for LiveShare IDE rooms.
 
-The browser copies a Python one-liner that downloads this file from the server
-and runs it locally. Keeping the agent in the backend avoids npm/pip package
-installation while still letting us update the handoff protocol centrally.
+This agent keeps a real shell running on the user's machine and polls the
+backend for terminal input, file sync updates, and run commands.
 """
 
 import argparse
 import json
-import os
 import pathlib
 import platform
-import shutil
 import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -54,16 +52,18 @@ def safe_relative_path(value):
     return pathlib.Path(*parts) if parts else pathlib.Path("main.py")
 
 
-def reset_workspace(room_id, agent_id):
+def ensure_workspace(room_id, agent_id):
     safe_room = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in room_id)
     safe_agent = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in agent_id)
     workspace = pathlib.Path(tempfile.gettempdir()) / f"liveshare_agent_{safe_room}_{safe_agent}"
-    shutil.rmtree(workspace, ignore_errors=True)
     workspace.mkdir(parents=True, exist_ok=True)
     return workspace
 
 
-def write_job_files(workspace, files):
+def sync_workspace_files(workspace, files):
+    if not isinstance(files, list):
+        return
+
     for file_info in files:
         rel_path = safe_relative_path(file_info.get("path", "main.py"))
         target = workspace / rel_path
@@ -71,84 +71,102 @@ def write_job_files(workspace, files):
         target.write_text(file_info.get("content") or "", encoding="utf-8")
 
 
-def command_for(language, active_path):
-    lang = (language or "").lower()
-    system = platform.system().lower()
+class ShellBridge:
+    def __init__(self, workspace):
+        self.workspace = pathlib.Path(workspace)
+        self.process = None
+        self._output_chunks = []
+        self._lock = threading.Lock()
+        self._reader_thread = None
+        self._last_exit_code = None
+        self._shell_name = ""
 
-    commands = {
-        "python": [sys.executable, str(active_path)],
-        "javascript": ["node", str(active_path)],
-        "typescript": ["node", "--experimental-strip-types", str(active_path)],
-        "go": ["go", "run", str(active_path)],
-        "php": ["php", str(active_path)],
-        "ruby": ["ruby", str(active_path)],
-        "perl": ["perl", str(active_path)],
-        "lua": ["lua", str(active_path)],
-    }
+    @property
+    def shell_name(self):
+        return self._shell_name
 
-    if lang == "shell":
-        return ["powershell", "-ExecutionPolicy", "Bypass", "-File", str(active_path)] if system == "windows" else ["bash", str(active_path)]
-
-    if lang == "java":
-        class_name = active_path.stem
+    def _shell_command(self):
+        system = platform.system().lower()
         if system == "windows":
-            return ["cmd", "/c", f'javac "{active_path.name}" && java "{class_name}"']
-        return ["sh", "-lc", f'javac "{active_path.name}" && java "{class_name}"']
+            self._shell_name = "powershell.exe"
+            return ["powershell.exe", "-NoLogo"]
+        self._shell_name = "bash"
+        return ["bash"]
 
-    if lang == "c":
-        if system == "windows":
-            return ["cmd", "/c", f'gcc "{active_path.name}" -o a.exe && a.exe']
-        exe = "./a.out"
-        return ["sh", "-lc", f'gcc "{active_path.name}" -o a.out && {exe}']
+    def ensure_running(self):
+        if self.process and self.process.poll() is None:
+            return
 
-    if lang == "cpp":
-        if system == "windows":
-            return ["cmd", "/c", f'g++ "{active_path.name}" -o a.exe && a.exe']
-        exe = "./a.out"
-        return ["sh", "-lc", f'g++ "{active_path.name}" -o a.out && {exe}']
+        if self.process and self.process.poll() is not None:
+            self._last_exit_code = self.process.returncode
 
-    return commands.get(lang) or [sys.executable, str(active_path)]
-
-
-def run_job(job, room_id, agent_id):
-    workspace = reset_workspace(room_id, agent_id)
-    write_job_files(workspace, job.get("files") or [])
-
-    active_file = job.get("activeFile") or {}
-    active_rel = safe_relative_path(active_file.get("path") or active_file.get("name") or "main.py")
-    active_path = workspace / active_rel
-    if not active_path.exists():
-        return f"Active file not found in Local Agent workspace: {active_rel}", 1
-
-    command = command_for(job.get("language"), active_path)
-    print(f"[LiveShare Agent] Running job {job.get('id')} with: {' '.join(command)}", flush=True)
-
-    try:
-        proc = subprocess.Popen(
+        command = self._shell_command()
+        self.process = subprocess.Popen(
             command,
-            cwd=str(active_path.parent),
+            cwd=str(self.workspace),
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            universal_newlines=True,
-            encoding="utf-8",
-            errors="replace",
+            bufsize=0,
         )
-    except FileNotFoundError as exc:
-        return f"Required local runtime was not found: {exc}", 1
-    except Exception as exc:  # pragma: no cover - defensive local-runtime guard
-        return f"Failed to start local run: {exc}", 1
 
-    chunks = []
-    assert proc.stdout is not None
-    for line in proc.stdout:
-        print(line, end="", flush=True)
-        chunks.append(line)
-        if sum(len(chunk) for chunk in chunks) > MAX_OUTPUT_CHARS:
-            chunks = ["".join(chunks)[-MAX_OUTPUT_CHARS:]]
+        self._reader_thread = threading.Thread(target=self._pump_output, daemon=True)
+        self._reader_thread.start()
 
-    exit_code = proc.wait()
-    output = "".join(chunks).strip()
-    return output or "(no output)", int(exit_code or 0)
+    def _pump_output(self):
+        assert self.process is not None
+        assert self.process.stdout is not None
+
+        stream = self.process.stdout
+        while True:
+            chunk = stream.read(1)
+            if not chunk:
+                break
+
+            text = chunk.decode("utf-8", errors="replace")
+            with self._lock:
+                self._output_chunks.append(text)
+
+        self._last_exit_code = self.process.poll()
+
+    def drain_output(self):
+        with self._lock:
+            if not self._output_chunks:
+                return ""
+            joined = "".join(self._output_chunks)
+            self._output_chunks = []
+        if len(joined) > MAX_OUTPUT_CHARS:
+            return joined[-MAX_OUTPUT_CHARS:]
+        return joined
+
+    def consume_exit_code(self):
+        code = self._last_exit_code
+        self._last_exit_code = None
+        return code
+
+    def write(self, data):
+        if not data:
+            return
+        self.ensure_running()
+        assert self.process is not None
+        assert self.process.stdin is not None
+        encoded = data.encode("utf-8", errors="replace")
+        self.process.stdin.write(encoded)
+        self.process.stdin.flush()
+
+    def set_workspace(self, workspace):
+        self.workspace = pathlib.Path(workspace)
+
+    def write_reset_cwd(self):
+        system = platform.system().lower()
+        if system == "windows":
+            self.write(f'Set-Location "{self.workspace}"\n')
+        else:
+            self.write(f'cd "{self.workspace}"\n')
+
+    def stop(self):
+        if self.process and self.process.poll() is None:
+            self.process.terminate()
 
 
 def main():
@@ -156,47 +174,66 @@ def main():
     parser.add_argument("--room", required=True, help="LiveShare room id")
     parser.add_argument("--server", required=True, help="LiveShare API server URL")
     parser.add_argument("--agent", default="", help="Optional stable agent id")
-    parser.add_argument("--interval", type=float, default=1.5, help="Polling interval in seconds")
+    parser.add_argument("--interval", type=float, default=0.35, help="Polling interval in seconds")
     args = parser.parse_args()
 
     agent_id = args.agent or f"{socket.gethostname()}-{uuid.uuid4().hex[:8]}"
     label = f"{socket.gethostname()} ({platform.system()})"
+    workspace = ensure_workspace(args.room, agent_id)
+    shell = ShellBridge(workspace)
 
     print("[LiveShare Agent] Connected.")
     print(f"[LiveShare Agent] Room: {args.room}")
+    print(f"[LiveShare Agent] Workspace: {workspace}")
     print("[LiveShare Agent] Keep this terminal open while running heavy code.")
 
-    while True:
-        try:
-            payload = {"roomId": args.room, "agentId": agent_id, "label": label}
-            data = post_json(args.server, "/local-agent/jobs/next", payload, timeout=30)
-            job = data.get("job")
+    try:
+        while True:
+            try:
+                shell.ensure_running()
 
-            if not job:
-                time.sleep(max(args.interval, 0.5))
-                continue
-
-            output, exit_code = run_job(job, args.room, agent_id)
-            post_json(
-                args.server,
-                "/local-agent/jobs/result",
-                {
+                payload = {
                     "roomId": args.room,
                     "agentId": agent_id,
                     "label": label,
-                    "jobId": job.get("id"),
-                    "userId": job.get("userId"),
-                    "output": output,
-                    "exitCode": exit_code,
-                },
-                timeout=30,
-            )
-        except KeyboardInterrupt:
-            print("\n[LiveShare Agent] Disconnected.")
-            return 0
-        except Exception as exc:
-            print(f"[LiveShare Agent] {exc}", flush=True)
-            time.sleep(3)
+                    "shell": shell.shell_name,
+                    "output": shell.drain_output(),
+                }
+
+                exit_code = shell.consume_exit_code()
+                if exit_code is not None:
+                    payload["exitCode"] = int(exit_code)
+
+                data = post_json(args.server, "/local-agent/terminal/poll", payload, timeout=30)
+                actions = data.get("actions") or {}
+
+                sync_files = actions.get("syncFiles")
+                if sync_files:
+                    sync_workspace_files(workspace, sync_files)
+                    shell.set_workspace(workspace)
+
+                resize = actions.get("resize")
+                if resize:
+                    # We currently accept resize commands to keep the protocol stable.
+                    # The stdlib subprocess bridge does not support PTY resizing.
+                    _ = resize
+
+                for item in actions.get("inputs") or []:
+                    if isinstance(item, dict):
+                        if item.get("resetCwd"):
+                            shell.write_reset_cwd()
+                        shell.write(item.get("command") or "")
+                    else:
+                        shell.write(str(item))
+
+                time.sleep(max(args.interval, 0.15))
+            except Exception as exc:
+                print(f"[LiveShare Agent] {exc}", flush=True)
+                time.sleep(2)
+    except KeyboardInterrupt:
+        print("\n[LiveShare Agent] Disconnected.")
+        shell.stop()
+        return 0
 
 
 if __name__ == "__main__":
