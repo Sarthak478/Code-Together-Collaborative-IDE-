@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { ShieldAlert, Loader2, DoorOpen, ShieldCheck } from "lucide-react";
 import { initVSCode } from "../services/vscode";
 
-export default function RoomWrapper({ roomId, roomType, isCreating, username, onLeave, children }) {
+export default function RoomWrapper({ roomId, roomType, roomMode, isCreating, username, onLeave, children }) {
   const [status, setStatus] = useState(() => roomType === "broadcast" ? "approved" : "checking");
   const [errorMsg, setErrorMsg] = useState("");
   useEffect(() => {
@@ -19,7 +19,7 @@ export default function RoomWrapper({ roomId, roomType, isCreating, username, on
       fetch(`${COLLAB_URL}/room/${roomId}/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hostToken: token, roomType })
+        body: JSON.stringify({ hostToken: token, roomType, roomMode })
       })
       .then(res => res.json())
       .then(data => {
@@ -42,7 +42,7 @@ export default function RoomWrapper({ roomId, roomType, isCreating, username, on
       fetch(`${COLLAB_URL}/room/${roomId}/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hostToken, roomType })
+        body: JSON.stringify({ hostToken, roomType, roomMode })
       })
       .then(res => res.json())
       .then(data => {
@@ -111,7 +111,7 @@ export default function RoomWrapper({ roomId, roomType, isCreating, username, on
     });
 
     return () => { isMounted = false; };
-  }, [roomId, roomType, isCreating, username]);
+  }, [roomId, roomType, roomMode, isCreating, username]);
 
   // Defer Monaco initialization until approved
   useEffect(() => {

@@ -6,6 +6,7 @@ import { HocuspocusProvider } from "@hocuspocus/provider"
 import { LANGUAGES, THEMES, FONT_FAMILIES, CURSORS } from "../constants/editorConfigs"
 import { ROOM_MODES } from "../constants/roomModes"
 import { loadPersonalPrefs, savePersonalPrefs } from "../utils/helpers"
+import { buildExecutionWebSocketUrl } from "../utils/socketUrls"
 import { WS_URL, API_URL, COLLAB_URL } from "../config"
 
 /* ─── useEditorRoom Hook ────────────────────────────────────────── */
@@ -240,8 +241,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
       recalcHost()
     }, 0)
 
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${API_URL.replace(/^https?:/, wsProtocol)}/execution`)
+    const ws = new WebSocket(buildExecutionWebSocketUrl(API_URL, window.location.protocol))
     ws.onopen = () => ws.send(JSON.stringify({ type: "join", roomId }))
     ws.onmessage = (event) => {
       try {

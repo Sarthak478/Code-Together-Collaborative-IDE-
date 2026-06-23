@@ -89,7 +89,7 @@ class ShellBridge:
         system = platform.system().lower()
         if system == "windows":
             self._shell_name = "powershell.exe"
-            return ["powershell.exe", "-NoLogo"]
+            return ["powershell.exe", "-NoLogo", "-NoProfile"]
         self._shell_name = "bash"
         return ["bash"]
 

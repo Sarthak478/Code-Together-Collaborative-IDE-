@@ -179,6 +179,11 @@ const getActiveRooms = async () =>
         () => Array.from(memoryStore.activeRooms)
     );
 
+const getRedisStatus = () => ({
+    configured: hasRedisConfig,
+    fallbackMode: !hasRedisConfig || warnedAboutFallback,
+});
+
 module.exports = {
     redis,
     getRoomMeta,
@@ -192,4 +197,5 @@ module.exports = {
     getWaitingUsers,
     removeWaitingUser,
     getActiveRooms,
+    getRedisStatus,
 };

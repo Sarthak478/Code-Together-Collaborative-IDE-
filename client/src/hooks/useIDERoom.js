@@ -6,6 +6,7 @@ import { IndexeddbPersistence } from "y-indexeddb"
 
 import { LANGUAGES, THEMES, FONT_FAMILIES, EXT_TO_LANG } from "../constants/editorConfigs"
 import { loadPersonalPrefs, savePersonalPrefs } from "../utils/helpers"
+import { buildExecutionWebSocketUrl } from "../utils/socketUrls"
 import useFileSystem from "./useFileSystem"
 import { WS_URL, API_URL, COLLAB_URL } from "../config"
 
@@ -383,8 +384,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     recalcHost()
 
     // Execution WS
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${API_URL.replace(/^https?:/, wsProtocol)}/execution`)
+    const ws = new WebSocket(buildExecutionWebSocketUrl(API_URL, window.location.protocol))
     ws.onopen = () => ws.send(JSON.stringify({ type: "join", roomId }))
     ws.onmessage = (event) => {
       try {
@@ -427,7 +427,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       clearInterval(timerInterval)
       roomMap.unobserve(onRoomChange)
       chatArray.unobserve(onChatChange)
-      provider.awareness.off("change", recalcHost)
+      provider.awareness.off("change", onAwarenessChange)
       ws.close()
     }
   }, [editor, recalcHost, roomId, onLeave, username, fs, isHost])

@@ -8,6 +8,7 @@ import { WS_URL } from "./config"
 
 const EditorRoom = lazy(() => import("./components/EditorRoom"))
 const IDERoom = lazy(() => import("./components/IDERoom"))
+const AdminPanel = lazy(() => import("./components/admin/AdminPanel"))
 
 const SESSION_KEY = "ls_session"
 
@@ -27,6 +28,7 @@ function clearSession() {
 }
 
 export default function App() {
+  const isAdminRoute = typeof window !== "undefined" && window.location.pathname.startsWith("/admin")
   const saved = getSession()
   const [roomId, setRoomId] = useState(saved?.roomId ?? null)
   const [roomType, setRoomType] = useState(saved?.roomType ?? "collaborative")
@@ -107,6 +109,14 @@ export default function App() {
     }
   }, [roomId, roomType, isCreating, isResolvingRoomMode, username])
 
+  if (isAdminRoute) {
+    return (
+      <Suspense fallback={null}>
+        <AdminPanel />
+      </Suspense>
+    )
+  }
+
   if (!roomId) {
     return (
       <Landing
@@ -140,9 +150,9 @@ export default function App() {
       <RoomWrapper
         roomId={roomId}
         roomType={roomType}
+        roomMode={roomMode}
         isCreating={isCreating}
         username={username}
-        roomMode={roomMode}
         onLeave={onLeave}
       >
         {roomMode === ROOM_MODES.IDE ? (

@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const http = require("http");
 const { WebSocketServer } = require("ws");
+const crypto = require("crypto");
 const { exec } = require("child_process");
 const fs = require("fs");
 const { writeFileSync, unlinkSync, mkdirSync, rmSync, existsSync } = require("fs");
@@ -14,6 +15,7 @@ const dotenv = require("dotenv");
 const rateLimit = require("express-rate-limit");
 const axios = require("axios");
 const { sendInviteEmail } = require("./services/emailService.js");
+const { getActiveRooms, getRoomMeta, getWaitingUsers, getRedisStatus } = require("./services/redisService.js");
 const {
   getGit,
   isValidRepo,
@@ -26,6 +28,17 @@ const {
   reinitRepo,
   withAuthenticatedOrigin
 } = require("./services/gitService.js");
+const {
+  getCounters,
+  listRecentEvents,
+  listRecentRooms,
+  recordRunRequest,
+} = require("./services/adminMetrics.js");
+const {
+  parseTerminalMessage,
+  parseExecutionMessage,
+} = require("./utils/wsPayloads");
+const { getTerminalShellLaunchConfig } = require("./utils/terminalShell");
 
 dotenv.config();
 
@@ -182,7 +195,104 @@ const initAPI = (app, server) => {
   const roomWatchers = new Map(); // roomId -> chokidarWatcher
   const roomCleanupTimers = new Map(); // roomId -> timeoutId
   const roomLastResizer = new Map(); // roomId -> { clientId, cols, rows, time }
+  const adminSessions = new Map(); // sessionId -> { createdAt, expiresAt }
   const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  const ADMIN_COOKIE_NAME = "ct_admin_session";
+  const ADMIN_SESSION_MS = 1000 * 60 * 60 * 12;
+
+  function parseCookies(req) {
+    const raw = req.headers.cookie || "";
+    return raw.split(";").reduce((acc, part) => {
+      const idx = part.indexOf("=");
+      if (idx === -1) return acc;
+      const key = part.slice(0, idx).trim();
+      const value = decodeURIComponent(part.slice(idx + 1).trim());
+      if (key) acc[key] = value;
+      return acc;
+    }, {});
+  }
+
+  function clearExpiredAdminSessions() {
+    const current = Date.now();
+    for (const [sessionId, session] of adminSessions.entries()) {
+      if ((session?.expiresAt || 0) <= current) {
+        adminSessions.delete(sessionId);
+      }
+    }
+  }
+
+  function getAdminSecrets() {
+    return {
+      accessKey: process.env.ADMIN_ACCESS_KEY || process.env.ADMIN_PANEL_KEY || "",
+      password: process.env.ADMIN_PASSWORD || process.env.ADMIN_SECRET || "",
+    };
+  }
+
+  function setAdminCookie(res, sessionId) {
+    const secure = process.env.NODE_ENV === "production";
+    const sameSite = secure ? "None" : "Lax";
+    const parts = [
+      `${ADMIN_COOKIE_NAME}=${encodeURIComponent(sessionId)}`,
+      "HttpOnly",
+      "Path=/",
+      `SameSite=${sameSite}`,
+      `Max-Age=${Math.floor(ADMIN_SESSION_MS / 1000)}`
+    ];
+    if (secure) parts.push("Secure");
+    res.setHeader("Set-Cookie", parts.join("; "));
+  }
+
+  function clearAdminCookie(res) {
+    const secure = process.env.NODE_ENV === "production";
+    const sameSite = secure ? "None" : "Lax";
+    const parts = [
+      `${ADMIN_COOKIE_NAME}=`,
+      "HttpOnly",
+      "Path=/",
+      `SameSite=${sameSite}`,
+      "Max-Age=0"
+    ];
+    if (secure) parts.push("Secure");
+    res.setHeader("Set-Cookie", parts.join("; "));
+  }
+
+  function getAdminSession(req) {
+    clearExpiredAdminSessions();
+    const cookies = parseCookies(req);
+    const sessionId = cookies[ADMIN_COOKIE_NAME];
+    if (!sessionId) return null;
+
+    const session = adminSessions.get(sessionId);
+    if (!session) return null;
+
+    if (session.expiresAt <= Date.now()) {
+      adminSessions.delete(sessionId);
+      return null;
+    }
+
+    return { sessionId, ...session };
+  }
+
+  function requireAdmin(req, res, next) {
+    const session = getAdminSession(req);
+    if (!session) {
+      return res.status(401).json({ authenticated: false, error: "Admin authentication required." });
+    }
+
+    req.adminSession = session;
+    next();
+  }
+
+  function createAdminSession() {
+    clearExpiredAdminSessions();
+    const sessionId = crypto.randomBytes(24).toString("hex");
+    const createdAt = Date.now();
+    adminSessions.set(sessionId, {
+      createdAt,
+      expiresAt: createdAt + ADMIN_SESSION_MS,
+    });
+    return sessionId;
+  }
 
   async function stopRoomResources(roomId) {
     roomCleanupTimers.delete(roomId);
@@ -337,7 +447,7 @@ const initAPI = (app, server) => {
 
         ws.on("message", (msg) => {
           try {
-            const data = JSON.parse(msg.toString());
+            const data = parseTerminalMessage(msg);
             const session = getLocalAgentTerminalSession(roomId);
             if (!session) return;
 
@@ -359,7 +469,8 @@ const initAPI = (app, server) => {
         return;
       }
 
-      const shell = platform() === "win32" ? "powershell.exe" : "bash";
+      const terminalLaunch = getTerminalShellLaunchConfig(platform());
+      const shell = terminalLaunch.shell;
       const roomCwd = join(tmpdir(), `liveshare_room_${roomId}`);
       if (!existsSync(roomCwd)) {
         mkdirSync(roomCwd, { recursive: true });
@@ -369,7 +480,7 @@ const initAPI = (app, server) => {
       if (!roomTerminals.has(termKey)) {
         console.log(`Spawning terminal ${terminalId} for room ${roomId} using ${shell} at ${roomCwd}`);
 
-        const ptyProcess = pty.spawn(shell, [], {
+        const ptyProcess = pty.spawn(shell, terminalLaunch.args, {
           name: "xterm-color",
           cols: 80,
           rows: 24,
@@ -412,7 +523,7 @@ const initAPI = (app, server) => {
 
       ws.on("message", (msg) => {
         try {
-          const data = JSON.parse(msg.toString());
+          const data = parseTerminalMessage(msg);
           const ptyProcess = roomTerminals.get(termKey);
           if (!ptyProcess) return;
 
@@ -447,7 +558,7 @@ const initAPI = (app, server) => {
     if (url.pathname === "/execution" || url.pathname === "/") {
       ws.on("message", (msg) => {
         try {
-          const data = JSON.parse(msg.toString());
+          const data = parseExecutionMessage(msg);
 
           if (data.type === "join" && data.roomId) {
             const cleanRoomId = sanitizePath(data.roomId);
@@ -630,6 +741,60 @@ const initAPI = (app, server) => {
     broadcastTerminal(roomId, null, { type: "output", data }, { includeAllRoomTerminals: true });
   }
 
+  async function buildAdminMetricsSnapshot() {
+    const activeRoomIds = await getActiveRooms().catch(() => []);
+    const roomIds = new Set([
+      ...activeRoomIds,
+      ...listRecentRooms().map((room) => room.roomId),
+    ]);
+
+    const recentRoomMetrics = listRecentRooms();
+    const recentRoomMap = new Map(recentRoomMetrics.map((room) => [room.roomId, room]));
+    const roomSummaries = [];
+
+    for (const roomId of roomIds) {
+      const meta = await getRoomMeta(roomId).catch(() => null);
+      const waitingUsers = await getWaitingUsers(roomId).catch(() => []);
+      const tracked = recentRoomMap.get(roomId) || { roomId };
+      const activeConnections = tracked.currentConnections || 0;
+
+      roomSummaries.push({
+        roomId,
+        roomType: meta?.roomType || tracked.roomType || "unknown",
+        roomMode: meta?.roomMode || tracked.roomMode || "unknown",
+        createdAt: Number(meta?.createdAt || tracked.createdAt || 0) || null,
+        lastActiveAt: tracked.lastActiveAt || null,
+        status: activeRoomIds.includes(roomId) ? (activeConnections > 0 ? "active" : "idle") : (tracked.status || "destroyed"),
+        activeConnections,
+        waitingCount: Array.isArray(waitingUsers) ? waitingUsers.length : (tracked.waitingCount || 0),
+        maxConnectionsSeen: tracked.maxConnectionsSeen || activeConnections,
+      });
+    }
+
+    roomSummaries.sort((a, b) => (b.lastActiveAt || b.createdAt || 0) - (a.lastActiveAt || a.createdAt || 0));
+
+    const activeClientConnections = roomSummaries.reduce((sum, room) => sum + room.activeConnections, 0);
+    const localAgentRoomCount = Array.from(localAgents.keys()).filter((roomId) => pruneLocalAgents(roomId).length > 0).length;
+    const localTerminalRoomCount = Array.from(localAgentTerminalSessions.keys()).filter((roomId) => !!getLocalAgentTerminalSession(roomId)).length;
+
+    return {
+      generatedAt: Date.now(),
+      counters: getCounters(),
+      overview: {
+        activeRooms: activeRoomIds.length,
+        trackedRooms: roomSummaries.length,
+        activeClientConnections,
+        waitingUsers: roomSummaries.reduce((sum, room) => sum + room.waitingCount, 0),
+        localAgentRooms: localAgentRoomCount,
+        localTerminalRooms: localTerminalRoomCount,
+        serverTerminalRooms: Array.from(roomTerminals.keys()).length,
+      },
+      redis: getRedisStatus(),
+      rooms: roomSummaries.slice(0, 50),
+      recentEvents: listRecentEvents(35),
+    };
+  }
+
   const { executeRemote } = require("./services/wandbox.js");
   /* -------------------- CODE EXECUTION -------------------- */
 
@@ -771,6 +936,8 @@ const initAPI = (app, server) => {
       return res.status(400).json({ error: "roomId and userId required" });
     }
 
+    recordRunRequest("cloud", roomId);
+
     if (!code || !code.trim()) {
       return res.json({ status: "done", stdout: "", stderr: "", exitCode: 0, output: "(empty code)" });
     }
@@ -821,6 +988,50 @@ const initAPI = (app, server) => {
     });
   });
 
+  app.post("/admin/login", (req, res) => {
+    const { accessKey, password } = req.body || {};
+    const secrets = getAdminSecrets();
+
+    if (!secrets.accessKey || !secrets.password) {
+      return res.status(503).json({ error: "Admin access is not configured on the server." });
+    }
+
+    if (String(accessKey || "") !== secrets.accessKey || String(password || "") !== secrets.password) {
+      return res.status(401).json({ error: "Invalid admin credentials." });
+    }
+
+    const sessionId = createAdminSession();
+    setAdminCookie(res, sessionId);
+
+    res.json({ success: true, authenticated: true });
+  });
+
+  app.post("/admin/logout", (req, res) => {
+    const cookies = parseCookies(req);
+    const sessionId = cookies[ADMIN_COOKIE_NAME];
+    if (sessionId) {
+      adminSessions.delete(sessionId);
+    }
+
+    clearAdminCookie(res);
+    res.json({ success: true });
+  });
+
+  app.get("/admin/session", (req, res) => {
+    const secrets = getAdminSecrets();
+    const session = getAdminSession(req);
+
+    res.json({
+      authenticated: !!session,
+      configured: Boolean(secrets.accessKey && secrets.password),
+    });
+  });
+
+  app.get("/admin/metrics", requireAdmin, async (_req, res) => {
+    const snapshot = await buildAdminMetricsSnapshot();
+    res.json({ success: true, ...snapshot });
+  });
+
   app.get("/local-agent/status", (req, res) => {
     const { roomId } = req.query;
     if (!roomId) {
@@ -864,6 +1075,7 @@ const initAPI = (app, server) => {
 
     const terminalSession = getLocalAgentTerminalSession(roomId);
     if (terminalSession) {
+      recordRunRequest("local-agent", roomId);
       const filepath = String(activeFile.path || "").replace(/^\//, "");
       const cmdString = buildRunCommand(language, filepath);
 
@@ -885,6 +1097,7 @@ const initAPI = (app, server) => {
     }
 
     const jobId = createLocalAgentJobId();
+    recordRunRequest("local-agent", roomId);
     const job = {
       id: jobId,
       userId: userId || "local-user",
@@ -1001,6 +1214,7 @@ const initAPI = (app, server) => {
 
       const localTerminalSession = getLocalAgentTerminalSession(roomId);
       if (localTerminalSession) {
+        recordRunRequest("local-agent", roomId);
         const filepath = activeFile.path.replace(/^\//, "");
         const cmdString = buildRunCommand(language, filepath);
 
@@ -1025,6 +1239,7 @@ const initAPI = (app, server) => {
       if (!ptyProcess) {
         return res.status(400).json({ error: "No active terminal session in this room." });
       }
+      recordRunRequest("terminal", roomId);
 
       const filepath = activeFile.path.replace(/^\//, "");
 

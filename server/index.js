@@ -1,4 +1,3 @@
-const { Server } = require("@hocuspocus/server");
 const { parse } = require("url");
 const express = require("express");
 const http = require("http");
@@ -6,6 +5,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const dotenv = require("dotenv");
 const { initAPI } = require("./api.js");
+const { createCollaborationServer } = require("./utils/collaborationServer");
 const {
     getRoomMeta,
     setRoomMeta,
@@ -19,6 +19,15 @@ const {
     removeWaitingUser,
     getActiveRooms
 } = require("./services/redisService");
+const {
+    recordRoomCreated,
+    recordRoomDestroyed,
+    recordJoinRequest,
+    recordApproval,
+    recordDenial,
+    recordConnectionCount,
+    recordWaitingCount,
+} = require("./services/adminMetrics");
 
 dotenv.config();
 
@@ -113,7 +122,8 @@ const activeConnections = new Map();
 const roomConnections = new Map();
 
 // --- Hocuspocus Server ---
-const hocuspocus = new Server({
+const collaboration = createCollaborationServer({
+    serverOptions: {
     async onAuthenticate(data) {
         const { documentName, request, connection } = data;
         const parsedUrl = parse(request.url, true);
@@ -150,6 +160,7 @@ const hocuspocus = new Server({
         const current = activeConnections.get(documentName) || 0;
         const updated = current + 1;
         activeConnections.set(documentName, updated);
+        recordConnectionCount(documentName, updated);
         console.log(`Client joined ${documentName}. Active: ${updated}`);
 
         if (deletionTimers.has(documentName)) {
@@ -174,6 +185,7 @@ const hocuspocus = new Server({
         const current = activeConnections.get(documentName) || 1;
         const updated = current - 1;
         activeConnections.set(documentName, updated);
+        recordConnectionCount(documentName, updated);
         console.log(`Client left ${documentName}. Active: ${updated}`);
 
         if (updated === 0) {
@@ -184,6 +196,7 @@ const hocuspocus = new Server({
                 roomConnections.delete(documentName);
 
                 await deleteRoom(documentName);
+                recordRoomDestroyed(documentName);
 
                 try {
                     const axios = require("axios");
@@ -193,7 +206,9 @@ const hocuspocus = new Server({
             deletionTimers.set(documentName, timeout);
         }
     }
+    }
 });
+const hocuspocus = collaboration.hocuspocus;
 
 // --- API Routes ---
 
@@ -208,7 +223,7 @@ app.get("/rooms", async (req, res) => {
 
 app.post("/room/:roomId/create", async (req, res) => {
     const { roomId } = req.params;
-    const { hostToken, roomType } = req.body;
+    const { hostToken, roomType, roomMode } = req.body;
     
     const existing = await getRoomMeta(roomId);
     if (existing && Object.keys(existing).length > 0) {
@@ -219,9 +234,11 @@ app.post("/room/:roomId/create", async (req, res) => {
         await setRoomMeta(roomId, {
             hostToken,
             roomType: roomType || "collaborative",
+            roomMode: roomMode || "unknown",
             limit: "0",
             createdAt: Date.now().toString()
         });
+        recordRoomCreated(roomId, { roomType, roomMode });
     }
     res.json({ success: true });
 });
@@ -249,7 +266,11 @@ app.post("/room/:roomId/join-request", async (req, res) => {
 
     if (!approved) {
         await addWaitingUser(roomId, username, { username, timestamp: Date.now() });
+        const waiting = await getWaitingUsers(roomId);
+        recordWaitingCount(roomId, waiting.length);
     }
+
+    recordJoinRequest(roomId);
 
     res.json({ success: true, status: approved ? "approved" : "waiting" });
 });
@@ -265,8 +286,14 @@ app.post("/room/:roomId/:action", async (req, res) => {
 
     if (action === "approve") {
         await approveUser(roomId, username);
+        const waiting = await getWaitingUsers(roomId);
+        recordWaitingCount(roomId, waiting.length);
+        recordApproval(roomId);
     } else if (action === "deny" || action === "kick") {
         await denyUser(roomId, username);
+        const waiting = await getWaitingUsers(roomId);
+        recordWaitingCount(roomId, waiting.length);
+        recordDenial(roomId);
         const conns = roomConnections.get(roomId);
         if (conns && conns.has(username)) {
             conns.get(username).close(4003, "Kicked");
@@ -281,6 +308,9 @@ app.post("/room/:roomId/:action", async (req, res) => {
         await deleteRoom(roomId);
         activeConnections.delete(roomId);
         roomConnections.delete(roomId);
+        recordConnectionCount(roomId, 0);
+        recordWaitingCount(roomId, 0);
+        recordRoomDestroyed(roomId);
     }
     res.json({ success: true });
 });
@@ -332,5 +362,8 @@ httpServer.on("upgrade", (request, socket, head) => {
 httpServer.listen(PORT, () => {
     console.log(`🚀 Unified Server running on port ${PORT}`);
     console.log(`   - API & Terminal: http://localhost:${PORT}`);
-    console.log(`   - Collaboration: ws://localhost:${PORT}`);
+    console.log(`   - Collaboration: ${collaboration.available ? `ws://localhost:${PORT}` : "unavailable (dependency load failed)"}`);
+    if (!collaboration.available) {
+        console.warn(`[collaboration] Disabled because the collaboration server dependency failed to load: ${collaboration.error.message}`);
+    }
 });
