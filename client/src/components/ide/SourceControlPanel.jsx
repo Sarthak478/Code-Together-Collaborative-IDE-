@@ -77,16 +77,12 @@ export default function SourceControlPanel({
   }, [roomId])
 
   useEffect(() => {
-    setGitStatus(initialGitStatus || null)
-  }, [initialGitStatus])
-
-  useEffect(() => {
-    setIsGitLoading(initialIsGitLoading || false)
-  }, [initialIsGitLoading])
-
-  useEffect(() => {
     if (!initialGitStatus) {
-      refreshGitStatus()
+      const timerId = setTimeout(() => {
+        refreshGitStatus()
+      }, 0)
+
+      return () => clearTimeout(timerId)
     }
   }, [initialGitStatus, refreshGitStatus])
 
@@ -207,7 +203,11 @@ export default function SourceControlPanel({
 
   useEffect(() => {
     if (showRepoSetup && userRepos.length === 0) {
-      fetchUserRepos()
+      const timerId = setTimeout(() => {
+        fetchUserRepos()
+      }, 0)
+
+      return () => clearTimeout(timerId)
     }
   }, [showRepoSetup, fetchUserRepos, userRepos.length])
 

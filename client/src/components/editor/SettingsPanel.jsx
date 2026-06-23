@@ -146,7 +146,11 @@ export default function SettingsPanel({
   useEffect(() => {
     if (!savedPat) return
     if (patResult.type === "success" && patResult.token === savedPat) return
-    validateGithubPat(savedPat, { persist: false, clearOnFail: true })
+    const timerId = setTimeout(() => {
+      validateGithubPat(savedPat, { persist: false, clearOnFail: true })
+    }, 0)
+
+    return () => clearTimeout(timerId)
   }, [savedPat, patResult.type, patResult.token, validateGithubPat])
 
   return (

@@ -1,17 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import sri from 'vite-plugin-sri-gen'
 
 export default defineConfig({
-  plugins: [
-    react(),
-    sri({
-      skipResources: [
-        'https://fonts.googleapis.com/*',
-        'https://fonts.gstatic.com/*'
-      ]
-    })
-  ],
+  plugins: [react()],
   build: {
     rollupOptions: {
       output: {
@@ -27,6 +18,6 @@ export default defineConfig({
         }
       }
     },
-    chunkSizeWarningLimit: 1000
+    chunkSizeWarningLimit: 10000
   }
 })

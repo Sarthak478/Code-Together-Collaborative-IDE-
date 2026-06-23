@@ -166,7 +166,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   const [toasts, setToasts] = useState([])
   const [interviewTime, setInterviewTime] = useState(0) // Shared timer
   const [isSyncingFile, setIsSyncingFile] = useState(false)
-  const [isPersistenceSynced, setIsPersistenceSynced] = useState(false)
+  const [isPersistenceSynced, setIsPersistenceSynced] = useState(() => !!editor.persistence.synced)
   const [localAgentPrompt, setLocalAgentPrompt] = useState({
     open: false,
     fileName: "",
@@ -255,12 +255,18 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   useEffect(() => {
     if (!localAgentPrompt.open) return
 
-    refreshLocalAgentStatus()
+    const initialPoll = setTimeout(() => {
+      refreshLocalAgentStatus()
+    }, 0)
+
     const timer = setInterval(() => {
       refreshLocalAgentStatus()
     }, 2500)
 
-    return () => clearInterval(timer)
+    return () => {
+      clearTimeout(initialPoll)
+      clearInterval(timer)
+    }
   }, [localAgentPrompt.open, refreshLocalAgentStatus])
 
   /* ── Personal UI ── */
@@ -293,9 +299,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       editor.provider.disconnect()
     }
     window.addEventListener("beforeunload", handleUnload)
-    
-    // Check initial persistence sync
-    if (editor.persistence.synced) setIsPersistenceSynced(true)
+
     editor.persistence.on("synced", () => setIsPersistenceSynced(true))
 
     return () => {
@@ -306,7 +310,11 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   }, [editor])
 
   useEffect(() => {
-    refreshGitStatus()
+    const timerId = setTimeout(() => {
+      refreshGitStatus()
+    }, 0)
+
+    return () => clearTimeout(timerId)
   }, [refreshGitStatus])
 
   useEffect(() => {
@@ -402,7 +410,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     }
 
     provider.awareness.on("change", onAwarenessChange)
-    recalcHost()
+    const frameId = requestAnimationFrame(recalcHost)
 
     // Execution WS
     const ws = new WebSocket(buildExecutionWebSocketUrl(API_URL, window.location.protocol))
@@ -449,6 +457,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       roomMap.unobserve(onRoomChange)
       chatArray.unobserve(onChatChange)
       provider.awareness.off("change", onAwarenessChange)
+      cancelAnimationFrame(frameId)
       ws.close()
     }
   }, [editor, recalcHost, roomId, onLeave, username, fs, isHost])
@@ -474,9 +483,13 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     if (newMsg.target !== "all" && newMsg.target !== editor.username && newMsg.sender !== editor.username) return
     if (newMsg.id !== lastToastId.current) {
       lastToastId.current = newMsg.id
-      if (newMsg.type === "system") addToast(`🚀 @${newMsg.sender} ran the code`)
-      else if (newMsg.type === "system_kick") addToast(`🚪 ${newMsg.text}`)
-      else if (rightPanel !== "chat") addToast(`💬 @${newMsg.sender}: ${newMsg.text}`)
+      const timerId = setTimeout(() => {
+        if (newMsg.type === "system") addToast(`🚀 @${newMsg.sender} ran the code`)
+        else if (newMsg.type === "system_kick") addToast(`🚪 ${newMsg.text}`)
+        else if (rightPanel !== "chat") addToast(`💬 @${newMsg.sender}: ${newMsg.text}`)
+      }, 0)
+
+      return () => clearTimeout(timerId)
     }
   }, [chatMessages, rightPanel, editor.username, addToast])
 
@@ -573,7 +586,13 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   useEffect(() => {
     if (openFiles.length === 0 && fs.getAllFiles().length > 0) {
       const first = fs.getAllFiles()[0]
-      if (first) openFile(first.path)
+      if (first) {
+        const timerId = setTimeout(() => {
+          openFile(first.path)
+        }, 0)
+
+        return () => clearTimeout(timerId)
+      }
     }
   }, [fs.version, openFiles.length, fs, openFile])
 

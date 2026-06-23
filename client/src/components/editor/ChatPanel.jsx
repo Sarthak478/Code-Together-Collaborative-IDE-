@@ -28,18 +28,38 @@ export default function ChatPanel({
   } = themeData;
 
   const messagesEndRef = useRef(null);
-  const hasInitialScroll = useRef(false);
+  const scrollContainerRef = useRef(null);
+  const shouldAutoScrollRef = useRef(true);
+  const hasInitialScrollRef = useRef(false);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (messagesEndRef.current) {
-      if (!hasInitialScroll.current) {
-        messagesEndRef.current.scrollIntoView();
-        hasInitialScroll.current = true;
-      } else {
-        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-      }
-    }
+    const container = scrollContainerRef.current;
+    if (!container) return undefined;
+
+    const updateStickiness = () => {
+      const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+      shouldAutoScrollRef.current = distanceFromBottom < 120;
+    };
+
+    updateStickiness();
+    container.addEventListener("scroll", updateStickiness, { passive: true });
+
+    return () => container.removeEventListener("scroll", updateStickiness);
+  }, [messages]);
+
+  useEffect(() => {
+    const bottom = messagesEndRef.current;
+    if (!bottom) return undefined;
+
+    if (hasInitialScrollRef.current && !shouldAutoScrollRef.current) return undefined;
+
+    const frameId = requestAnimationFrame(() => {
+      bottom.scrollIntoView({ block: "end", behavior: "auto" });
+      hasInitialScrollRef.current = true;
+    });
+
+    return () => cancelAnimationFrame(frameId);
   }, [messages]);
 
   const handleSendMessage = (e) => {
@@ -209,6 +229,7 @@ export default function ChatPanel({
 
       {/* Messages Container - Scrollable */}
       <div
+        ref={scrollContainerRef}
         style={{
           flex: 1,
           overflowY: "auto",
@@ -338,7 +359,7 @@ export default function ChatPanel({
             </div>
           );
         })}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} aria-hidden="true" style={{ height: 1, width: 1 }} />
       </div>
 
       {/* Input Form */}

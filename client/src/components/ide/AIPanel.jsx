@@ -628,6 +628,9 @@ export default function AIPanel({
   const [customAgentsOpen, setCustomAgentsOpen] = useState(false)
   
   const scrollRef = useRef(null)
+  const scrollBottomRef = useRef(null)
+  const shouldAutoScrollRef = useRef(true)
+  const hasInitialScrollRef = useRef(false)
   const consentResolveRef = useRef(null)
   const hasConsentedRef = useRef(false) // Ref mirrors state to avoid stale closures
   const availableAgents = useMemo(() => [...BUILT_IN_AGENTS, ...customAgents], [customAgents])
@@ -667,8 +670,33 @@ export default function AIPanel({
 
   // Auto-scroll
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    const container = scrollRef.current
+    if (!container) return undefined
+
+    const updateStickiness = () => {
+      const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+      shouldAutoScrollRef.current = distanceFromBottom < 120
+    }
+
+    updateStickiness()
+    container.addEventListener("scroll", updateStickiness, { passive: true })
+
+    return () => container.removeEventListener("scroll", updateStickiness)
   }, [messages, isLoading])
+
+  useEffect(() => {
+    const bottom = scrollBottomRef.current
+    if (!bottom) return undefined
+
+    if (hasInitialScrollRef.current && !shouldAutoScrollRef.current) return undefined
+
+    const frameId = requestAnimationFrame(() => {
+      bottom.scrollIntoView({ block: "end", behavior: "auto" })
+      hasInitialScrollRef.current = true
+    })
+
+    return () => cancelAnimationFrame(frameId)
+  }, [messages, isLoading, pendingConsentResolve])
 
   // ── Model Discovery (cached per session in state, NOT localStorage) ──
   const modelRef = useRef(null)
@@ -1341,6 +1369,8 @@ return (
           {activeAgent.name} is working...
         </div>
       )}
+
+      <div ref={scrollBottomRef} aria-hidden="true" style={{ height: 1, width: 1 }} />
     </div>
 
     {/* Input */}
