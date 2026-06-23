@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { MonacoBinding } from "y-monaco"
 import * as Y from "yjs"
-import { HocuspocusProvider } from "@hocuspocus/provider"
+import { createManagedCollaborationProvider } from "../utils/collaborationProvider"
 
 import { LANGUAGES, THEMES, FONT_FAMILIES, CURSORS } from "../constants/editorConfigs"
 import { ROOM_MODES } from "../constants/roomModes"
@@ -17,7 +17,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
     const hostToken = localStorage.getItem(`host_${roomId}`) || "";
     const authUrl = `${WS_URL}?username=${encodeURIComponent(username)}&hostToken=${encodeURIComponent(hostToken)}`;
 
-    const provider = new HocuspocusProvider({
+    const provider = createManagedCollaborationProvider({
       url: authUrl,
       name: roomId,
       document: ydoc,

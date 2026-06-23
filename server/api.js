@@ -7,7 +7,7 @@ const { exec } = require("child_process");
 const fs = require("fs");
 const { writeFileSync, unlinkSync, mkdirSync, rmSync, existsSync } = require("fs");
 const { tmpdir, platform } = require("os");
-const { join, dirname, relative } = require("path");
+const { join, dirname, relative, basename } = require("path");
 const pty = require("node-pty");
 const chokidar = require("chokidar");
 const { simpleGit } = require("simple-git");
@@ -110,6 +110,9 @@ const initAPI = (app, server) => {
 
   function buildRunCommand(language, filepath) {
     const normalizedLanguage = String(language || "").toLowerCase();
+    const isWindows = platform() === "win32";
+    const windowsChain = (first, second) => `${first}; if ($LASTEXITCODE -eq 0) { ${second} }`;
+    const windowsJavaClassPath = (classDir) => (classDir === "." ? "." : `${classDir};.`);
     const pythonCommand = platform() === "win32"
       ? `if (Get-Command python -ErrorAction SilentlyContinue) { python "${filepath}" } elseif (Get-Command py -ErrorAction SilentlyContinue) { py -3 "${filepath}" } else { Write-Error "Python runtime not found" }\r`
       : `python3 "${filepath}" || python "${filepath}"\r`;
@@ -122,28 +125,37 @@ const initAPI = (app, server) => {
       "kotlin": {
         cmd: () => {
           const jarName = `${filepath.replace(/\.kt$/i, "")}.jar`;
-          return `kotlinc "${filepath}" -include-runtime -d "${jarName}" && java -jar "${jarName}"\r`;
+          return isWindows
+            ? `${windowsChain(`kotlinc "${filepath}" -include-runtime -d "${jarName}"`, `java -jar "${jarName}"`)}\r`
+            : `kotlinc "${filepath}" -include-runtime -d "${jarName}" && java -jar "${jarName}"\r`;
         },
         lang: "Kotlin"
       },
       "cpp": {
         cmd: () => {
-          const executable = platform() === "win32" ? "a.exe" : "./a.out";
-          return `g++ "${filepath}" && ${executable}\r`;
+          const executable = isWindows ? "& .\\a.exe" : "./a.out";
+          return isWindows
+            ? `${windowsChain(`g++ "${filepath}"`, executable)}\r`
+            : `g++ "${filepath}" && ${executable}\r`;
         },
         lang: "C++"
       },
       "c": {
         cmd: () => {
-          const executable = platform() === "win32" ? "a.exe" : "./a.out";
-          return `g++ "${filepath}" && ${executable}\r`;
+          const executable = isWindows ? "& .\\a.exe" : "./a.out";
+          return isWindows
+            ? `${windowsChain(`g++ "${filepath}"`, executable)}\r`
+            : `g++ "${filepath}" && ${executable}\r`;
         },
         lang: "C"
       },
       "rust": {
         cmd: () => {
-          const executable = platform() === "win32" ? `${filepath.replace(".rs", ".exe")}` : `./${filepath.replace(".rs", "")}`;
-          return `rustc "${filepath}" && ${executable}\r`;
+          const binaryName = basename(filepath, ".rs");
+          const executable = isWindows ? `& ".\\${binaryName}.exe"` : `./${binaryName}`;
+          return isWindows
+            ? `${windowsChain(`rustc "${filepath}" -o "${binaryName}.exe"`, executable)}\r`
+            : `rustc "${filepath}" -o "${binaryName}" && ${executable}\r`;
         },
         lang: "Rust"
       },
@@ -152,8 +164,10 @@ const initAPI = (app, server) => {
         cmd: () => {
           const className = filepath.split("/").pop().replace(/\.java$/i, "");
           const classDir = dirname(filepath);
-          const classPath = classDir === "." ? "." : `${classDir}${platform() === "win32" ? ";" : ":"}.`;
-          return `javac "${filepath}" && java -cp "${classPath}" "${className}"\r`;
+          const classPath = isWindows ? windowsJavaClassPath(classDir) : (classDir === "." ? "." : `${classDir}:.`);
+          return isWindows
+            ? `${windowsChain(`javac "${filepath}"`, `java -cp "${classPath}" "${className}"`)}\r`
+            : `javac "${filepath}" && java -cp "${classPath}" "${className}"\r`;
         },
         lang: "Java"
       },

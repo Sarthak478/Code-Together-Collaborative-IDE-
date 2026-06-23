@@ -1,11 +1,11 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { MonacoBinding } from "y-monaco"
 import * as Y from "yjs"
-import { HocuspocusProvider } from "@hocuspocus/provider"
 import { IndexeddbPersistence } from "y-indexeddb"
 
 import { LANGUAGES, THEMES, FONT_FAMILIES, EXT_TO_LANG } from "../constants/editorConfigs"
 import { loadPersonalPrefs, savePersonalPrefs } from "../utils/helpers"
+import { createManagedCollaborationProvider } from "../utils/collaborationProvider"
 import { buildExecutionWebSocketUrl } from "../utils/socketUrls"
 import useFileSystem from "./useFileSystem"
 import { WS_URL, API_URL, COLLAB_URL } from "../config"
@@ -90,7 +90,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     const hostToken = localStorage.getItem(`host_${roomId}`) || "";
     const authUrl = `${WS_URL}?username=${encodeURIComponent(username)}&hostToken=${encodeURIComponent(hostToken)}`;
 
-    const provider = new HocuspocusProvider({
+    const provider = createManagedCollaborationProvider({
       url: authUrl,
       name: roomId,
       document: ydoc,
@@ -179,6 +179,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     error: ""
   })
   const lastToastId = useRef(null)
+  const collabErrorShownRef = useRef(false)
 
   const refreshGitStatus = useCallback(async () => {
     if (!roomId) return
@@ -307,6 +308,26 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
   useEffect(() => {
     refreshGitStatus()
   }, [refreshGitStatus])
+
+  useEffect(() => {
+    const handleDisconnect = () => {
+      if (collabErrorShownRef.current) return
+      collabErrorShownRef.current = true
+      addToast("Collaboration server is temporarily unavailable. Retrying has been paused.")
+    }
+
+    const handleConnect = () => {
+      collabErrorShownRef.current = false
+    }
+
+    editor.provider.on("disconnect", handleDisconnect)
+    editor.provider.on("connect", handleConnect)
+
+    return () => {
+      editor.provider.off("disconnect", handleDisconnect)
+      editor.provider.off("connect", handleConnect)
+    }
+  }, [editor.provider, addToast])
 
   useEffect(() => {
     if (isHost && editor.roomMap) {

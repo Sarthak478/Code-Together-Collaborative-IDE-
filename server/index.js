@@ -68,11 +68,13 @@ app.options(/.*/, cors(corsOptions));
 app.use((req, res, next) => {
     const host = req.header("host") || "";
     const forwardedProto = req.header("x-forwarded-proto");
+    const upgradeHeader = String(req.header("upgrade") || "").toLowerCase();
     const isLocalHost = /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(host);
 
     if (
         process.env.NODE_ENV === "production" &&
         !isLocalHost &&
+        upgradeHeader !== "websocket" &&
         forwardedProto &&
         forwardedProto !== "https"
     ) {
@@ -92,12 +94,14 @@ app.use(helmet({
             "font-src": ["'self'", "https://fonts.gstatic.com"],
             "connect-src": [
                 "'self'", 
+                "data:",
                 "https://code-together-collaborative-ide.onrender.com", 
                 "wss://code-together-collaborative-ide.onrender.com",
                 "https://code-together.me",
                 "wss://code-together.me",
                 "http://localhost:*",
-                "ws://localhost:*"
+                "ws://localhost:*",
+                "wss://localhost:*"
             ],
             "img-src": ["'self'", "data:", "blob:", "https://cdn.jsdelivr.net"],
             "worker-src": ["'self'", "blob:"],

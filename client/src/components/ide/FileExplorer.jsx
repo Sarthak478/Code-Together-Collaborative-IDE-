@@ -208,7 +208,10 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
       setPendingFolderImport({ files, rootName, count: files.length })
     } else {
       // File import: proceed directly
-      if (fs.importFiles) await fs.importFiles(files, "/")
+      if (fs.importFiles) {
+        const result = await fs.importFiles(files, "/")
+        if (result?.error) addToast?.(`⚠️ ${result.error}`)
+      }
     }
     if (fileInputRef.current) fileInputRef.current.value = ""
     if (folderInputRef.current) folderInputRef.current.value = ""
@@ -218,7 +221,8 @@ export default function FileExplorer({ fs, activeFile, onFileClick, isHost, canE
     if (pendingFolderImport && fs.importFiles) {
       const files = pendingFolderImport.files
       setPendingFolderImport(null)
-      await fs.importFiles(files, "/")
+      const result = await fs.importFiles(files, "/")
+      if (result?.error) addToast?.(`⚠️ ${result.error}`)
     }
   }
 

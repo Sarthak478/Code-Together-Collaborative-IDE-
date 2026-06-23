@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect, useRef, useMemo } from "react"
 import { EXT_TO_LANG } from "../constants/editorConfigs"
 import { API_URL } from "../config"
+import { syncFilesBatch } from "../utils/batchSync"
 const IGNORE_PATTERNS = ["node_modules", ".git", "__pycache__", ".venv", ".pytest_cache", ".next", ".DS_Store"]
 
 export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHost) {
@@ -258,7 +259,7 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHos
 
   const importFiles = useCallback(async (files, parentPath = "/") => {
     const fileList = Array.from(files)
-    if (fileList.length === 0) return
+    if (fileList.length === 0) return { success: true }
 
     // Detect if this is a folder import (webkitRelativePath will have a root dir)
     const isFolder = fileList[0]?.webkitRelativePath?.includes("/")
@@ -289,6 +290,7 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHos
         })
       } catch (e) {
         console.error("Clear room error:", e)
+        return { success: false, error: "Backend workspace reset failed. Please try again when the server is available." }
       }
 
       // 3. Reset local tree state
@@ -299,67 +301,72 @@ export default function useFileSystem(ydoc, provider, isCreating, roomId, _isHos
 
     // Process in batches of 100 to prevent freezing
     const batchSize = 100
-    for (let i = 0; i < fileList.length; i += batchSize) {
-      const batch = fileList.slice(i, i + batchSize)
-      const syncPayload = []
+    try {
+      for (let i = 0; i < fileList.length; i += batchSize) {
+        const batch = fileList.slice(i, i + batchSize)
+        const syncPayload = []
 
-      await Promise.all(batch.map(async (file, index) => {
-        const fileIdx = i + index
-        const relativePath = file.webkitRelativePath || file.name
+        await Promise.all(batch.map(async (file, index) => {
+          const fileIdx = i + index
+          const relativePath = file.webkitRelativePath || file.name
 
-        const ignored = isPathIgnored(relativePath)
-        if (ignored) return
+          const ignored = isPathIgnored(relativePath)
+          if (ignored) return
 
-        setImportProgress(prev => ({ ...prev, current: fileIdx + 1, fileName: file.name }))
+          setImportProgress(prev => ({ ...prev, current: fileIdx + 1, fileName: file.name }))
 
-        let filePath = parentPath === "/" ? "/" + relativePath : parentPath + "/" + relativePath
-        filePath = filePath.replace(/\/\//g, "/") // normalize
+          let filePath = parentPath === "/" ? "/" + relativePath : parentPath + "/" + relativePath
+          filePath = filePath.replace(/\/\//g, "/") // normalize
 
-        // Read file content
-        const content = await new Promise((resolve) => {
-          const reader = new FileReader()
-          reader.onload = (e) => resolve(e.target.result)
-          reader.readAsText(file)
-        })
-
-        syncPayload.push({
-          path: filePath,
-          content: content
-        })
-
-        const ytext = getFileText(filePath)
-        const CHUNK_SIZE = 50000 // 50KB chunks
-
-        if (content.length > CHUNK_SIZE) {
-          ydoc.transact(() => {
-            if (ytext.length > 0) ytext.delete(0, ytext.length)
-            for (let k = 0; k < content.length; k += CHUNK_SIZE) {
-              ytext.insert(k, content.slice(k, k + CHUNK_SIZE))
-            }
+          const content = await new Promise((resolve) => {
+            const reader = new FileReader()
+            reader.onload = (e) => resolve(e.target.result)
+            reader.readAsText(file)
           })
-        } else {
-          ydoc.transact(() => {
-            if (ytext.length > 0) ytext.delete(0, ytext.length)
-            ytext.insert(0, content)
-          })
-        }
-      }))
 
-      if (syncPayload.length > 0) {
-        try {
-          await fetch(`${API_URL}/sync`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ roomId, files: syncPayload })
+          syncPayload.push({
+            path: filePath,
+            content: content
           })
-        } catch (e) {
-          console.error("Batch sync error:", e)
+
+          const ytext = getFileText(filePath)
+          const CHUNK_SIZE = 50000
+
+          if (content.length > CHUNK_SIZE) {
+            ydoc.transact(() => {
+              if (ytext.length > 0) ytext.delete(0, ytext.length)
+              for (let k = 0; k < content.length; k += CHUNK_SIZE) {
+                ytext.insert(k, content.slice(k, k + CHUNK_SIZE))
+              }
+            })
+          } else {
+            ydoc.transact(() => {
+              if (ytext.length > 0) ytext.delete(0, ytext.length)
+              ytext.insert(0, content)
+            })
+          }
+        }))
+
+        if (syncPayload.length > 0) {
+          await syncFilesBatch({
+            apiUrl: API_URL,
+            roomId,
+            files: syncPayload,
+          })
         }
       }
-    }
 
-    setImportProgress(null)
-    refreshPath(parentPath)
+      refreshPath(parentPath)
+      return { success: true }
+    } catch (e) {
+      console.error("Batch sync error:", e)
+      return {
+        success: false,
+        error: e.message || "Backend sync failed. Please retry once the server is healthy."
+      }
+    } finally {
+      setImportProgress(null)
+    }
   }, [roomId, getFileText, ydoc, refreshPath, tree, isPathIgnored])
 
   /* ── Tree helpers ── */
