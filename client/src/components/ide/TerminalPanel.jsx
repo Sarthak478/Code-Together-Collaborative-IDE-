@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { API_URL } from "../../config"
+import { buildTerminalWebSocketUrl } from "../../utils/socketUrls"
 import { Plus, X } from "lucide-react"
 
 /**
@@ -61,7 +62,7 @@ function TerminalInstance({ roomId, terminalId, isActive, isDark, onAskRalph, on
         fitRef.current = fitAddon
 
         // Connect to server terminal WebSocket WITH terminalId
-        ws = new WebSocket(`${API_URL.replace("http","ws")}/terminal?roomId=${encodeURIComponent(roomId)}&terminalId=${terminalId}`)
+        ws = new WebSocket(`${buildTerminalWebSocketUrl(API_URL, window.location.protocol)}?roomId=${encodeURIComponent(roomId)}&terminalId=${terminalId}`)
         wsRef.current = ws
 
         ws.onopen = () => {

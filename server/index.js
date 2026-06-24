@@ -371,3 +371,16 @@ httpServer.listen(PORT, () => {
         console.warn(`[collaboration] Disabled because the collaboration server dependency failed to load: ${collaboration.error.message}`);
     }
 });
+
+const gracefulShutdown = () => {
+    console.log("Gracefully shutting down server...");
+    httpServer.close(() => {
+        console.log("Server closed.");
+        process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 5000);
+};
+
+process.once('SIGUSR2', gracefulShutdown); // Nodemon restarts
+process.once('SIGINT', gracefulShutdown);
+process.once('SIGTERM', gracefulShutdown);
