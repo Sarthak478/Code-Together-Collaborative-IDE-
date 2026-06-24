@@ -137,6 +137,11 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
 
   /* ── File System ── */
   const fs = useFileSystem(editor.ydoc, editor.provider, isCreating, roomId, isHost)
+  const fsRef = useRef(fs)
+
+  useEffect(() => {
+    fsRef.current = fs
+  }, [fs])
 
   /* ── Open Files & Tabs ── */
   const [openFiles, setOpenFiles] = useState([])
@@ -426,12 +431,12 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
           setOutput(data.output || "(no output)")
         } else if (data.type === "fs:changed") {
           console.log(`[IDE Room] Received fs:changed for path ${data.path}. Refreshing parent ${data.parentPath}`)
-          fs.refreshPath(data.parentPath)
+          fsRef.current?.refreshPath?.(data.parentPath)
           if (data.eventType === "change" || data.eventType === "add") {
-            fs.reloadFileContentFromDisk?.(data.path)
+            fsRef.current?.reloadFileContentFromDisk?.(data.path)
           }
           if (data.eventType === "unlink") {
-            const ytext = fs.getFileText?.(data.path)
+            const ytext = fsRef.current?.getFileText?.(data.path)
             if (ytext && ytext.length > 0) {
               editor.ydoc.transact(() => {
                 ytext.delete(0, ytext.length)
@@ -460,7 +465,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
       cancelAnimationFrame(frameId)
       ws.close()
     }
-  }, [editor, recalcHost, roomId, onLeave, username, fs, isHost])
+  }, [editor, recalcHost, roomId, onLeave, username])
 
 
   /* ── Broadcast Active File ── */

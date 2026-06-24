@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { motion as Motion, AnimatePresence } from "framer-motion"
 import { API_URL } from "../config"
 import Editor from "@monaco-editor/react"
@@ -32,12 +32,17 @@ export default function IDERoom(props) {
   // Ralph Automation State
   const [ralphPrompt, setRalphPrompt] = useState(null)
   const [sendTerminalCommand, setSendTerminalCommand] = useState(null)
+  const rightPanelRef = useRef(ide.rightPanel)
+
+  useEffect(() => {
+    rightPanelRef.current = ide.rightPanel
+  }, [ide.rightPanel])
 
   const handleAskRalph = useCallback((log) => {
     // Open AI panel if not already open
-    if (ide.rightPanel !== "ai") ide.toggleRightPanel("ai")
+    if (rightPanelRef.current !== "ai") ide.toggleRightPanel("ai")
     setRalphPrompt("I encountered this error in my terminal. Analyze it and provide a fix:\n\n```\n" + log + "\n```")
-  }, [ide])
+  }, [ide.toggleRightPanel])
 
   const handleSendCommandReady = useCallback((sendFn) => {
     setSendTerminalCommand(() => sendFn)
