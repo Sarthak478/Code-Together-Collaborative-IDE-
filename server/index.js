@@ -95,13 +95,9 @@ app.use(helmet({
             "connect-src": [
                 "'self'", 
                 "data:",
-                "https://code-together-collaborative-ide.onrender.com", 
-                "wss://code-together-collaborative-ide.onrender.com",
-                "https://code-together.me",
-                "wss://code-together.me",
-                "http://localhost:*",
-                "ws://localhost:*",
-                "wss://localhost:*"
+                "https:",
+                "wss:",
+                "ws:"
             ],
             "img-src": ["'self'", "data:", "blob:", "https://cdn.jsdelivr.net"],
             "worker-src": ["'self'", "blob:"],

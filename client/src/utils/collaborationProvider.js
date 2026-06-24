@@ -6,10 +6,10 @@ export function getCollaborationWebsocketConfig(url) {
     autoConnect: true,
     delay: 1000,
     factor: 2,
-    maxAttempts: 4,
+    maxAttempts: 0,
     maxDelay: 8000,
     minDelay: 1000,
-    timeout: 15000,
+    timeout: 60000,
     jitter: true,
   }
 }
