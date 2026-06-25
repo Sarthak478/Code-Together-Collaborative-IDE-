@@ -7,6 +7,7 @@ import { LANGUAGES, THEMES, FONT_FAMILIES, CURSORS } from "../constants/editorCo
 import { ROOM_MODES } from "../constants/roomModes"
 import { loadPersonalPrefs, savePersonalPrefs } from "../utils/helpers"
 import { buildExecutionWebSocketUrl } from "../utils/socketUrls"
+import { ReconnectingWebSocket } from "../utils/reconnectingWebSocket"
 import { WS_URL, API_URL, COLLAB_URL } from "../config"
 
 /* ─── useEditorRoom Hook ────────────────────────────────────────── */
@@ -241,7 +242,7 @@ export default function useEditorRoom({ roomId, initialRoomType, isCreating, use
       recalcHost()
     }, 0)
 
-    const ws = new WebSocket(buildExecutionWebSocketUrl(API_URL, window.location.protocol))
+    const ws = new ReconnectingWebSocket(buildExecutionWebSocketUrl(API_URL, window.location.protocol))
     ws.onopen = () => ws.send(JSON.stringify({ type: "join", roomId }))
     ws.onmessage = (event) => {
       try {

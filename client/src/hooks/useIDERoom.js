@@ -7,6 +7,7 @@ import { LANGUAGES, THEMES, FONT_FAMILIES, EXT_TO_LANG } from "../constants/edit
 import { loadPersonalPrefs, savePersonalPrefs } from "../utils/helpers"
 import { createManagedCollaborationProvider } from "../utils/collaborationProvider"
 import { buildExecutionWebSocketUrl } from "../utils/socketUrls"
+import { ReconnectingWebSocket } from "../utils/reconnectingWebSocket"
 import useFileSystem from "./useFileSystem"
 import { WS_URL, API_URL, COLLAB_URL } from "../config"
 
@@ -418,7 +419,7 @@ export default function useIDERoom({ roomId, initialRoomType, isCreating, userna
     const frameId = requestAnimationFrame(recalcHost)
 
     // Execution WS
-    const ws = new WebSocket(buildExecutionWebSocketUrl(API_URL, window.location.protocol))
+    const ws = new ReconnectingWebSocket(buildExecutionWebSocketUrl(API_URL, window.location.protocol))
     ws.onopen = () => ws.send(JSON.stringify({ type: "join", roomId }))
     ws.onmessage = (event) => {
       try {
