@@ -89,9 +89,9 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             "default-src": ["'self'"],
-            "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'", "blob:", "https://cdn.jsdelivr.net", "data:"],
-            "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-            "font-src": ["'self'", "https://fonts.gstatic.com"],
+            "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'", "blob:", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "data:"],
+            "style-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
+            "font-src": ["'self'", "data:", "https:"],
             "connect-src": [
                 "'self'", 
                 "data:",
@@ -99,7 +99,7 @@ app.use(helmet({
                 "wss:",
                 "ws:"
             ],
-            "img-src": ["'self'", "data:", "blob:", "https://cdn.jsdelivr.net"],
+            "img-src": ["'self'", "data:", "blob:", "https:"],
             "worker-src": ["'self'", "blob:"],
             "frame-src": ["'self'"],
             "frame-ancestors": ["'self'"],
