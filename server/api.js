@@ -570,6 +570,15 @@ const initAPI = (app, server) => {
 
     // Path must be /execution (or / for backward compatibility)
     if (url.pathname === "/execution" || url.pathname === "/") {
+      
+      // ✅ SEND INITIAL CONNECTION ACK
+      ws.send(JSON.stringify({ type: "connected", message: "WebSocket connection established" }));
+      console.log(`[WS] New connection on /execution`);
+      
+      // ✅ KEEP-ALIVE PING/PONG
+      ws.isAlive = true;
+      ws.on("pong", () => { ws.isAlive = true; });
+
       ws.on("message", (msg) => {
         try {
           const data = parseExecutionMessage(msg);
@@ -580,7 +589,6 @@ const initAPI = (app, server) => {
               roomClients.set(cleanRoomId, new Set());
             }
 
-            // Cancel any pending cleanup if a user joins
             if (roomCleanupTimers.has(cleanRoomId)) {
               console.log(`[WS] User joined ${cleanRoomId}. Cancelling pending cleanup.`);
               clearTimeout(roomCleanupTimers.get(cleanRoomId));
@@ -607,7 +615,6 @@ const initAPI = (app, server) => {
           const clients = roomClients.get(ws.roomId);
           clients.delete(ws);
 
-          // Automatic 60-second cleanup if room is empty
           if (clients.size === 0) {
             console.log(`[WS] Room ${ws.roomId} is empty. Scheduling cleanup in 60s...`);
             const timerId = setTimeout(() => cleanupRoomFolder(ws.roomId), 60000);
@@ -618,7 +625,22 @@ const initAPI = (app, server) => {
     }
   });
 
+// ✅ KEEP-ALIVE: Send periodic pings to all WebSocket clients
+  const keepAliveInterval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+      if (!ws.isAlive) {
+        ws.terminate();
+        return;
+      }
+      ws.isAlive = false;
+      ws.ping();
+    });
+  }, 30000); // Ping every 30 seconds
 
+  // Clean up interval on server shutdown
+  server.on("close", () => {
+    clearInterval(keepAliveInterval);
+  });
   /* -------------------- BROADCAST -------------------- */
 
   function broadcast(roomId, message) {
